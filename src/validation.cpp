@@ -4824,7 +4824,9 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, const Co
     if (pindexPrev && pindexPrev->nTime >= consensusParams.nPPSwitchTime && block.nTime < consensusParams.nPPSwitchTime)
         return state.Invalid(false, REJECT_INVALID, "bad-blk-progpow-state", "Cannot go back from ProgPOW");
 
-    if (pindexPrev && pindexPrev->nTime >= consensusParams.stage3StartTime && block.nTime < consensusParams.stage3StartTime)
+    if (pindexPrev && 
+        (consensusParams.stage3StartTime < 0 || pindexPrev->nTime >= static_cast<uint32_t>(consensusParams.stage3StartTime)) && 
+        (consensusParams.stage3StartTime > 0 && block.nTime < static_cast<uint32_t>(consensusParams.stage3StartTime)))
         return state.Invalid(false, REJECT_INVALID, "bad-blk-stage3-state", "Cannot go back to 5 minutes between blocks");
 
     if (block.IsProgPow() && block.nHeight != nHeight)
@@ -4840,7 +4842,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, const Co
                               ? pindexPrev->GetMedianTimePast()
                               : block.GetBlockTime();
 
-    bool fDIP0003Active_context = nHeight >= consensusParams.DIP0003Height;
+    bool fDIP0003Active_context = (consensusParams.DIP0003Height < 0 || nHeight >= static_cast<uint32_t>(consensusParams.DIP0003Height));
 
     // Check that all transactions are finalized
     for (const auto& tx : block.vtx) {
@@ -4853,10 +4855,10 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, const Co
         }
     }
 
-    if (nHeight >= consensusParams.nSubsidyHalvingFirst) {
-        if (block.nTime >= consensusParams.stage3StartTime) {
-            bool fStage3 = nHeight < consensusParams.nSubsidyHalvingSecond;
-            bool fStage4 = nHeight >= consensusParams.stage4StartBlock;
+    if (consensusParams.nSubsidyHalvingFirst < 0 || nHeight >= static_cast<uint32_t>(consensusParams.nSubsidyHalvingFirst)) {
+        if (consensusParams.stage3StartTime < 0 || block.nTime >= static_cast<uint32_t>(consensusParams.stage3StartTime)) {
+            bool fStage3 = consensusParams.nSubsidyHalvingSecond > 0 && nHeight < static_cast<uint32_t>(consensusParams.nSubsidyHalvingSecond);
+            bool fStage4 = consensusParams.stage4StartBlock < 0 || nHeight >= static_cast<uint32_t>(consensusParams.stage4StartBlock);
             CAmount devPayoutValue = 0, communityPayoutValue = 0;
             CScript devPayoutScript = GetScriptForDestination(CBitcoinAddress(consensusParams.stage3DevelopmentFundAddress).Get());
             CScript communityPayoutScript = GetScriptForDestination(CBitcoinAddress(consensusParams.stage3CommunityFundAddress).Get());

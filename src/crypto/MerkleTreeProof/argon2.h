@@ -205,7 +205,7 @@ typedef struct Argon2_Context {
     uint32_t adlen; /* associated data length */
 
     uint32_t t_cost;  /* number of passes */
-    uint32_t m_cost;  /* amount of memory requested (KB) */
+    uint64_t m_cost;  /* amount of memory requested (KB) */
     uint32_t lanes;   /* number of lanes */
     uint32_t threads; /* maximum number of threads */
 

@@ -3537,12 +3537,13 @@ bool CWallet::GetCoinsToSpend(
             throw std::invalid_argument(
                 _("Can not choose coins within limit."));
     }
-
-    if (SelectMintCoinsForAmount(best_spend_val - roundedRequired * zeros, denominations, coinsToMint_out) != best_spend_val - roundedRequired * zeros) {
+    auto select_mint_coins_amount = SelectMintCoinsForAmount(best_spend_val - roundedRequired * zeros, denominations, coinsToMint_out);
+    if (select_mint_coins_amount < 0 || static_cast<uint64_t>(select_mint_coins_amount) != best_spend_val - roundedRequired * zeros) {
         throw std::invalid_argument(
             _("Problem with coin selection for re-mint while spending."));
     }
-    if (SelectSpendCoinsForAmount(best_spend_val, coins, coinsToSpend_out) != best_spend_val) {
+    select_mint_coins_amount = SelectSpendCoinsForAmount(best_spend_val, coins, coinsToSpend_out);
+    if (select_mint_coins_amount < 0 || static_cast<uint64_t>(select_mint_coins_amount) != best_spend_val) {
         throw std::invalid_argument(
             _("Problem with coin selection for spend."));
     }
@@ -5364,7 +5365,8 @@ bool CWallet::CreateLelantusMintTransactions(
                     if (nFeeRet >= nFeeNeeded) {
                         for (auto &usedCoin : setCoins) {
                             for (auto coin = itr->second.begin(); coin != itr->second.end(); coin++) {
-                                if (usedCoin.first == coin->tx && usedCoin.second == coin->i) {
+                                if (usedCoin.first == coin->tx && 
+                                    (coin->i >= 0 && usedCoin.second == static_cast<unsigned int>(coin->i))) {
                                     itr->first -= coin->tx->tx->vout[coin->i].nValue;
                                     itr->second.erase(coin);
                                     break;
@@ -5617,7 +5619,7 @@ std::string CWallet::MintAndStoreLelantus(const CAmount& value,
     }
 
 
-    if ((value + payTxFee.GetFeePerK()) > GetBalance())
+    if (value + payTxFee.GetFeePerK() > GetBalance())
         return _("Insufficient funds");
 
     LogPrintf("payTxFee.GetFeePerK()=%s\n", payTxFee.GetFeePerK());
@@ -5686,7 +5688,8 @@ std::string CWallet::MintAndStoreSpark(
     for (auto& output : outputs)
         value += output.v;
 
-    if ((value + payTxFee.GetFeePerK()) > GetBalance())
+    const CAmount balance = GetBalance();
+    if (balance < 0 || (value + payTxFee.GetFeePerK()) > static_cast<uint64_t>(balance))
         return _("Insufficient funds");
 
     LogPrintf("payTxFee.GetFeePerK()=%s\n", payTxFee.GetFeePerK());

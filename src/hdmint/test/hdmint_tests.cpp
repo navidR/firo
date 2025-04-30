@@ -64,9 +64,9 @@ BOOST_AUTO_TEST_CASE(deterministic)
     std::vector<sigma::PrivateCoin> privCoins;
     const auto& sigmaParams = sigma::Params::get_default();
 
-    int mempoolCount = 0;
+    std::size_t mempoolCount = 0;
 
-    for(int i = 0; i < denominations.size() - 1; i++)
+    for(size_t i = 0; i < denominations.size() - 1; i++)
     {
         vDMintsBuilder.clear();
         denominationsForTx.clear();
@@ -111,7 +111,7 @@ BOOST_AUTO_TEST_CASE(deterministic)
     sigmaState->Reset();
     pwalletMain->ZapSigmaMints();
 
-    for(int i = 0; i < denominations.size() - 1; i++)
+    for(size_t i = 0; i < denominations.size() - 1; i++)
     {
         vDMintsBuilder.clear();
         denominationsForTx.clear();
@@ -145,7 +145,7 @@ BOOST_AUTO_TEST_CASE(deterministic)
 
     BOOST_CHECK(vDMints.size() == vDMintsRegenerated.size());
 
-    for(int i=0; i<vDMints.size();i++){
+    for(size_t i=0; i<vDMints.size();i++){
         BOOST_CHECK(vDMints[i].GetCount() == vDMintsRegenerated[i].GetCount());
         BOOST_CHECK(vDMints[i].GetSeedId() == vDMintsRegenerated[i].GetSeedId());
         BOOST_CHECK(vDMints[i].GetSerialHash() == vDMintsRegenerated[i].GetSerialHash());
@@ -261,7 +261,7 @@ BOOST_AUTO_TEST_CASE(blockchain_restore)
     vector<CHDMint> vDMintsBuilder;
     const auto& sigmaParams = sigma::Params::get_default();
 
-    for(int i = 0; i < denominations.size() - 1; i++)
+    for(size_t i = 0; i < denominations.size() - 1; i++)
     {
         vDMintsBuilder.clear();
         denominationsForTx.clear();
@@ -331,9 +331,9 @@ BOOST_AUTO_TEST_CASE(blockchain_restore)
 
     BOOST_CHECK(vDMints.size() == vDMintsRegenerated.size());
 
-    for(int i=0; i<vDMints.size();i++){
+    for(size_t i=0; i<vDMints.size();i++){
         bool found = false;
-        for(int j=0; (j<vDMintsRegenerated.size())||!found;j++){
+        for(size_t j=0; (j<vDMintsRegenerated.size())||!found;j++){
             if(vDMints[i].GetCount() == vDMintsRegenerated[j].GetCount()){
                 BOOST_CHECK(vDMints[i].GetCount() == vDMintsRegenerated[j].GetCount());
                 BOOST_CHECK(vDMints[i].GetSeedId() == vDMintsRegenerated[j].GetSeedId());

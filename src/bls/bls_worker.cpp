@@ -84,16 +84,19 @@ bool CBLSWorker::GenerateContributions(int quorumThreshold, const BLSIdVector& i
     std::list<std::future<bool> > futures;
     size_t batchSize = 8;
 
-    for (size_t i = 0; i < quorumThreshold; i += batchSize) {
-        size_t start = i;
-        size_t count = std::min(batchSize, quorumThreshold - start);
-        auto f = [&, start, count](int threadId) {
-            for (size_t j = start; j < start + count; j++) {
-                (*vvecRet)[j] = (*svec)[j].GetPublicKey();
-            }
-            return true;
-        };
-        futures.emplace_back(workerPool.push(f));
+    if (quorumThreshold > 0)
+    {
+        for (size_t i = 0; i < static_cast<size_t>(quorumThreshold); i += batchSize) {
+            size_t start = i;
+            size_t count = std::min(batchSize, quorumThreshold - start);
+            auto f = [&, start, count](int threadId) {
+                for (size_t j = start; j < start + count; j++) {
+                    (*vvecRet)[j] = (*svec)[j].GetPublicKey();
+                }
+                return true;
+            };
+            futures.emplace_back(workerPool.push(f));
+        }
     }
 
     for (size_t i = 0; i < ids.size(); i += batchSize) {
