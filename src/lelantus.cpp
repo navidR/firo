@@ -1384,7 +1384,7 @@ void CLelantusState::RemoveBlock(CBlockIndex *index) {
         if (nMintsToForget == 0)
             continue;
 
-        assert(coinGroup.nCoins >= nMintsToForget);
+        assert(coinGroup.nCoins >= static_cast<int>(nMintsToForget));
         auto isExtended = coins.first > 1;
         coinGroup.nCoins -= nMintsToForget;
 

@@ -116,11 +116,11 @@ static int _convertBase(
 {
     memset(dst, 0, sizeof(Value) * Len);
 
-    int resLen = 0;
+    size_t resLen = 0;
     for (auto iter = begin; iter != end; iter++) {
         int carry = *iter;
 
-        for (int i = 0; i < resLen || carry != 0; i++) {
+        for (size_t i = 0; i < resLen || carry != 0; i++) {
             if (i == resLen) {
                 resLen++;
             }
@@ -135,7 +135,7 @@ static int _convertBase(
         }
     }
 
-    for (int i = 0; i < Len / 2; i++) {
+    for (size_t i = 0; i < Len / 2; i++) {
         unsigned char tmp = dst[i];
         dst[i] = dst[Len - i - 1];
         dst[Len - i - 1] = tmp;
@@ -191,7 +191,7 @@ static void _convertToFieldElement(secp256k1_fe *r, const char* str, int base) {
     auto strLen = strlen(str);
     std::vector<uint8_t> src(strLen, 0);
 
-    for (int i = 0; i < strLen; i++) {
+    for (size_t i = 0; i < strLen; i++) {
         char ch = str[i];
 
         switch (base) {
