@@ -5229,17 +5229,6 @@ UniValue removetxwallet(const JSONRPCRequest& request) {
     return NullUniValue;
 }
 
-
-
-extern UniValue dumpprivkey_firo(const JSONRPCRequest& request); // in rpcdump.cpp
-extern UniValue importprivkey(const JSONRPCRequest& request);
-extern UniValue importaddress(const JSONRPCRequest& request);
-extern UniValue importpubkey(const JSONRPCRequest& request);
-extern UniValue dumpwallet_firo(const JSONRPCRequest& request);
-extern UniValue importwallet(const JSONRPCRequest& request);
-extern UniValue importprunedfunds(const JSONRPCRequest& request);
-extern UniValue removeprunedfunds(const JSONRPCRequest& request);
-
 // Calculate the size of the transaction assuming all signatures are max size
 // Use DummySignatureCreator, which inserts 72 byte signatures everywhere.
 // TODO: re-use this in CWallet::CreateTransaction (right now
@@ -5853,10 +5842,6 @@ UniValue setusednumber(const JSONRPCRequest& request)
 }
 
 /******************************************************************************/
-
-extern UniValue dumpprivkey(const JSONRPCRequest& request); // in rpcdump.cpp
-extern UniValue dumpwallet(const JSONRPCRequest& request);
-extern UniValue importmulti(const JSONRPCRequest& request);
 
 static const CRPCCommand commands[] =
 { //  category              name                        actor (function)           okSafeMode
