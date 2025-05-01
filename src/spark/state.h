@@ -56,6 +56,7 @@ std::vector<spark::Coin>  GetSparkMintCoins(const CTransaction &tx);
 
 size_t GetSpendInputs(const CTransaction &tx);
 CAmount GetSpendTransparentAmount(const CTransaction& tx);
+unsigned char GetNetworkType();
 
 bool CheckSparkBlock(CValidationState &state, const CBlock& block);
 
