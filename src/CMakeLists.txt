@@ -81,6 +81,9 @@ endif()
 #=============================
 message("")
 message("Configuring secp256k1 subtree...")
+# We need SECP256K1_BUILD to prevent nonnull warnings
+# Basically saying to SECP256K1 we are building it.
+add_compile_definitions(SECP256K1_BUILD=1)
 set(SECP256K1_DISABLE_SHARED ON CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_ECDH ON CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_RECOVERY ON CACHE BOOL "" FORCE)
