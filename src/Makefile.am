@@ -11,6 +11,10 @@ AM_CPPFLAGS += -I$(srcdir)/wallet -I$(srcdir)/../src/wallet -I$(srcdir) -I$(srcd
 AM_LIBTOOLFLAGS = --preserve-dup-deps
 EXTRA_LIBRARIES =
 
+AM_CPPFLAGS += -I$(srcdir) -I$(srcdir)/../src
+# Add the directory containing compat_macros.h
+AM_CPPFLAGS += -I$(srcdir)/../src
+
 noinst_LTLIBRARIES =
 
 if ENABLE_CRASH_HOOKS
