@@ -9,6 +9,7 @@
 
 #include "platformstyle.h"
 #include "validation.h"
+#include "compat_macros.h"
 
 #include <QStyle>
 #include <QMessageBox>
@@ -117,7 +118,7 @@ bool CreateSparkNamePage::CreateSparkNameTransaction(const std::string &name, co
         assert(!name.empty() && name.length() <= CSparkNameManager::maximumSparkNameLength);
 
         CAmount sparkNameFee = consensusParams.nSparkNamesFee[name.length()]*COIN*numberOfYears;
-        CAmount txFee;
+        FIRO_UNUSED CAmount txFee;
 
         WalletModelTransaction tx = model->initSparkNameTransaction(sparkNameFee);
 
