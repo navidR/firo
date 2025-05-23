@@ -1,10 +1,10 @@
 OSX_MIN_VERSION=10.15
-OSX_SDK_VERSION=11.0
-XCODE_VERSION=12.2
-XCODE_BUILD_ID=12B45b
+OSX_SDK_VERSION=15.4
+XCODE_VERSION=15.4
 LD64_VERSION=609
 
-OSX_SDK=$(SDK_PATH)/Xcode-$(XCODE_VERSION)-$(XCODE_BUILD_ID)-extracted-SDK-with-libcxx-headers
+# The new SDK tarball extracts to MacOSX15.4.sdk
+OSX_SDK=$(SDK_PATH)/MacOSX-$(XCODE_VERSION).sdk
 
 darwin_native_binutils=native_cctools
 
