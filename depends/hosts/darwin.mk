@@ -4,7 +4,7 @@ XCODE_VERSION=15.4
 LD64_VERSION=609
 
 # The new SDK tarball extracts to MacOSX15.4.sdk
-OSX_SDK=$(SDK_PATH)/MacOSX-$(XCODE_VERSION).sdk
+OSX_SDK=$(SDK_PATH)/MacOSX-$(XCODE_VERSION)
 
 darwin_native_binutils=native_cctools
 
