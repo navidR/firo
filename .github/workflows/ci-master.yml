@@ -389,12 +389,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y guix
+      - name: Update GUIX channel
+        run: |
           guix pull --url=https://codeberg.org/guix/guix-mirror
       - name: Run Guix Build
         run: |
           CORES=$(nproc)
           env HOSTS="${HOSTS}" \
-            ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" \
+            ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" FORCE_DIRTY_WORKTREE=1 \
             ./contrib/guix/guix-build
       - name: Prepare Files for Artifact
         run: |
@@ -423,12 +425,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y guix
+      - name: Update GUIX channel
+        run: |
           guix pull --url=https://codeberg.org/guix/guix-mirror
       - name: Run Guix Build
         run: |
           CORES=$(nproc)
           env HOSTS="${HOSTS}" \
-            ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" \
+            ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" FORCE_DIRTY_WORKTREE=1 \
             ./contrib/guix/guix-build
       - name: Prepare Files for Artifact
         run: |
@@ -467,6 +471,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y guix
+      - name: Update GUIX channel
+        run: |
           guix pull --url=https://codeberg.org/guix/guix-mirror
       - name: Run Guix Build
         run: |
@@ -474,7 +480,7 @@ jobs:
           export SDK_PATH="$(pwd)/depends/SDKs"
           env HOSTS="x86_64-apple-darwin" \
             SDK_PATH="$SDK_PATH" \
-            ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" \
+            ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" FORCE_DIRTY_WORKTREE=1 \
             ./contrib/guix/guix-build
       - name: Prepare Files for Artifact
         run: |
@@ -501,13 +507,19 @@ jobs:
       - name: Install Guix
         run: |
           sudo apt-get update
-          sudo apt-get install -y guix
+          sudo apt-get install -y guix automake
+      - name: Copy config.sub and config.guess
+        run: |
+          cp /usr/share/automake-*/config.sub depends/
+          cp /usr/share/automake-*/config.guess depends/
+      - name: Update GUIX channel
+        run: |
           guix pull --url=https://codeberg.org/guix/guix-mirror
       - name: Run Guix Build
         run: |
           CORES=$(nproc)
           env HOSTS="${HOSTS}" \
-            ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" \
+            ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" FORCE_DIRTY_WORKTREE=1 \
             ./contrib/guix/guix-build
       - name: Prepare Files for Artifact
         run: |
@@ -546,6 +558,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y guix
+      - name: Update GUIX channel
+        run: |
           guix pull --url=https://codeberg.org/guix/guix-mirror
       - name: Run Guix Build
         run: |
@@ -553,7 +567,7 @@ jobs:
           export SDK_PATH="$(pwd)/depends/SDKs"
           env HOSTS="arm64-apple-darwin" \
             SDK_PATH="$SDK_PATH" \
-            ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" \
+            ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" FORCE_DIRTY_WORKTREE=1 \
             ./contrib/guix/guix-build
       - name: Prepare Files for Artifact
         run: |
