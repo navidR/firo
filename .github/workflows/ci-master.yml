@@ -372,6 +372,7 @@ jobs:
         name: mac-autotools-binaries
         path: ${{ env.ARTIFACT_DIR }}
   build-guix-x86_64-linux-gnu:
+    if: false  # disabled for testing build-guix only
     name: Build for x86_64-linux-gnu (Guix)
     runs-on: ubuntu-22.04
     env:
@@ -405,6 +406,7 @@ jobs:
           name: guix-binaries-x86_64-linux-gnu
           path: ${{ env.ARTIFACT_DIR }}
   build-guix-x86_64-w64-mingw32:
+    if: false  # disabled for testing build-guix only
     name: Build for x86_64-w64-mingw32 (Guix)
     runs-on: ubuntu-22.04
     env:
