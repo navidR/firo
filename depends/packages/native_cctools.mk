@@ -17,7 +17,8 @@ define $(package)_set_vars
 endef
 
 define $(package)_preprocess_cmds
-  cp -f $(BASEDIR)/config.guess $(BASEDIR)/config.sub cctools
+  cp -f $(BASEDIR)/config.guess $(BASEDIR)/config.sub cctools && \
+  cd cctools && ./autogen.sh
 endef
 
 define $(package)_config_cmds
