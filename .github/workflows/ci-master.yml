@@ -469,7 +469,7 @@ jobs:
       - name: Run Guix Build
         run: |
           CORES=$(nproc)
-          export SDK_PATH="$(pwd)/depends/SDKs/MacOSX-15.4.sdk"
+          export SDK_PATH="$(pwd)/depends/SDKs/MacOSX-15.4"
           env HOSTS="x86_64-apple-darwin" \
             SDK_PATH="$SDK_PATH" \
             ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" \
@@ -542,13 +542,14 @@ jobs:
           python-version: '3.8'
       - name: Install Guix
         run: |
-          brew install guix || true
+          sudo apt-get update
+          sudo apt-get install -y guix
           guix pull --url=https://codeberg.org/guix/guix-mirror
       - name: Run Guix Build
         run: |
-          CORES=$(sysctl -n hw.ncpu)
-          export SDK_PATH="$(pwd)/depends/SDKs/MacOSX-15.4.sdk"
-          env HOSTS="${HOSTS}" \
+          CORES=$(nproc)
+          export SDK_PATH="$(pwd)/depends/SDKs/MacOSX-15.4"
+          env HOSTS="arm64-apple-darwin" \
             SDK_PATH="$SDK_PATH" \
             ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" \
             ./contrib/guix/guix-build
