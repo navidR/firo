@@ -471,7 +471,7 @@ jobs:
       - name: Run Guix Build
         run: |
           CORES=$(nproc)
-          export SDK_PATH="$(pwd)/depends/SDKs/MacOSX-15.4"
+          export SDK_PATH="$(pwd)/depends/SDKs"
           env HOSTS="x86_64-apple-darwin" \
             SDK_PATH="$SDK_PATH" \
             ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" \
@@ -550,7 +550,7 @@ jobs:
       - name: Run Guix Build
         run: |
           CORES=$(nproc)
-          export SDK_PATH="$(pwd)/depends/SDKs/MacOSX-15.4"
+          export SDK_PATH="$(pwd)/depends/SDKs"
           env HOSTS="arm64-apple-darwin" \
             SDK_PATH="$SDK_PATH" \
             ADDITIONAL_GUIX_COMMON_FLAGS="--cores=$CORES --max-jobs=$CORES" \
