@@ -13,6 +13,6 @@ sqlite_packages=sqlite
 
 zmq_packages=zeromq
 
-darwin_native_packages = native_mac_alias
+darwin_native_packages = 
 
 $(host_arch)_$(host_os)_native_packages += native_b2
