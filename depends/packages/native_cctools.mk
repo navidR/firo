@@ -4,7 +4,6 @@ $(package)_download_path=https://github.com/tpoechtrager/cctools-port/archive
 $(package)_file_name=cctools-$($(package)_version).tar.gz
 $(package)_sha256_hash=c88b0631b1d7bb5186dd6466a62f5220dc6191f2b2d9c7c122b327385e734aaf
 $(package)_build_subdir=cctools
-$(package)_dependencies=native_libtapi
 
 define $(package)_set_vars
   $(package)_config_opts=--target=$(host)
