@@ -74,11 +74,10 @@ mkdir -p "$VERSION_BASE"
 ################
 
 # Default to building for all supported HOSTs (overridable by environment)
-export HOSTS="${HOSTS:-x86_64-linux-gnu 
+# powerpc64le-linux-gnu currently disabled due non-determinism issues across build arches.
+export HOSTS="${HOSTS:-x86_64-linux-gnu arm-linux-gnueabihf aarch64-linux-gnu riscv64-linux-gnu powerpc64-linux-gnu
                        x86_64-w64-mingw32
-                       x86_64-apple-darwin 
-                       aarch64-linux-gnu
-                       arm64-apple-darwin}"
+                       x86_64-apple-darwin arm64-apple-darwin}"
 
 # Usage: distsrc_for_host HOST
 #
@@ -123,7 +122,7 @@ else
 fi
 
 ################
-# When building for darwin, the macOS SDK should exists
+# When building for darwin, the macOS SDK should exist
 ################
 
 for host in $HOSTS; do
@@ -132,8 +131,9 @@ for host in $HOSTS; do
             OSX_SDK="$(make -C "${PWD}/depends" --no-print-directory HOST="$host" print-OSX_SDK | sed 's@^[^=]\+=@@g')"
             if [ -e "$OSX_SDK" ]; then
                 echo "Found macOS SDK at '${OSX_SDK}', using..."
+                break
             else
-                echo "macOS SDK does not exist at '${OSX_SDK}', please place the extracted, untarred SDK there to perform darwin builds, exiting..."
+                echo "macOS SDK does not exist at '${OSX_SDK}', please place the extracted, untarred SDK there to perform darwin builds, or define SDK_PATH environment variable. Exiting..."
                 exit 1
             fi
             ;;
@@ -148,9 +148,9 @@ avail_KiB="$(df -Pk "$VERSION_BASE" | sed 1d | tr -s ' ' | cut -d' ' -f4)"
 total_required_KiB=0
 for host in $HOSTS; do
     case "$host" in
-        *darwin*) required_KiB=1200000 ;;
-        *mingw*)  required_KiB=2900000 ;;
-        *)        required_KiB=2100000 ;;
+        *darwin*) required_KiB=440000 ;;
+        *mingw*)  required_KiB=7600000 ;;
+        *)        required_KiB=6400000 ;;
     esac
     total_required_KiB=$((total_required_KiB+required_KiB))
 done
@@ -194,7 +194,7 @@ fi
 
 if ! getent services http https ftp > /dev/null 2>&1; then
 cat << EOF
-ERR: Your system's C library can not find service database entries for at least
+ERR: Your system's C library cannot find service database entries for at least
      one of the following services: http, https, ftp.
 
 Hint: Most likely, /etc/services does not exist yet (common for docker images
@@ -235,21 +235,6 @@ host_to_commonname() {
 
 # Determine the reference time used for determinism (overridable by environment)
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -c log.showSignature=false log --format=%at -1)}"
-
-# Execute "$@" in a pinned, possibly older version of Guix, for reproducibility
-# across time.
-time-machine() {
-    # shellcheck disable=SC2086
-    guix time-machine --url=https://codeberg.org/guix/guix-mirror \
-                      --commit=aa34d4d28dfe25ba47d5800d05000fb7221788c0 \
-                      --cores="$JOBS" \
-                      --keep-failed \
-                      --fallback \
-                      ${SUBSTITUTE_URLS:+--substitute-urls="$SUBSTITUTE_URLS"} \
-                      ${ADDITIONAL_GUIX_COMMON_FLAGS} ${ADDITIONAL_GUIX_TIMEMACHINE_FLAGS} \
-                      -- "$@"
-}
-
 
 # Precious directories are those which should not be cleaned between successive
 # guix builds
@@ -371,17 +356,21 @@ INFO: Building ${VERSION:?not set} for platform triple ${HOST:?not set}:
       ...using reference timestamp: ${SOURCE_DATE_EPOCH:?not set}
       ...running at most ${JOBS:?not set} jobs
       ...from worktree directory: '${PWD}'
-          ...bind-mounted in container to: '/firo'
+          ...bind-mounted in container to: '/bitcoin'
       ...in build directory: '$(distsrc_for_host "$HOST")'
           ...bind-mounted in container to: '$(DISTSRC_BASE=/distsrc-base && distsrc_for_host "$HOST")'
       ...outputting in: '$(outdir_for_host "$HOST")'
           ...bind-mounted in container to: '$(OUTDIR_BASE=/outdir-base && outdir_for_host "$HOST")'
+      ADDITIONAL FLAGS (if set)
+          ADDITIONAL_GUIX_COMMON_FLAGS: ${ADDITIONAL_GUIX_COMMON_FLAGS}
+          ADDITIONAL_GUIX_ENVIRONMENT_FLAGS: ${ADDITIONAL_GUIX_ENVIRONMENT_FLAGS}
+          ADDITIONAL_GUIX_TIMEMACHINE_FLAGS: ${ADDITIONAL_GUIX_TIMEMACHINE_FLAGS}
 EOF
 
         # Run the build script 'contrib/guix/libexec/build.sh' in the build
         # container specified by 'contrib/guix/manifest.scm'.
         #
-        # Explanation of `guix environment` flags:
+        # Explanation of `guix shell` flags:
         #
         #   --container        run command within an isolated container
         #
@@ -405,16 +394,16 @@ EOF
         #   --share=SPEC       for containers, share writable host file system
         #                      according to SPEC
         #
-        #   --share="$PWD"=/firo
+        #   --share="$PWD"=/bitcoin
         #
-        #                     maps our current working directory to /firo
+        #                     maps our current working directory to /bitcoin
         #                     inside the isolated container, which we later cd
         #                     into.
         #
         #     While we don't want to map our current working directory to the
         #     same exact path (as this introduces irreproducibility), we do want
         #     it to be at a _fixed_ path _somewhere_ inside the isolated
-        #     container so that we have something to build. '/firo' was
+        #     container so that we have something to build. '/bitcoin' was
         #     chosen arbitrarily.
         #
         #   ${SOURCES_PATH:+--share="$SOURCES_PATH"}
@@ -444,11 +433,11 @@ EOF
         #    more information.
         #
         # shellcheck disable=SC2086,SC2031
-        time-machine environment --manifest="${PWD}/contrib/guix/manifest.scm" \
+        time-machine shell --manifest="${PWD}/contrib/guix/manifest.scm" \
                                  --container \
                                  --pure \
                                  --no-cwd \
-                                 --share="$PWD"=/firo \
+                                 --share="$PWD"=/bitcoin \
                                  --share="$DISTSRC_BASE"=/distsrc-base \
                                  --share="$OUTDIR_BASE"=/outdir-base \
                                  --expose="$(git rev-parse --git-common-dir)" \
@@ -473,7 +462,7 @@ EOF
                                         DISTSRC="$(DISTSRC_BASE=/distsrc-base && distsrc_for_host "$HOST")" \
                                         OUTDIR="$(OUTDIR_BASE=/outdir-base && outdir_for_host "$HOST")" \
                                         DIST_ARCHIVE_BASE=/outdir-base/dist-archive \
-                                      bash -c "cd /firo && bash contrib/guix/libexec/build.sh"
+                                        bash -c "cd /bitcoin && bash contrib/guix/libexec/build.sh"
     )
 
 done
