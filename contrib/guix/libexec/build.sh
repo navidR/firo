@@ -41,7 +41,6 @@ EOF
 
 ACTUAL_OUTDIR="${OUTDIR}"
 OUTDIR="${DISTSRC}/output"
-DISTNAME="firo-${HOST}-${VERSION}"
 
 # Use a fixed timestamp for depends builds so hashes match across commits that
 # don't make changes to the build system. This timestamp is only used for depends
@@ -398,6 +397,7 @@ mkdir -p "$DISTSRC"
 )  # $DISTSRC
 
 rm -rf "$ACTUAL_OUTDIR"
+echo "Moving $OUTDIR to $ACTUAL_OUTDIR"
 mv --no-target-directory "$OUTDIR" "$ACTUAL_OUTDIR" \
     || ( rm -rf "$ACTUAL_OUTDIR" && exit 1 )
 
