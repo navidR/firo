@@ -17,6 +17,10 @@ if(@depends_crosscompiling@)
   set(CMAKE_C_COMPILER_TARGET @host@)
   set(CMAKE_CXX_COMPILER_TARGET @host@)
   set(CMAKE_OBJCXX_COMPILER_TARGET @host@)
+
+  set(CMAKE_C_COMPILER_TARGET @host@)
+  set(CMAKE_CXX_COMPILER_TARGET @host@)
+  set(CMAKE_OBJCXX_COMPILER_TARGET @host@)
 endif()
 
 if(NOT DEFINED CMAKE_C_FLAGS_INIT)
@@ -101,10 +105,17 @@ set(CMAKE_OBJDUMP "@OBJDUMP@")
 set(CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH OFF)
 
 set(CMAKE_FIND_ROOT_PATH "${CMAKE_CURRENT_LIST_DIR}")
+set(CMAKE_FIND_ROOT_PATH "${CMAKE_CURRENT_LIST_DIR}")
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+set(QT_TRANSLATIONS_DIR "${CMAKE_CURRENT_LIST_DIR}/translations")
+
+# Make sure we only append once, as this file may be called repeatedly.
+if(NOT "/" IN_LIST CMAKE_PREFIX_PATH)
+  list(APPEND CMAKE_PREFIX_PATH "/")
+endif()
 set(QT_TRANSLATIONS_DIR "${CMAKE_CURRENT_LIST_DIR}/translations")
 
 # Make sure we only append once, as this file may be called repeatedly.
@@ -121,7 +132,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_HOST_APPLE)
 endif()
 
 
-if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD|Windows)$")
+if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
   # Customize pkg-config behavior for finding dependencies
   # of the xcb QPA platform plugin:
   # 1. Restrict search paths to the depends.
@@ -139,12 +150,18 @@ endif()
 # semantics as empty strings or strings containing only spaces.
 # Therefore, MATCHES must be used rather than STREQUAL.
 if("@qt_packages@" MATCHES "^[ ]*$")
+# The depends/Makefile can generate values with "not-set"
+# semantics as empty strings or strings containing only spaces.
+# Therefore, MATCHES must be used rather than STREQUAL.
+if("@qt_packages@" MATCHES "^[ ]*$")
   set(BUILD_GUI OFF CACHE BOOL "")
 else()
   set(BUILD_GUI ON CACHE BOOL "")
   set(Qt6_ROOT "${CMAKE_CURRENT_LIST_DIR}" CACHE PATH "")
+  set(Qt6_ROOT "${CMAKE_CURRENT_LIST_DIR}" CACHE PATH "")
 endif()
 
+if("@qrencode_packages@" MATCHES "^[ ]*$")
 if("@qrencode_packages@" MATCHES "^[ ]*$")
   set(WITH_QRENCODE OFF CACHE BOOL "")
 else()
@@ -152,17 +169,20 @@ else()
 endif()
 
 if("@zmq_packages@" MATCHES "^[ ]*$")
+if("@zmq_packages@" MATCHES "^[ ]*$")
   set(WITH_ZMQ OFF CACHE BOOL "")
 else()
   set(WITH_ZMQ ON CACHE BOOL "")
 endif()
 
 if("@wallet_packages@" MATCHES "^[ ]*$")
+if("@wallet_packages@" MATCHES "^[ ]*$")
   set(ENABLE_WALLET OFF CACHE BOOL "")
 else()
   set(ENABLE_WALLET ON CACHE BOOL "")
 endif()
 
+set(wallet_packages @wallet_packages@)
 set(wallet_packages @wallet_packages@)
 set(bdb_packages @bdb_packages@)
 if("${wallet_packages}" STREQUAL "" OR "${bdb_packages}" STREQUAL "")
@@ -171,6 +191,7 @@ else()
   set(WITH_BDB ON CACHE BOOL "")
 endif()
 
+if("@usdt_packages@" MATCHES "^[ ]*$")
 if("@usdt_packages@" MATCHES "^[ ]*$")
   set(WITH_USDT OFF CACHE BOOL "")
 else()
