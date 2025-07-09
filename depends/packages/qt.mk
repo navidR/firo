@@ -195,13 +195,10 @@ $(package)_cmake_opts := -DCMAKE_PREFIX_PATH=$(host_prefix)
 $(package)_cmake_opts += -DQT_FEATURE_cxx20=ON
 $(package)_cmake_opts += -DQT_ENABLE_CXX_EXTENSIONS=OFF
 
-ifneq ($(host),$(build))
 $(package)_cmake_opts += -DCMAKE_C_COMPILER=$$(firstword $$($(package)_cc))
 $(package)_cmake_opts += -DCMAKE_CXX_COMPILER=$$(firstword $$($(package)_cxx))
+ifneq ($(host),$(build))
 $(package)_cmake_opts += -DCMAKE_ASM_COMPILER=$$(firstword $$($(package)_cc))
-else
-$(package)_cmake_opts += -DCMAKE_C_COMPILER="$$($(package)_cc)"
-$(package)_cmake_opts += -DCMAKE_CXX_COMPILER="$$($(package)_cxx)"
 endif
 ifeq ($(host_os),mingw32)
 $(package)_cmake_opts += -DCMAKE_SYSTEM_NAME=Windows
