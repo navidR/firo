@@ -171,6 +171,11 @@ $(package)_config_opts_linux += -no-feature-xlib
 $(package)_config_opts_linux += -no-xcb-xlib
 $(package)_config_opts_linux += -pkg-config
 $(package)_config_opts_linux += -system-freetype
+$(package)_config_opts_linux += -fontconfig
+$(package)_config_opts_linux += -no-opengl
+$(package)_config_opts_linux += -no-feature-vulkan
+$(package)_config_opts_linux += -dbus-runtime
+$(package)_config_opts_linux += -feature-xcb
 ifneq ($(LTO),)
 $(package)_config_opts_linux += -ltcg
 endif
@@ -189,13 +194,15 @@ $(package)_config_env_darwin += OBJCXX="$$($(package)_cxx)"
 $(package)_cmake_opts := -DCMAKE_PREFIX_PATH=$(host_prefix)
 $(package)_cmake_opts += -DQT_FEATURE_cxx20=ON
 $(package)_cmake_opts += -DQT_ENABLE_CXX_EXTENSIONS=OFF
+
+ifneq ($(host),$(build))
+$(package)_cmake_opts += -DCMAKE_C_COMPILER=$$(firstword $$($(package)_cc))
+$(package)_cmake_opts += -DCMAKE_CXX_COMPILER=$$(firstword $$($(package)_cxx))
+$(package)_cmake_opts += -DCMAKE_ASM_COMPILER=$$(firstword $$($(package)_cc))
+else
 $(package)_cmake_opts += -DCMAKE_C_COMPILER="$$($(package)_cc)"
 $(package)_cmake_opts += -DCMAKE_CXX_COMPILER="$$($(package)_cxx)"
-ifneq ($(host),$(build))
-$(package)_cmake_opts += -DCMAKE_SYSTEM_NAME=$(host_os)
-$(package)_cmake_opts += -DCMAKE_SYSTEM_PROCESSOR=$(host_arch)
 endif
-# Windows-specific configuration
 ifeq ($(host_os),mingw32)
 $(package)_cmake_opts += -DCMAKE_SYSTEM_NAME=Windows
 $(package)_cmake_opts += -DCMAKE_RC_COMPILER=$$($(package)_windres)
@@ -205,10 +212,17 @@ $(package)_cmake_opts += --log-level=STATUS
 endif
 
 $(package)_cmake_opts += -DQT_USE_DEFAULT_CMAKE_OPTIMIZATION_FLAGS=ON
+
+ifneq ($(host),$(build))
+$(package)_cmake_opts += -DCMAKE_C_FLAGS="$$(wordlist 2,9999,$$($(package)_cc)) $$($(package)_cppflags) $$($$($(package)_type)_CFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
+$(package)_cmake_opts += -DCMAKE_CXX_FLAGS="$$(wordlist 2,9999,$$($(package)_cxx)) $$($(package)_cppflags) $$($$($(package)_type)_CXXFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
+$(package)_cmake_opts += -DCMAKE_ASM_FLAGS="$$(wordlist 2,9999,$$($(package)_cc))"
+else
 $(package)_cmake_opts += -DCMAKE_C_FLAGS="$$($(package)_cppflags) $$($$($(package)_type)_CFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
+$(package)_cmake_opts += -DCMAKE_CXX_FLAGS="$$($(package)_cppflags) $$($$($(package)_type)_CXXFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
+endif
 $(package)_cmake_opts += -DCMAKE_C_FLAGS_RELEASE="$$($$($(package)_type)_release_CFLAGS)"
 $(package)_cmake_opts += -DCMAKE_C_FLAGS_DEBUG="$$($$($(package)_type)_debug_CFLAGS)"
-$(package)_cmake_opts += -DCMAKE_CXX_FLAGS="$$($(package)_cppflags) $$($$($(package)_type)_CXXFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
 $(package)_cmake_opts += -DCMAKE_CXX_FLAGS_RELEASE="$$($$($(package)_type)_release_CXXFLAGS)"
 $(package)_cmake_opts += -DCMAKE_CXX_FLAGS_DEBUG="$$($$($(package)_type)_debug_CXXFLAGS)"
 $(package)_cmake_opts += -DCMAKE_EXE_LINKER_FLAGS="$$($$($(package)_type)_LDFLAGS)"
@@ -221,6 +235,7 @@ ifneq ($(host),$(build))
 $(package)_cmake_opts += -DCMAKE_SYSTEM_NAME=$($(host_os)_cmake_system_name)
 $(package)_cmake_opts += -DCMAKE_SYSTEM_VERSION=$($(host_os)_cmake_system_version)
 $(package)_cmake_opts += -DCMAKE_SYSTEM_PROCESSOR=$(host_arch)
+$(package)_cmake_opts += -DQT_HOST_PATH=$(build_prefix)
 # Native packages cannot be used during cross-compiling. However,
 # Qt still unconditionally tries to find them, which causes issues
 # in some cases, such as when cross-compiling from macOS to Windows.
@@ -270,7 +285,10 @@ define $(package)_extract_cmds
   cp $($(package)_source_dir)/$($(package)_top_cmakelists_file_name)-$($(package)_version) ./$($(package)_top_cmakelists_file_name) && \
   mkdir cmake && \
   cp $($(package)_source_dir)/$($(package)_top_cmake_ecmoptionaladdsubdirectory_file_name)-$($(package)_version) cmake/$($(package)_top_cmake_ecmoptionaladdsubdirectory_file_name) && \
-  cp $($(package)_source_dir)/$($(package)_top_cmake_qttoplevelhelpers_file_name)-$($(package)_version) cmake/$($(package)_top_cmake_qttoplevelhelpers_file_name)
+  cp $($(package)_source_dir)/$($(package)_top_cmake_qttoplevelhelpers_file_name)-$($(package)_version) cmake/$($(package)_top_cmake_qttoplevelhelpers_file_name) && \
+  rm -rf qtbase/src/qtbase/tests/ && \
+  rm -rf qtbase/src/qtbase/tools/ && \
+  rm -rf qtbase/src/qtbase/examples/
 endef
 else
 define $(package)_extract_cmds
@@ -285,7 +303,10 @@ define $(package)_extract_cmds
   cp $($(package)_source_dir)/$($(package)_top_cmakelists_file_name)-$($(package)_version) ./$($(package)_top_cmakelists_file_name) && \
   mkdir cmake && \
   cp $($(package)_source_dir)/$($(package)_top_cmake_ecmoptionaladdsubdirectory_file_name)-$($(package)_version) cmake/$($(package)_top_cmake_ecmoptionaladdsubdirectory_file_name) && \
-  cp $($(package)_source_dir)/$($(package)_top_cmake_qttoplevelhelpers_file_name)-$($(package)_version) cmake/$($(package)_top_cmake_qttoplevelhelpers_file_name)
+  cp $($(package)_source_dir)/$($(package)_top_cmake_qttoplevelhelpers_file_name)-$($(package)_version) cmake/$($(package)_top_cmake_qttoplevelhelpers_file_name) && \
+  rm -rf qtbase/src/qtbase/tests/ && \
+  rm -rf qtbase/src/qtbase/tools/ && \
+  rm -rf qtbase/src/qtbase/examples/
 endef
 endif
 
