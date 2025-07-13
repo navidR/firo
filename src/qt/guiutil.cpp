@@ -52,6 +52,11 @@
 #include <QFileDialog>
 #include <QFont>
 #include <QLineEdit>
+#if QT_VERSION > 0x060000
+#include <QRegularExpression>
+#else
+#include <QRegExp>
+#endif
 #include <QSettings>
 #include <QTextDocument> // for Qt::mightBeRichText
 #include <QThread>
@@ -305,6 +310,19 @@ QList<QModelIndex> getEntryData(QAbstractItemView *view, int column)
     return view->selectionModel()->selectedRows(column);
 }
 
+#if QT_VERSION > 0x060000
+QString ExtractFirstSuffixFromFilter(const QString& filter)
+{
+    QRegularExpression filter_re(QStringLiteral(".* \\(\\*\\.(.*)[ \\)]"), QRegularExpression::InvertedGreedinessOption);
+    QString suffix;
+    QRegularExpressionMatch m = filter_re.match(filter);
+    if (m.hasMatch()) {
+        suffix = m.captured(1);
+    }
+    return suffix;
+}
+#endif
+
 QString getSaveFileName(QWidget *parent, const QString &caption, const QString &dir,
     const QString &filter,
     QString *selectedSuffixOut)
@@ -326,6 +344,9 @@ QString getSaveFileName(QWidget *parent, const QString &caption, const QString &
     /* Directly convert path to native OS path separators */
     QString result = QDir::toNativeSeparators(QFileDialog::getSaveFileName(parent, caption, myDir, filter, &selectedFilter));
 
+#if QT_VERSION > 0x060000
+    QString selectedSuffix = ExtractFirstSuffixFromFilter(selectedFilter);
+#else
     /* Extract first suffix from filter pattern "Description (*.foo)" or "Description (*.foo *.bar ...) */
     QRegExp filter_re(".* \\(\\*\\.(.*)[ \\)]");
     QString selectedSuffix;
@@ -333,6 +354,7 @@ QString getSaveFileName(QWidget *parent, const QString &caption, const QString &
     {
         selectedSuffix = filter_re.cap(1);
     }
+#endif
 
     /* Add suffix if needed */
     QFileInfo info(result);
@@ -378,6 +400,10 @@ QString getOpenFileName(QWidget *parent, const QString &caption, const QString &
 
     if(selectedSuffixOut)
     {
+
+#if QT_VERSION > 0x060000
+        *selectedSuffixOut = ExtractFirstSuffixFromFilter(selectedFilter);
+#else
         /* Extract first suffix from filter pattern "Description (*.foo)" or "Description (*.foo *.bar ...) */
         QRegExp filter_re(".* \\(\\*\\.(.*)[ \\)]");
         QString selectedSuffix;
@@ -386,6 +412,8 @@ QString getOpenFileName(QWidget *parent, const QString &caption, const QString &
             selectedSuffix = filter_re.cap(1);
         }
         *selectedSuffixOut = selectedSuffix;
+#endif
+
     }
     return result;
 }
