@@ -16,6 +16,13 @@
 
 #include <QApplication>
 #include <QClipboard>
+
+#if QT_VERSION > 0x060000
+#include <QRegularExpression>
+#else
+#include <QRegExp>
+#endif
+
 #include<QResizeEvent>
 
 SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *parent) :
@@ -82,7 +89,11 @@ void SendCoinsEntry::on_MemoTextChanged(const QString &text)
         ui->iconMessageWarning->setVisible(true);
     } else {
         QString sanitized = text;
+#if QT_VERSION > 0x060000
+        sanitized.remove(QRegularExpression("[\\x00-\\x1F\\x7F]"));
+#else
         sanitized.remove(QRegExp("[\\x00-\\x1F\\x7F]"));
+#endif
         if (sanitized != text) {
             ui->messageTextLabel->setText(sanitized);
             return;
