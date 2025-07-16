@@ -7,6 +7,7 @@
 #include "bitcoinaddressvalidator.h"
 #include "bitcoinunits.h"
 #include "qvalidatedlineedit.h"
+#include "qtcompat.h"
 #include "walletmodel.h"
 
 #include "primitives/transaction.h"
@@ -100,7 +101,7 @@ QString dateTimeStr(const QDateTime &date)
 
 QString dateTimeStr(qint64 nTime)
 {
-    return dateTimeStr(QDateTime::fromTime_t((qint32)nTime));
+    return dateTimeStr(QT_DATETIME_FROM_TIME_T((qint32)nTime));
 }
 
 QFont fixedPitchFont()

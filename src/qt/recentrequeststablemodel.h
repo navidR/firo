@@ -6,6 +6,7 @@
 #define BITCOIN_QT_RECENTREQUESTSTABLEMODEL_H
 
 #include "walletmodel.h"
+#include "qtcompat.h"
 
 #include <QAbstractTableModel>
 #include <QStringList>
@@ -28,15 +29,16 @@ public:
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
-        unsigned int nDate = date.toTime_t();
+        unsigned int nDate = QT_DATETIME_TO_TIME_T(date);
 
         READWRITE(this->nVersion);
         READWRITE(id);
         READWRITE(nDate);
         READWRITE(recipient);
 
-        if (ser_action.ForRead())
-            date = QDateTime::fromTime_t(nDate);
+        if (ser_action.ForRead()) {
+            date = QT_DATETIME_FROM_TIME_T(nDate);
+        }
     }
 };
 
