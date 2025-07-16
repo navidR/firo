@@ -21,4 +21,13 @@
 #define QT_DATETIME_TO_TIME_T(datetime) (datetime).toTime_t()
 #endif
 
+// Key combination compatibility
+#if QT_VERSION >= 0x060000
+#define QT_KEY_COMBINATION(modifier, key) (modifier | key)
+#define QT_KEY_COMBINATION_THREE(mod1, mod2, key) (mod1 | mod2 | key)
+#else
+#define QT_KEY_COMBINATION(modifier, key) (modifier + key)
+#define QT_KEY_COMBINATION_THREE(mod1, mod2, key) (mod1 + mod2 + key)
+#endif
+
 #endif // BITCOIN_QT_QTCOMPAT_H
