@@ -6,15 +6,16 @@
 
 #include "transactiontablemodel.h"
 #include "transactionrecord.h"
+#include "qtcompat.h"
 
 #include <cstdlib>
 
 #include <QDateTime>
 
 // Earliest date that can be represented (far in the past)
-const QDateTime TransactionFilterProxy::MIN_DATE = QDateTime::fromTime_t(0);
+const QDateTime TransactionFilterProxy::MIN_DATE = QT_DATETIME_FROM_TIME_T(0);
 // Last date that can be represented (far in the future)
-const QDateTime TransactionFilterProxy::MAX_DATE = QDateTime::fromTime_t(0xFFFFFFFF);
+const QDateTime TransactionFilterProxy::MAX_DATE = QT_DATETIME_FROM_TIME_T(0xFFFFFFFF);
 
 TransactionFilterProxy::TransactionFilterProxy(QObject *parent) :
     QSortFilterProxyModel(parent),
