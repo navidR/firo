@@ -21,7 +21,11 @@
 
 #include <QApplication>
 #include <QCloseEvent>
+#if QT_VERSION >= 0x060000
+#include <QScreen>
+#else
 #include <QDesktopWidget>
+#endif
 #include <QPainter>
 #include <QRadialGradient>
 

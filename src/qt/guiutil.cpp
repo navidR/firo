@@ -48,7 +48,11 @@
 #include <QClipboard>
 #include <QDateTime>
 #include <QDesktopServices>
+#if QT_VERSION >= 0x060000
+#include <QScreen>
+#else
 #include <QDesktopWidget>
+#endif
 #include <QDoubleValidator>
 #include <QFileDialog>
 #include <QFont>
