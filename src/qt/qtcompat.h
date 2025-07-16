@@ -30,4 +30,11 @@
 #define QT_KEY_COMBINATION_THREE(mod1, mod2, key) (mod1 + mod2 + key)
 #endif
 
+// Qt::ItemFlag compatibility
+#if QT_VERSION >= 0x060000
+#define QT_ITEM_IS_TRISTATE Qt::ItemIsUserTristate
+#else
+#define QT_ITEM_IS_TRISTATE Qt::ItemIsTristate
+#endif
+
 #endif // BITCOIN_QT_QTCOMPAT_H
