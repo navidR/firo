@@ -54,6 +54,24 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOUIC_SEARCH_PATHS forms)
 
+# Generate QM files from TS files
+file(GLOB TS_FILES "${CMAKE_CURRENT_SOURCE_DIR}/locale/*.ts")
+set(LOCALE_BUILD_DIR "${CMAKE_BINARY_DIR}/src/qt/locale")
+file(MAKE_DIRECTORY ${LOCALE_BUILD_DIR})
+foreach(TS_FILE ${TS_FILES})
+  get_filename_component(TS_NAME ${TS_FILE} NAME_WE)
+  set(QM_FILE "${LOCALE_BUILD_DIR}/${TS_NAME}.qm")
+  add_custom_command(
+    OUTPUT ${QM_FILE}
+    COMMAND Qt6::lrelease ${TS_FILE} -qm ${QM_FILE}
+    DEPENDS ${TS_FILE}
+    COMMENT "Generating ${TS_NAME}.qm in build directory"
+  )
+  list(APPEND QM_FILES ${QM_FILE})
+endforeach()
+
+add_custom_target(translations ALL DEPENDS ${QM_FILES})
+
 configure_file(bitcoin_locale.qrc bitcoin_locale.qrc USE_SOURCE_PERMISSIONS COPYONLY)
 
 # The bitcoinqt sources have to include headers in
@@ -168,6 +186,9 @@ target_link_libraries(firoqt
     $<$<BOOL:${WITH_ZMQ}>:firo_zmq>
     $<$<BOOL:${WIN32}>:windows_system>
 )
+
+# Make sure translations are built before firoqt
+add_dependencies(firoqt translations)
 
 if(ENABLE_WALLET)
   target_sources(firoqt
