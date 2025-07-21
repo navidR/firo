@@ -9,7 +9,6 @@
 #include "bitcoingui.h"
 
 #include "bitcoinunits.h"
-#include "qtcompat.h"
 #include "clientmodel.h"
 #include "guiconstants.h"
 #include "guiutil.h"
@@ -311,14 +310,14 @@ void BitcoinGUI::createActions()
 	overviewAction->setStatusTip(tr("Show general overview of wallet"));
 	overviewAction->setToolTip(overviewAction->statusTip());
 	overviewAction->setCheckable(true);
-	overviewAction->setShortcut(QKeySequence(QT_KEY_COMBINATION(Qt::ALT, key++)));
+	overviewAction->setShortcut(QKeySequence(Qt::ALT | key++));
 	tabGroup->addAction(overviewAction);
 
 	sendCoinsAction = new QAction(tr("&Send"), this);
 	sendCoinsAction->setStatusTip(tr("Send coins to a Firo address"));
 	sendCoinsAction->setToolTip(sendCoinsAction->statusTip());
 	sendCoinsAction->setCheckable(true);
-	sendCoinsAction->setShortcut(QKeySequence(QT_KEY_COMBINATION(Qt::ALT, key++)));
+	sendCoinsAction->setShortcut(QKeySequence(Qt::ALT | key++));
 	tabGroup->addAction(sendCoinsAction);
 
 	sendCoinsMenuAction = new QAction(sendCoinsAction->text(), this);
@@ -329,7 +328,7 @@ void BitcoinGUI::createActions()
 	receiveCoinsAction->setStatusTip(tr("Request payments (generates QR codes and firo: URIs)"));
 	receiveCoinsAction->setToolTip(receiveCoinsAction->statusTip());
 	receiveCoinsAction->setCheckable(true);
-	receiveCoinsAction->setShortcut(QKeySequence(QT_KEY_COMBINATION(Qt::ALT, key++)));
+	receiveCoinsAction->setShortcut(QKeySequence(Qt::ALT | key++));
 	tabGroup->addAction(receiveCoinsAction);
 
 	receiveCoinsMenuAction = new QAction(receiveCoinsAction->text(), this);
@@ -340,7 +339,7 @@ void BitcoinGUI::createActions()
 	historyAction->setStatusTip(tr("Browse transaction history"));
 	historyAction->setToolTip(historyAction->statusTip());
 	historyAction->setCheckable(true);
-	historyAction->setShortcut(QKeySequence(QT_KEY_COMBINATION(Qt::ALT, key++)));
+	historyAction->setShortcut(QKeySequence(Qt::ALT | key++));
 	tabGroup->addAction(historyAction);
 
 #ifdef ENABLE_WALLET
@@ -348,7 +347,7 @@ void BitcoinGUI::createActions()
     lelantusAction->setStatusTip(tr("Anonymize your coins"));
     lelantusAction->setToolTip(lelantusAction->statusTip());
     lelantusAction->setCheckable(true);
-    lelantusAction->setShortcut(QKeySequence(QT_KEY_COMBINATION(Qt::ALT, key++)));
+    lelantusAction->setShortcut(QKeySequence(Qt::ALT | key++));
     tabGroup->addAction(lelantusAction);
     lelantusAction->setVisible(false);
 
@@ -359,9 +358,9 @@ void BitcoinGUI::createActions()
     masternodeAction->setToolTip(masternodeAction->statusTip());
     masternodeAction->setCheckable(true);
 #ifdef Q_OS_MAC
-    masternodeAction->setShortcut(QKeySequence(QT_KEY_COMBINATION(Qt::CTRL, key++)));
+    masternodeAction->setShortcut(QKeySequence(Qt::CTRL | key++));
 #else
-    masternodeAction->setShortcut(QKeySequence(QT_KEY_COMBINATION(Qt::ALT, key++)));
+    masternodeAction->setShortcut(QKeySequence(Qt::ALT | key++));
 #endif
     tabGroup->addAction(masternodeAction);
 #endif
@@ -386,7 +385,7 @@ void BitcoinGUI::createActions()
 
     quitAction = new QAction(tr("E&xit"), this);
     quitAction->setStatusTip(tr("Quit application"));
-    quitAction->setShortcut(QKeySequence(QT_KEY_COMBINATION(Qt::CTRL, Qt::Key_Q)));
+    quitAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q));
     quitAction->setMenuRole(QAction::QuitRole);
     aboutAction = new QAction(tr("&About %1").arg(tr(PACKAGE_NAME)), this);
     aboutAction->setStatusTip(tr("Show information about %1").arg(tr(PACKAGE_NAME)));
@@ -459,8 +458,8 @@ void BitcoinGUI::createActions()
     }
 #endif // ENABLE_WALLET
 
-    connect(new QShortcut(QKeySequence(QT_KEY_COMBINATION_THREE(Qt::CTRL, Qt::SHIFT, Qt::Key_C)), this), &QShortcut::activated, this, &BitcoinGUI::showDebugWindowActivateConsole);
-    connect(new QShortcut(QKeySequence(QT_KEY_COMBINATION_THREE(Qt::CTRL, Qt::SHIFT, Qt::Key_D)), this), &QShortcut::activated, this, &BitcoinGUI::showDebugWindow);
+    connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_C), this), &QShortcut::activated, this, &BitcoinGUI::showDebugWindowActivateConsole);
+    connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D), this), &QShortcut::activated, this, &BitcoinGUI::showDebugWindow);
 }
 
 void BitcoinGUI::createMenuBar()
@@ -551,7 +550,7 @@ void BitcoinGUI::setClientModel(ClientModel *_clientModel)
         connect(_clientModel, &ClientModel::numConnectionsChanged, this, &BitcoinGUI::setNumConnections);
         connect(_clientModel, &ClientModel::networkActiveChanged, this, &BitcoinGUI::setNetworkActive);
 
-        modalOverlay->setKnownBestHeight(_clientModel->getHeaderTipHeight(), QT_DATETIME_FROM_TIME_T(_clientModel->getHeaderTipTime()));
+        modalOverlay->setKnownBestHeight(_clientModel->getHeaderTipHeight(), QDateTime::fromSecsSinceEpoch(_clientModel->getHeaderTipTime()));
         setNumBlocks(_clientModel->getNumBlocks(), _clientModel->getLastBlockDate(), _clientModel->getVerificationProgress(NULL), false);
         connect(_clientModel, &ClientModel::numBlocksChanged, this, &BitcoinGUI::setNumBlocks);
 
