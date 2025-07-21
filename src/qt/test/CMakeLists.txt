@@ -33,7 +33,6 @@ target_link_libraries(test_firo-qt
   Boost::headers
   Boost::unit_test_framework
   Qt6::Test
-  Qt6::Dependencies
   Qt6::Widgets
   Boost::thread
   $<TARGET_NAME_IF_EXISTS:libevent::pthreads>

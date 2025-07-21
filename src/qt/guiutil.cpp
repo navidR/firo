@@ -54,6 +54,7 @@
 #include <QLineEdit>
 #include <QRegularExpression>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QTextDocument> // for Qt::mightBeRichText
 #include <QThread>
 #include <QMouseEvent>
