@@ -6,7 +6,6 @@
 #define BITCOIN_QT_RECENTREQUESTSTABLEMODEL_H
 
 #include "walletmodel.h"
-#include "qtcompat.h"
 
 #include <QAbstractTableModel>
 #include <QStringList>
@@ -29,7 +28,7 @@ public:
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
-        unsigned int nDate = QT_DATETIME_TO_TIME_T(date);
+        unsigned int nDate = date.toSecsSinceEpoch();
 
         READWRITE(this->nVersion);
         READWRITE(id);
@@ -37,7 +36,7 @@ public:
         READWRITE(recipient);
 
         if (ser_action.ForRead()) {
-            date = QT_DATETIME_FROM_TIME_T(nDate);
+            date = QDateTime::fromSecsSinceEpoch(nDate);
         }
     }
 };

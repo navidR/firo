@@ -9,7 +9,6 @@
 #include "guiutil.h"
 #include "optionsmodel.h"
 #include "platformstyle.h"
-#include "qtcompat.h"
 #include "transactiondesc.h"
 #include "transactionrecord.h"
 #include "walletmodel.h"
@@ -754,7 +753,7 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
     case TypeRole:
         return rec->type;
     case DateRole:
-        return QT_DATETIME_FROM_TIME_T(static_cast<uint>(rec->time));
+        return QDateTime::fromSecsSinceEpoch(static_cast<uint>(rec->time));
     case WatchonlyRole:
         return rec->involvesWatchAddress;
     case WatchonlyDecorationRole:
@@ -783,7 +782,7 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
     case TxPlainTextRole:
         {
             QString details;
-            QDateTime date = QT_DATETIME_FROM_TIME_T(static_cast<uint>(rec->time));
+            QDateTime date = QDateTime::fromSecsSinceEpoch(static_cast<uint>(rec->time));
             QString txLabel = walletModel->getAddressTableModel()->labelForAddress(QString::fromStdString(rec->address));
 
             details.append(date.toString("M/d/yy HH:mm"));

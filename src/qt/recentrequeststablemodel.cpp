@@ -6,7 +6,6 @@
 
 #include "bitcoinunits.h"
 #include "guiutil.h"
-#include "qtcompat.h"
 #include "optionsmodel.h"
 
 #include "clientversion.h"
@@ -243,7 +242,7 @@ bool RecentRequestEntryLessThan::operator()(RecentRequestEntry &left, RecentRequ
     switch(column)
     {
     case RecentRequestsTableModel::Date:
-        return QT_DATETIME_TO_TIME_T(pLeft->date) < QT_DATETIME_TO_TIME_T(pRight->date);
+        return pLeft->date.toSecsSinceEpoch() < pRight->date.toSecsSinceEpoch();
     case RecentRequestsTableModel::Label:
         return pLeft->recipient.label < pRight->recipient.label;
     case RecentRequestsTableModel::Message:
