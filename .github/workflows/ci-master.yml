@@ -296,7 +296,13 @@ jobs:
         else
           echo "pkg-config is already installed"
         fi
-        brew install automake coreutils python-setuptools cmake make
+        for pkg in automake coreutils python-setuptools cmake make; do
+          if brew list --versions "$pkg" >/dev/null; then
+            echo "$pkg is already installed"
+          else
+            brew install "$pkg"
+          fi
+        done
       # Workaround for macOS: https://github.com/actions/runner/issues/2958
     - name: Install setuptools
       run: sudo -H pip install setuptools
@@ -349,7 +355,13 @@ jobs:
         else
           echo "pkg-config is already installed"
         fi
-        brew install automake coreutils python-setuptools
+        for pkg in automake coreutils python-setuptools; do
+          if brew list --versions "$pkg" >/dev/null; then
+            echo "$pkg is already installed"
+          else
+            brew install "$pkg"
+          fi
+        done
       # Workaround for macOS: https://github.com/actions/runner/issues/2958
     - name: Install setuptools
       run: sudo -H pip install setuptools
