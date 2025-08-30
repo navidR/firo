@@ -347,36 +347,37 @@ endif()
 # Gets sources to be parsed to gather translatable strings.
 function(get_translatable_sources var)
   set(result)
-  set(targets)
   foreach(dir IN ITEMS ${ARGN})
-    get_directory_property(dir_targets DIRECTORY ${PROJECT_SOURCE_DIR}/${dir} BUILDSYSTEM_TARGETS)
-    list(APPEND targets ${dir_targets})
-  endforeach()
-  foreach(target IN LISTS targets)
-    get_target_property(target_sources ${target} SOURCES)
-    if(target_sources)
-      foreach(source IN LISTS target_sources)
-        # Get an expression from the generator expression, if any.
-        if(source MATCHES ":([^>]+)>$")
-          set(source ${CMAKE_MATCH_1})
-        endif()
-        cmake_path(GET source EXTENSION LAST_ONLY ext)
-        if(ext STREQUAL ".qrc")
-          continue()
-        endif()
-        if(NOT IS_ABSOLUTE source)
-          get_target_property(target_source_dir ${target} SOURCE_DIR)
-          cmake_path(APPEND target_source_dir ${source} OUTPUT_VARIABLE source)
-        endif()
-        get_property(is_generated
-          SOURCE  ${source} TARGET_DIRECTORY ${target}
-          PROPERTY GENERATED
-        )
-        if(NOT is_generated)
-          list(APPEND result ${source})
-        endif()
-      endforeach()
-    endif()
+    # Use file() instead of get_directory_property() to avoid target dependency issues
+    file(GLOB_RECURSE dir_sources 
+      ${PROJECT_SOURCE_DIR}/${dir}/*.cpp
+      ${PROJECT_SOURCE_DIR}/${dir}/*.h
+      ${PROJECT_SOURCE_DIR}/${dir}/*.mm
+    )
+    
+    foreach(source IN LISTS dir_sources)
+      # Skip resource files and generated files
+      get_filename_component(source_name ${source} NAME)
+      if(source_name MATCHES "^(moc_|ui_|qrc_)")
+        continue()
+      endif()
+      
+      cmake_path(GET source EXTENSION LAST_ONLY ext)
+      if(ext STREQUAL ".qrc")
+        continue()
+      endif()
+      
+      # Check if file is generated (best effort without target dependencies)
+      get_filename_component(source_dir ${source} DIRECTORY)
+      get_filename_component(build_dir ${CMAKE_BINARY_DIR} REALPATH)
+      get_filename_component(source_dir_real ${source_dir} REALPATH)
+      string(FIND "${source_dir_real}" "${build_dir}" is_in_build_dir)
+      if(NOT is_in_build_dir EQUAL -1)
+        continue()  # Skip files in build directory (likely generated)
+      endif()
+      
+      list(APPEND result ${source})
+    endforeach()
   endforeach()
   set(${var} ${result} PARENT_SCOPE)
 endfunction()
