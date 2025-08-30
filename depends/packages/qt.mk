@@ -49,6 +49,7 @@ define $(package)_set_vars
 $(package)_config_env = QT_MAC_SDK_NO_VERSION_CHECK=1
 $(package)_config_opts_release = -release
 $(package)_config_opts_debug = -debug
+$(package)_config_opts = -no-egl
 $(package)_config_opts_debug += -optimized-tools
 $(package)_config_opts += -bindir $(build_prefix)/bin
 $(package)_config_opts += -c++std c++17
@@ -160,6 +161,8 @@ $(package)_config_opts += -no-feature-qtplugininfo
 endif
 
 $(package)_config_opts_darwin := -no-dbus
+$(package)_config_opts_darwin += -no-opengl
+$(package)_config_opts_darwin += -pch
 $(package)_config_opts_darwin += -no-feature-printsupport
 $(package)_config_opts_darwin += -no-freetype
 $(package)_config_opts_darwin += -no-pkg-config
@@ -185,7 +188,6 @@ $(package)_config_opts_mingw32 := -no-dbus
 $(package)_config_opts_mingw32 += -no-freetype
 $(package)_config_opts_mingw32 += -no-pkg-config
 
-# CMake build options.
 $(package)_config_env := CC="$$($(package)_cc)"
 $(package)_config_env += CXX="$$($(package)_cxx)"
 $(package)_config_env_darwin := OBJC="$$($(package)_cc)"
@@ -195,13 +197,9 @@ $(package)_cmake_opts := -DCMAKE_PREFIX_PATH=$(host_prefix)
 $(package)_cmake_opts += -DQT_FEATURE_cxx20=ON
 $(package)_cmake_opts += -DQT_ENABLE_CXX_EXTENSIONS=OFF
 
-$(package)_cmake_opts += -DCMAKE_C_COMPILER=$$(firstword $$($(package)_cc))
-$(package)_cmake_opts += -DCMAKE_CXX_COMPILER=$$(firstword $$($(package)_cxx))
-ifneq ($(host),$(build))
-$(package)_cmake_opts += -DCMAKE_ASM_COMPILER=$$(firstword $$($(package)_cc))
-endif
 ifeq ($(host_os),mingw32)
 $(package)_cmake_opts += -DCMAKE_SYSTEM_NAME=Windows
+$(package)_windres := $(host)-windres
 $(package)_cmake_opts += -DCMAKE_RC_COMPILER=$$($(package)_windres)
 endif
 ifneq ($(V),)
@@ -210,24 +208,43 @@ endif
 
 $(package)_cmake_opts += -DQT_USE_DEFAULT_CMAKE_OPTIMIZATION_FLAGS=ON
 
-ifneq ($(host),$(build))
-$(package)_cmake_opts += -DCMAKE_C_FLAGS="$$(wordlist 2,9999,$$($(package)_cc)) $$($(package)_cppflags) $$($$($(package)_type)_CFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
-$(package)_cmake_opts += -DCMAKE_CXX_FLAGS="$$(wordlist 2,9999,$$($(package)_cxx)) $$($(package)_cppflags) $$($$($(package)_type)_CXXFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
-$(package)_cmake_opts += -DCMAKE_ASM_FLAGS="$$(wordlist 2,9999,$$($(package)_cc))"
-else
-$(package)_cmake_opts += -DCMAKE_C_FLAGS="$$($(package)_cppflags) $$($$($(package)_type)_CFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
-$(package)_cmake_opts += -DCMAKE_CXX_FLAGS="$$($(package)_cppflags) $$($$($(package)_type)_CXXFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
+# Here we used firstword and filter-out functions (guix-functions) to extract the compiler and flags seperately.
+# They defined together in darwin.mk, because for autotools we would pass them together as CC/CXX, but for cmake, we should seperate them.
+$(package)_cmake_opts += -DCMAKE_C_COMPILER="$$(firstword $$($(package)_cc))"
+$(package)_cmake_opts += -DCMAKE_C_FLAGS="$$(filter-out $$(firstword $$($(package)_cc)),$$($(package)_cc)) $($(package)_cflags) $($(package)_cppflags)"
+$(package)_cmake_opts += -DCMAKE_C_FLAGS_RELEASE="$$(filter-out $$(firstword $$($(package)_cc)),$$($(package)_cc)) $($(package)_release_cflags) $($(package)_release_cppflags)"
+$(package)_cmake_opts += -DCMAKE_C_FLAGS_DEBUG="$$(filter-out $$(firstword $$($(package)_cc)),$$($(package)_cc)) $($(package)_debug_cflags) $($(package)_debug_cppflags)"
+$(package)_cmake_opts += -DCMAKE_CXX_COMPILER="$$(firstword $$($(package)_cxx))"
+$(package)_cmake_opts += -DCMAKE_CXX_FLAGS="$$(filter-out $$(firstword $$($(package)_cxx)),$$($(package)_cxx)) $($(package)_cxxflags) $($(package)_cppflags)"
+$(package)_cmake_opts += -DCMAKE_CXX_FLAGS_RELEASE="$$(filter-out $$(firstword $$($(package)_cxx)),$$($(package)_cxx)) $($(package)_release_cxxflags) $($(package)_release_cppflags)"
+$(package)_cmake_opts += -DCMAKE_CXX_FLAGS_DEBUG="$$(filter-out $$(firstword $$($(package)_cxx)),$$($(package)_cxx)) $($(package)_debug_cxxflags) $($(package)_debug_cppflags)"
+$(package)_cmake_opts += -DCMAKE_EXE_LINKER_FLAGS="$($(package)_ldflags)"
+$(package)_cmake_opts += -DCMAKE_EXE_LINKER_FLAGS_RELEASE="$($(package)_ldflags)"
+$(package)_cmake_opts += -DCMAKE_EXE_LINKER_FLAGS_DEBUG="$($(package)_ldflags)"
+$(package)_cmake_opts += -DCMAKE_SHARED_LINKER_FLAGS="$($(package)_ldflags)"
+$(package)_cmake_opts += -DCMAKE_SHARED_LINKER_FLAGS_RELEASE="$($(package)_ldflags)"
+$(package)_cmake_opts += -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="$($(package)_ldflags)"
+ifeq ($(host_os),darwin)
+$(package)_cmake_opts += -DCMAKE_OBJC_FLAGS="$($(package)_cflags) $($(package)_cppflags) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
+$(package)_cmake_opts += -DCMAKE_OBJC_FLAGS_RELEASE="$$($$($(package)_type)_release_CFLAGS)"
+$(package)_cmake_opts += -DCMAKE_OBJC_FLAGS_DEBUG="$$($$($(package)_type)_debug_CFLAGS)"
+$(package)_cmake_opts += -DCMAKE_OBJCXX_FLAGS="$($(package)_cxxflags) $($(package)_cppflags) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
+$(package)_cmake_opts += -DCMAKE_OBJCXX_FLAGS_RELEASE="$$($$($(package)_type)_release_CXXFLAGS)"
+$(package)_cmake_opts += -DCMAKE_OBJCXX_FLAGS_DEBUG="$$($$($(package)_type)_debug_CXXFLAGS)"
 endif
-$(package)_cmake_opts += -DCMAKE_C_FLAGS_RELEASE="$$($$($(package)_type)_release_CFLAGS)"
-$(package)_cmake_opts += -DCMAKE_C_FLAGS_DEBUG="$$($$($(package)_type)_debug_CFLAGS)"
-$(package)_cmake_opts += -DCMAKE_CXX_FLAGS_RELEASE="$$($$($(package)_type)_release_CXXFLAGS)"
-$(package)_cmake_opts += -DCMAKE_CXX_FLAGS_DEBUG="$$($$($(package)_type)_debug_CXXFLAGS)"
-$(package)_cmake_opts += -DCMAKE_EXE_LINKER_FLAGS="$$($$($(package)_type)_LDFLAGS)"
-$(package)_cmake_opts += -DCMAKE_EXE_LINKER_FLAGS_RELEASE="$$($$($(package)_type)_release_LDFLAGS)"
-$(package)_cmake_opts += -DCMAKE_EXE_LINKER_FLAGS_DEBUG="$$($$($(package)_type)_debug_LDFLAGS)"
+
 ifeq ($(host_os),linux)
 $(package)_cmake_opts += -DQT_FEATURE_xcb=ON
 endif
+
+ifdef GUIX_ENVIRONMENT
+export QT_MAC_SDK_NO_VERSION_CHECK=1
+ifneq ($(host_os),darwin)
+$(package)_config_env_darwin += AR="$$($(package)_ar)"
+$(package)_config_env_darwin += RANLIB="$$($(package)_ranlib)"
+endif
+endif
+
 ifneq ($(host),$(build))
 $(package)_cmake_opts += -DCMAKE_SYSTEM_NAME=$($(host_os)_cmake_system_name)
 $(package)_cmake_opts += -DCMAKE_SYSTEM_VERSION=$($(host_os)_cmake_system_version)
@@ -241,16 +258,18 @@ $(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_Libb2=TRUE
 $(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_WrapSystemDoubleConversion=TRUE
 $(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_WrapSystemMd4c=TRUE
 $(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_WrapZSTD=TRUE
-endif
-ifeq ($(host_os),darwin)
-$(package)_cmake_opts += -DCMAKE_OBJC_FLAGS="$$($(package)_cppflags) $$($$($(package)_type)_CFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
-$(package)_cmake_opts += -DCMAKE_OBJC_FLAGS_RELEASE="$$($$($(package)_type)_release_CFLAGS)"
-$(package)_cmake_opts += -DCMAKE_OBJC_FLAGS_DEBUG="$$($$($(package)_type)_debug_CFLAGS)"
-$(package)_cmake_opts += -DCMAKE_OBJCXX_FLAGS="$$($(package)_cppflags) $$($$($(package)_type)_CXXFLAGS) -ffile-prefix-map=$$($(package)_extract_dir)=/usr"
-$(package)_cmake_opts += -DCMAKE_OBJCXX_FLAGS_RELEASE="$$($$($(package)_type)_release_CXXFLAGS)"
-$(package)_cmake_opts += -DCMAKE_OBJCXX_FLAGS_DEBUG="$$($$($(package)_type)_debug_CXXFLAGS)"
+ifneq ($(host_os), darwin)
 $(package)_cmake_opts += -DCMAKE_ASM_COMPILER=$$(firstword $$($(package)_cc))
-$(package)_cmake_opts += -DCMAKE_ASM_FLAGS="$$(wordlist 2,9999,$$($(package)_cc))"
+endif
+endif
+
+ifeq ($(host_os),darwin)
+$(package)_cmake_opts += -DCMAKE_INSTALL_NAME_TOOL=true
+$(package)_cmake_opts += -DCMAKE_FRAMEWORK_PATH=$(OSX_SDK)/System/Library/Frameworks
+$(package)_cmake_opts += -DQT_INTERNAL_APPLE_SDK_VERSION=$(OSX_SDK_VERSION)
+$(package)_cmake_opts += -DQT_INTERNAL_XCODE_VERSION=$(XCODE_VERSION)
+$(package)_cmake_opts += -DQT_NO_APPLE_SDK_MAX_VERSION_CHECK=ON
+$(package)_config_env_darwin += unset LIBRARY_PATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH OBJC_INCLUDE_PATH OBJCPLUS_INCLUDE_PATH;
 endif
 endef
 
@@ -321,29 +340,12 @@ ifeq ($(host),$(build))
   $(package)_preprocess_cmds += && patch -p1 -i $($(package)_patch_dir)/qttools_skip_dependencies.patch
 endif
 define $(package)_config_cmds
-  echo "*********************************************" && \
-  echo "DEBUG: build_prefix = $(build_prefix)" && \
-  echo "DEBUG: host = $(host)" && \
-  echo "DEBUG: build = $(build)" && \
-  echo "DEBUG: host_prefix = $(host_prefix)" && \
-  echo "DEBUG: host_arch = $(host_arch)" && \
-  echo "DEBUG: host_os = $(host_os)" && \
-  echo "DEBUG: $(host_arch)_$(host_os)_prefix = $($(host_arch)_$(host_os)_prefix)" && \
-  echo "DEBUG: $(host_arch)_$(host_os)_host = $($(host_arch)_$(host_os)_host)" && \
-  echo "DEBUG: basedir = $(BASEDIR)" && \
-  echo "DEBUG: host = $(host)" && \
-  echo "DEBUG: build_host = $(build_host)" && \
-  echo "DEBUG: host_os_cmake_system_name = $($(host_os)_cmake_system_name)" && \
-  ls -la /home/dev/development/firo-private/depends/x86_64-linux-gnu/native/ | head -5 && \
-  ls -la /home/dev/development/firo-private/depends/x86_64-linux-gnu/native/bin/ | head -5 && \
-  echo "DEBUG: basedir + build_host = $(BASEDIR)/$(build_host)" && \
-  echo "*********************************************" && \
   cd qtbase && \
-  ./configure -top-level $($(package)_config_opts) -- $($(package)_cmake_opts)
+  $($(package)_config_env) ./configure -top-level $($(package)_config_opts) -- $($(package)_cmake_opts)
 endef
 
 define $(package)_build_cmds
-  cmake --build . -- $$(filter -j%,$$(MAKEFLAGS))
+  $($(package)_config_env) cmake --build . -- $$(filter -j%,$$(MAKEFLAGS))
 endef
 
 define $(package)_stage_cmds
