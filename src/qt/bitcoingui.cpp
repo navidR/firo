@@ -311,14 +311,14 @@ void BitcoinGUI::createActions()
 	overviewAction->setStatusTip(tr("Show general overview of wallet"));
 	overviewAction->setToolTip(overviewAction->statusTip());
 	overviewAction->setCheckable(true);
-	overviewAction->setShortcut(QKeySequence(Qt::ALT | key++));
+	overviewAction->setShortcut(QKeySequence(QString("Alt+%1").arg(key++)));
 	tabGroup->addAction(overviewAction);
 
 	sendCoinsAction = new QAction(tr("&Send"), this);
 	sendCoinsAction->setStatusTip(tr("Send coins to a Firo address"));
 	sendCoinsAction->setToolTip(sendCoinsAction->statusTip());
 	sendCoinsAction->setCheckable(true);
-	sendCoinsAction->setShortcut(QKeySequence(Qt::ALT | key++));
+	sendCoinsAction->setShortcut(QKeySequence(QString("Alt+%1").arg(key++)));
 	tabGroup->addAction(sendCoinsAction);
 
 	sendCoinsMenuAction = new QAction(sendCoinsAction->text(), this);
@@ -329,7 +329,7 @@ void BitcoinGUI::createActions()
 	receiveCoinsAction->setStatusTip(tr("Request payments (generates QR codes and firo: URIs)"));
 	receiveCoinsAction->setToolTip(receiveCoinsAction->statusTip());
 	receiveCoinsAction->setCheckable(true);
-	receiveCoinsAction->setShortcut(QKeySequence(Qt::ALT | key++));
+	receiveCoinsAction->setShortcut(QKeySequence(QString("Alt+%1").arg(key++)));
 	tabGroup->addAction(receiveCoinsAction);
 
 	receiveCoinsMenuAction = new QAction(receiveCoinsAction->text(), this);
@@ -340,7 +340,7 @@ void BitcoinGUI::createActions()
 	historyAction->setStatusTip(tr("Browse transaction history"));
 	historyAction->setToolTip(historyAction->statusTip());
 	historyAction->setCheckable(true);
-	historyAction->setShortcut(QKeySequence(Qt::ALT | key++));
+	historyAction->setShortcut(QKeySequence(QString("Alt+%1").arg(key++)));
 	tabGroup->addAction(historyAction);
 
 #ifdef ENABLE_WALLET
@@ -348,7 +348,7 @@ void BitcoinGUI::createActions()
     lelantusAction->setStatusTip(tr("Anonymize your coins"));
     lelantusAction->setToolTip(lelantusAction->statusTip());
     lelantusAction->setCheckable(true);
-    lelantusAction->setShortcut(QKeySequence(Qt::ALT | key++));
+    lelantusAction->setShortcut(QKeySequence(QString("Alt+%1").arg(key++)));
     tabGroup->addAction(lelantusAction);
     lelantusAction->setVisible(false);
 
@@ -359,9 +359,9 @@ void BitcoinGUI::createActions()
     masternodeAction->setToolTip(masternodeAction->statusTip());
     masternodeAction->setCheckable(true);
 #ifdef Q_OS_MAC
-    masternodeAction->setShortcut(QKeySequence(Qt::CTRL | key++));
+    masternodeAction->setShortcut(QKeySequence(QString("Alt+%1").arg(key++)));
 #else
-    masternodeAction->setShortcut(QKeySequence(Qt::ALT | key++));
+    masternodeAction->setShortcut(QKeySequence(QString("Alt+%1").arg(key++)));
 #endif
     tabGroup->addAction(masternodeAction);
 #endif
