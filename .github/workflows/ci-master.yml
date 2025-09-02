@@ -122,7 +122,6 @@ jobs:
       with:
         name: test-linux-cmake-logs-${{ env.COMMIT_HASH }}
         path: ${{ env.TEST_LOG_ARTIFACT_DIR }}
-
   build-windows-cmake:
     needs: get-commit-hash
     name: build-windows-cmake
@@ -233,7 +232,6 @@ jobs:
       with:
         name: mac-cmake-binaries-${{ env.COMMIT_HASH }}
         path: ${{ env.ARTIFACT_DIR }}
-
   build-guix-x86_64-linux-gnu:
     needs: get-commit-hash
     name: build-guix-x86_64-linux-gnu
