@@ -42,7 +42,6 @@
 #include "validation.h"
 #include "mtpstate.h"
 #include "batchproof_container.h"
-#include <crypto/progpow/include/ethash/progpow.hpp>
 #include "leveldb/env.h"
 
 #ifdef ENABLE_WALLET
@@ -342,6 +341,7 @@ void Shutdown()
 #endif
     globalVerifyHandle.reset();
     ECC_Stop();
+    leveldb::Env::Default()->Shutdown();
     leveldb::Env::Default()->Shutdown();
     LogPrintf("%s: done\n", __func__);
 }
