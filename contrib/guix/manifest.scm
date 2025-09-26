@@ -102,7 +102,7 @@ chain for " target " development."))
                                        #:key
                                        (base-gcc-for-libc linux-base-gcc)
                                        (base-kernel-headers base-linux-kernel-headers)
-                                       (base-libc glibc-2.32)
+                                       (base-libc glibc-2.31)
                                        (base-gcc linux-base-gcc))
   "Convenience wrapper around MAKE-CROSS-TOOLCHAIN with default values
 desirable for building Bitcoin Core release binaries."
@@ -194,11 +194,11 @@ chain for " target " development."))
                  (("-rpath=") "-rpath-link="))
                #t))))))))
 
-(define-public glibc-2.32
-  (let ((commit "3de512be7ea6053255afed6154db9ee31d4e557a"))
+(define-public glibc-2.31
+  (let ((commit "7b27c450c34563a28e634cccb399cd415e71ebfe"))
   (package
-    (inherit glibc) ;; 2.32
-    (version "2.32")
+    (inherit glibc) ;; 2.35
+    (version "2.31")
     (source (origin
               (method git-fetch)
               (uri (git-reference
@@ -207,7 +207,7 @@ chain for " target " development."))
               (file-name (git-file-name "glibc" commit))
               (sha256
                (base32
-                "1175qgpbmfh3hl435p4myamncnbvvv69r3xann823hrmrhc31bc0"))
+                "017qdpr5id7ddb4lpkzj2li1abvw916m3fc6n7nw28z4h5qbv2n0"))
               (patches (search-our-patches "glibc-guix-prefix.patch"))))
     (arguments
       (substitute-keyword-arguments (package-arguments glibc)

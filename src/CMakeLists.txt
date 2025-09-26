@@ -31,6 +31,7 @@ target_include_directories(bitcoin_clientversion PRIVATE ${PROJECT_BINARY_DIR}/s
 #=============================
 
 add_library(bitcoin_util STATIC EXCLUDE_FROM_ALL
+  ${CMAKE_CURRENT_SOURCE_DIR}/compat/glibc_single_threaded_shim.c
   ${CMAKE_CURRENT_SOURCE_DIR}/bls/bls_batchverifier.h
   ${CMAKE_CURRENT_SOURCE_DIR}/bls/bls_ies.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/bls/bls_ies.h
@@ -358,10 +359,11 @@ add_library(firo_node STATIC EXCLUDE_FROM_ALL
 )
 
 target_link_libraries(firo_node
-  PRIVATE
-    core_interface
+  PUBLIC
     bitcoin_common
     bitcoin_util
+  PRIVATE
+    core_interface
     secp256k1
     $<$<BOOL:${WITH_ZMQ}>:firo_zmq>
     leveldb
@@ -384,6 +386,7 @@ target_link_libraries(firo_node
 if(BUILD_DAEMON)
   add_executable(firod
   ${CMAKE_CURRENT_SOURCE_DIR}/bitcoind.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/compat/glibc_single_threaded_shim.c
   )
   add_windows_resources(firod bitcoind-res.rc)
   target_link_libraries(firod
@@ -400,6 +403,7 @@ if(BUILD_DAEMON)
     secp256k1pp
     $<TARGET_NAME_IF_EXISTS:firo_wallet>
     ${TOR_LIBRARY}
+    bitcoin_util    
     $<$<BOOL:${WIN32}>:windows_system>
   )
   set_platform_output_name(firod FIRO_DAEMON_NAME)
