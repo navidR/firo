@@ -61,7 +61,18 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install pyzmq
     - name: Download Dependencies
-      run: make -C depends download
+      run: |
+        attempt=1
+        max=5
+        until make -C depends download; do
+          if [ "$attempt" -ge "$max" ]; then
+            echo "make -C depends download failed after $attempt attempts"
+            exit 1
+          fi
+          echo "make -C depends download attempt $attempt failed; retrying in $((attempt*5))s..."
+          sleep $((attempt*5))
+          attempt=$((attempt+1))
+        done
     - name: Build Dependencies
       run: make -C depends -j$(nproc)
     - name: Build Firo
@@ -115,7 +126,7 @@ jobs:
   build-windows-cmake:
     needs: get-commit-hash
     name: build-windows-cmake
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     env:
       ARTIFACT_DIR: windows-cmake-binaries
       COMMIT_HASH: ${{ needs.get-commit-hash.outputs.short_sha }}
@@ -125,13 +136,24 @@ jobs:
     - name: Install Required Packages
       run: |
         sudo apt-get update
-        sudo apt-get install -y g++-mingw-w64-x86-64 gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64 cmake 
+        sudo apt-get install -y g++-mingw-w64-x86-64 gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64 cmake mingw-w64-common mingw-w64-i686-dev mingw-w64-x86-64-dev wget unzip
     - name: Switch MinGW GCC and G++ to POSIX Threading
       run: |
         sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
         sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
     - name: Download Dependencies
-      run: make -C depends download
+      run: |
+        attempt=1
+        max=5
+        until make -C depends download; do
+          if [ "$attempt" -ge "$max" ]; then
+            echo "make -C depends download failed after $attempt attempts"
+            exit 1
+          fi
+          echo "make -C depends download attempt $attempt failed; retrying in $((attempt*5))s..."
+          sleep $((attempt*5))
+          attempt=$((attempt+1))
+        done
     - name: Build Dependencies
       run: make -C depends -j$(nproc) HOST=x86_64-w64-mingw32
     - name: Build Firo
@@ -179,7 +201,18 @@ jobs:
     - name: Install setuptools
       run: sudo -H pip install setuptools
     - name: Download Dependencies
-      run: make -C depends download
+      run: |
+        attempt=1
+        max=5
+        until make -C depends download; do
+          if [ "$attempt" -ge "$max" ]; then
+            echo "make -C depends download failed after $attempt attempts"
+            exit 1
+          fi
+          echo "make -C depends download attempt $attempt failed; retrying in $((attempt*5))s..."
+          sleep $((attempt*5))
+          attempt=$((attempt+1))
+        done
     - name: Build Dependencies
       run: |
         make -C depends -j$NJOBS
@@ -479,7 +512,18 @@ jobs:
           sudo apt-get install -y guix
           guix pull --url=https://codeberg.org/guix/guix-mirror --substitute-urls="http://git.savannah.gnu.org/git/guix.git http://hydra-guix-129.guix.gnu.org http://ci.guix.gnu.org"
       - name: Download Dependencies
-        run: make -C depends download
+        run: |
+          attempt=1
+          max=5
+          until make -C depends download; do
+            if [ "$attempt" -ge "$max" ]; then
+              echo "make -C depends download failed after $attempt attempts"
+              exit 1
+            fi
+            echo "make -C depends download attempt $attempt failed; retrying in $((attempt*5))s..."
+            sleep $((attempt*5))
+            attempt=$((attempt+1))
+          done
       - name: Run Guix Build
         run: |
           CORES=$(nproc)
@@ -572,7 +616,18 @@ jobs:
           sudo apt-get install -y guix
           guix pull --url=https://codeberg.org/guix/guix-mirror --substitute-urls="http://git.savannah.gnu.org/git/guix.git http://hydra-guix-129.guix.gnu.org http://ci.guix.gnu.org"
       - name: Download Dependencies
-        run: make -C depends download
+        run: |
+          attempt=1
+          max=5
+          until make -C depends download; do
+            if [ "$attempt" -ge "$max" ]; then
+              echo "make -C depends download failed after $attempt attempts"
+              exit 1
+            fi
+            echo "make -C depends download attempt $attempt failed; retrying in $((attempt*5))s..."
+            sleep $((attempt*5))
+            attempt=$((attempt+1))
+          done
       - name: Run Guix Build
         run: |
           CORES=$(nproc)
