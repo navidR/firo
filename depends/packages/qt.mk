@@ -345,7 +345,7 @@ define $(package)_config_cmds
 endef
 
 define $(package)_build_cmds
-  $($(package)_config_env) cmake --build . -- $$(filter -j%,$$(MAKEFLAGS))
+  $($(package)_config_env) cmake --build . --parallel
 endef
 
 define $(package)_stage_cmds
