@@ -179,6 +179,7 @@ class DIP3Test(BitcoinTestFramework):
         for i in range(spend_mns_count):
             self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())
             mns_tmp.append(mns[spend_mns_count - 1 - i])
+            self.wait_for_mnlist(self.nodes[0], mns_tmp)
             self.assert_mnlist(self.nodes[0], mns_tmp)
 
         # self.log.info("cause a reorg with a double spend and check that mnlists are still correct on all nodes")
@@ -189,6 +190,14 @@ class DIP3Test(BitcoinTestFramework):
         #
         # self.log.info("testing instant send with replaced MNs")
         # self.test_instantsend(10, 3, timeout=20)
+    def wait_for_mnlist(self, node, expected_mns, timeout=30):
+        def mnlist_matches():
+            mnlist = node.protx('list', 'registered', True)
+            actual = sorted(mnlist.keys())
+            expected = sorted(expected_mns)
+            return actual == expected
+
+        self.wait_until(mnlist_matches, timeout=timeout)
 
     def spend_mn_collateral(self, mn, with_dummy_input_output=False):
         return self.spend_input(mn.collateral_txid, mn.collateral_vout, 1000, with_dummy_input_output)
