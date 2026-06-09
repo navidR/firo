@@ -53,6 +53,11 @@ struct PayoutVerificationSkeletonResult {
     PayoutPublicValidationResult public_result{PayoutPublicValidationResult::OK};
 };
 
+struct StakeUpdateVerificationSkeletonResult {
+    bool tx_complete{false};
+    StakeValidationResult stake_result{StakeValidationResult::OK};
+};
+
 struct ValidationStateView {
     std::map<OutputId, SparkOutputRecord> sparkOutputs;
     std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
@@ -164,6 +169,11 @@ bool ArePayoutIndexesDistinctSkeleton(const std::vector<PayoutTxSkeleton>& payou
 
 // Structural skeleton for revised-spec StakeUpdateVerify steps 1-3 only.
 StakeValidationResult CheckStakeUpdateEligibilitySkeleton(const uint256& stake_id, const ValidationStateView& view);
+
+// Structural skeleton for revised-spec StakeUpdateVerify field presence plus steps 1-3.
+// This deliberately stops before context parsing, update_pk extraction, enc_context(m_new),
+// signature verification, and update effective-height rules.
+StakeUpdateVerificationSkeletonResult CheckStakeUpdateVerificationSkeleton(const StakeUpdateTx& tx, const ValidationStateView& view);
 
 // Block-level skeleton for revised-spec ValidateBlock step 4 and StakeUpdateVerify steps 1-3 only.
 // This deliberately stops before context parsing, signature verification, effective-height rules,

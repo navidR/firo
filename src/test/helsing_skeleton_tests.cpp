@@ -2241,6 +2241,89 @@ BOOST_AUTO_TEST_CASE(payout_verification_skeleton_does_not_mutate_state)
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(stake_update_verification_skeleton_accepts_complete_active_update)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(52, DeterministicPoint(52));
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = record.stake_id;
+    tx.m_new.bytes = {0x6d, 0x32};
+    tx.sig_update.bytes = {0x73, 0x32};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::StakeUpdateVerificationSkeletonResult result = helsing::CheckStakeUpdateVerificationSkeleton(tx, view);
+
+    BOOST_CHECK(result.tx_complete);
+    BOOST_CHECK(result.stake_result == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_verification_skeleton_checks_completeness_before_state)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(53, DeterministicPoint(53));
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = record.stake_id;
+    tx.m_new.bytes = {0x6d, 0x33};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    view.blockSpentTags.insert(record.T);
+    const helsing::StakeUpdateVerificationSkeletonResult result = helsing::CheckStakeUpdateVerificationSkeleton(tx, view);
+
+    BOOST_CHECK(!result.tx_complete);
+    BOOST_CHECK(result.stake_result == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_verification_skeleton_reports_eligibility_after_completeness)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(54, DeterministicPoint(54));
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = record.stake_id;
+    tx.m_new.bytes = {0x6d, 0x34};
+    tx.sig_update.bytes = {0x73, 0x34};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    view.blockSpentTags.insert(record.T);
+    const helsing::StakeUpdateVerificationSkeletonResult result = helsing::CheckStakeUpdateVerificationSkeleton(tx, view);
+
+    BOOST_CHECK(result.tx_complete);
+    BOOST_CHECK(result.stake_result == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_verification_skeleton_does_not_mutate_state)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(55, DeterministicPoint(55));
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = record.stake_id;
+    tx.m_new.bytes = {0x6d, 0x35};
+    tx.sig_update.bytes = {0x73, 0x35};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::StakeUpdateVerificationSkeletonResult result = helsing::CheckStakeUpdateVerificationSkeleton(tx, view);
+
+    BOOST_CHECK(result.tx_complete);
+    BOOST_CHECK(result.stake_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nLastUpdateHeight);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(stake_update_eligibility_accepts_active_stake)
 {
     helsing::CHelsingState state;

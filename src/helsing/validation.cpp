@@ -602,6 +602,18 @@ StakeValidationResult CheckStakeUpdateEligibilitySkeleton(const uint256& stake_i
     return StakeValidationResult::OK;
 }
 
+StakeUpdateVerificationSkeletonResult CheckStakeUpdateVerificationSkeleton(const StakeUpdateTx& tx, const ValidationStateView& view)
+{
+    StakeUpdateVerificationSkeletonResult result;
+    result.tx_complete = IsCompleteStakeUpdateTxSkeleton(tx);
+    if (!result.tx_complete) {
+        return result;
+    }
+
+    result.stake_result = CheckStakeUpdateEligibilitySkeleton(tx.stake_id, view);
+    return result;
+}
+
 StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view)
 {
     for (const StakeUpdateTx& tx : update_txs) {
