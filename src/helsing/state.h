@@ -10,6 +10,8 @@
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 namespace helsing {
 
@@ -24,6 +26,7 @@ public:
 
     bool AddActiveStake(const StakeRecord& record);
     bool AddAcceptedStake(const uint256& stake_id, const StakeTx& tx, int nHeight);
+    bool ApplyAcceptedStakesSkeleton(const std::vector<std::pair<uint256, StakeTx>>& acceptedStakes, int nHeight);
     bool ApplyAcceptedStakeUpdateSkeleton(const uint256& stake_id, const StakeContext& m_new, int nHeight);
     bool ApplyBlockSpentTagsSkeleton(const std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags, int nHeight);
     bool AddSpentTag(const GroupElement& tag, int nHeight);

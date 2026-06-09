@@ -84,6 +84,23 @@ bool CHelsingState::AddAcceptedStake(const uint256& stake_id, const StakeTx& tx,
     return AddActiveStake(record);
 }
 
+bool CHelsingState::ApplyAcceptedStakesSkeleton(const std::vector<std::pair<uint256, StakeTx>>& acceptedStakes, int nHeight)
+{
+    if (nHeight < 0) {
+        return false;
+    }
+
+    CHelsingState next = *this;
+    for (const auto& acceptedStake : acceptedStakes) {
+        if (!next.AddAcceptedStake(acceptedStake.first, acceptedStake.second, nHeight)) {
+            return false;
+        }
+    }
+
+    *this = next;
+    return true;
+}
+
 bool CHelsingState::ApplyAcceptedStakeUpdateSkeleton(const uint256& stake_id, const StakeContext& m_new, int nHeight)
 {
     if (nHeight < 0) {

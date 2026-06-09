@@ -1590,6 +1590,124 @@ BOOST_AUTO_TEST_CASE(state_add_accepted_stake_rejects_invalid_inputs_without_mut
     BOOST_CHECK(state.GetStakeRecord(DeterministicHash(136)) == nullptr);
 }
 
+BOOST_AUTO_TEST_CASE(state_apply_accepted_stakes_skeleton_adds_all_records_atomically)
+{
+    helsing::CHelsingState state;
+    helsing::StakeTx first = ValidStakeTx();
+    helsing::StakeTx second = ValidStakeTx();
+    second.T = DeterministicPoint(189);
+    second.m.bytes = {0x73, 0x65, 0x63};
+    const GroupElement spentOnlyTag = DeterministicPoint(190);
+    const uint256 firstStakeId = DeterministicHash(177);
+    const uint256 secondStakeId = DeterministicHash(178);
+
+    BOOST_CHECK(state.AddSpentTag(spentOnlyTag, 406));
+    BOOST_CHECK(state.ApplyAcceptedStakesSkeleton({{firstStakeId, first}, {secondStakeId, second}}, 407));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 2U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 2U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(first.T));
+    BOOST_CHECK(state.IsActiveTag(second.T));
+    BOOST_CHECK(state.IsSpentTag(spentOnlyTag));
+
+    uint256 activeStakeId;
+    BOOST_CHECK(state.GetActiveStakeId(first.T, activeStakeId));
+    BOOST_CHECK(activeStakeId == firstStakeId);
+    BOOST_CHECK(state.GetActiveStakeId(second.T, activeStakeId));
+    BOOST_CHECK(activeStakeId == secondStakeId);
+
+    const helsing::StakeRecord* firstStored = state.GetStakeRecord(firstStakeId);
+    const helsing::StakeRecord* secondStored = state.GetStakeRecord(secondStakeId);
+    BOOST_REQUIRE(firstStored != nullptr);
+    BOOST_REQUIRE(secondStored != nullptr);
+    BOOST_CHECK(firstStored->T == first.T);
+    BOOST_CHECK(firstStored->m.bytes == first.m.bytes);
+    BOOST_CHECK_EQUAL(firstStored->nHeight, 407);
+    BOOST_CHECK_EQUAL(firstStored->nSpentHeight, -1);
+    BOOST_CHECK_EQUAL(firstStored->nLastUpdateHeight, 407);
+    BOOST_CHECK(firstStored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK(secondStored->T == second.T);
+    BOOST_CHECK(secondStored->m.bytes == second.m.bytes);
+    BOOST_CHECK_EQUAL(secondStored->nHeight, 407);
+    BOOST_CHECK_EQUAL(secondStored->nSpentHeight, -1);
+    BOOST_CHECK_EQUAL(secondStored->nLastUpdateHeight, 407);
+    BOOST_CHECK(secondStored->status == helsing::StakeStatus::ACTIVE);
+}
+
+BOOST_AUTO_TEST_CASE(state_apply_accepted_stakes_skeleton_accepts_empty_set)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord activeRecord = ActiveRecord(179, DeterministicPoint(191));
+    const GroupElement spentOnlyTag = DeterministicPoint(192);
+
+    BOOST_CHECK(state.AddActiveStake(activeRecord));
+    BOOST_CHECK(state.AddSpentTag(spentOnlyTag, 408));
+
+    BOOST_CHECK(state.ApplyAcceptedStakesSkeleton({}, 409));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(activeRecord.T));
+    BOOST_CHECK(state.IsSpentTag(spentOnlyTag));
+}
+
+BOOST_AUTO_TEST_CASE(state_apply_accepted_stakes_skeleton_rejects_negative_height_without_mutation)
+{
+    helsing::CHelsingState state;
+    helsing::StakeTx tx = ValidStakeTx();
+    const uint256 stakeId = DeterministicHash(180);
+
+    BOOST_CHECK(!state.ApplyAcceptedStakesSkeleton({{stakeId, tx}}, -1));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 0U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 0U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(!state.IsActiveTag(tx.T));
+    BOOST_CHECK(state.GetStakeRecord(stakeId) == nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(state_apply_accepted_stakes_skeleton_rejects_invalid_batch_without_partial_mutation)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord existingRecord = ActiveRecord(181, DeterministicPoint(193));
+    helsing::StakeTx first = ValidStakeTx();
+    helsing::StakeTx duplicateTag = ValidStakeTx();
+    helsing::StakeTx validAfterFailure = ValidStakeTx();
+    duplicateTag.T = first.T;
+    validAfterFailure.T = DeterministicPoint(194);
+    const uint256 firstStakeId = DeterministicHash(182);
+    const uint256 duplicateStakeId = DeterministicHash(183);
+    const uint256 validAfterFailureStakeId = DeterministicHash(184);
+
+    BOOST_CHECK(state.AddActiveStake(existingRecord));
+    BOOST_CHECK(!state.ApplyAcceptedStakesSkeleton({{firstStakeId, first}, {duplicateStakeId, duplicateTag}, {validAfterFailureStakeId, validAfterFailure}}, 410));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(existingRecord.T));
+    BOOST_CHECK(!state.IsActiveTag(first.T));
+    BOOST_CHECK(!state.IsActiveTag(validAfterFailure.T));
+    BOOST_CHECK(state.GetStakeRecord(firstStakeId) == nullptr);
+    BOOST_CHECK(state.GetStakeRecord(duplicateStakeId) == nullptr);
+    BOOST_CHECK(state.GetStakeRecord(validAfterFailureStakeId) == nullptr);
+
+    uint256 nullStakeId;
+    BOOST_CHECK(!state.ApplyAcceptedStakesSkeleton({{nullStakeId, first}}, 411));
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+
+    helsing::StakeTx spentTagTx = ValidStakeTx();
+    spentTagTx.T = DeterministicPoint(195);
+    BOOST_CHECK(state.AddSpentTag(spentTagTx.T, 412));
+    BOOST_CHECK(!state.ApplyAcceptedStakesSkeleton({{DeterministicHash(185), spentTagTx}}, 413));
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+}
+
 BOOST_AUTO_TEST_CASE(state_apply_accepted_stake_update_skeleton_updates_only_metadata)
 {
     helsing::CHelsingState state;

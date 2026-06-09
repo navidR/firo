@@ -25,12 +25,14 @@ Current scope:
 - `CheckPayoutEligibilitySkeleton` performs revised spec `PayoutVerify` steps 3-7 only: stake record lookup, active status, spent-tag checks, and payout maturity.
 - `ArePayoutIndexesDistinctSkeleton` checks the revised spec section 16 duplicate-`payout_index` rule for a caller-supplied payout set.
 - `CheckStakeUpdateEligibilitySkeleton` performs revised spec `StakeUpdateVerify` steps 1-3 only: stake record lookup, active status, and spent-tag checks.
+- `ApplyAcceptedStakesSkeleton` applies already accepted new stakes to in-memory `ActiveTags` and `StakeRecords`; it takes caller-supplied `stake_id` values because canonical stake-id hashing is not implemented.
 - `ApplyAcceptedStakeUpdateSkeleton` applies an already accepted update to `StakeRecords` by changing only `m` and `last_update_height`; it does not validate contexts or signatures.
 - `ApplyBlockSpentTagsSkeleton` applies an already validated `BlockSpentTags` set to in-memory `SpentTags`, `ActiveTags`, and matching `StakeRecords`.
 
 Not implemented yet:
 
 - canonical `stake_stmt`, `incoins_root`, and context hashing
+- canonical `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction
 - final `StakeVerify` check ordering matching the revised spec once value parameters and context validation are wired
 - wiring cover-set output checks into `StakeVerify` after public Helsing parameters are selected
 - Spark maturity and cover-set eligibility rules using current height and consensus maturity parameters
@@ -41,6 +43,7 @@ Not implemented yet:
 - consensus block-level `BlockSpentTags` extraction/integration
 - persistent block undo data for Helsing state mutations
 - consensus block-level duplicate new stake tag integration
+- consensus wiring for applying accepted new stakes during deterministic block application
 - full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, and deterministic Spark payout coin comparison
 - deterministic payout ordinal selection and payout identifier `j` construction
 - canonical `chain_id`, `enc_int`, `enc_hash`, and `enc_bytes` encodings for payout-id construction
