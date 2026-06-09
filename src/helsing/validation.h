@@ -35,6 +35,7 @@ enum class StakeValidationResult {
     OUTPUT_ID_MISMATCH,
     INVALID_OUTPUT_RECORD,
     OUTPUT_NOT_ELIGIBLE,
+    OUTPUT_SPARK_RULES_FAILED,
 };
 
 const char* StakeValidationResultToString(StakeValidationResult result);
@@ -74,6 +75,11 @@ struct StakeVerificationContextSkeletonResult {
 struct StakeVerificationCoverSetSkeletonResult {
     StakeVerificationContextSkeletonResult context_result;
     StakeValidationResult cover_set_result{StakeValidationResult::OK};
+};
+
+struct StakeVerificationOutputSkeletonResult {
+    StakeVerificationCoverSetSkeletonResult cover_set_result;
+    StakeValidationResult output_result{StakeValidationResult::OK};
 };
 
 struct ValidationStateView {
@@ -154,6 +160,12 @@ StakeValidationResult CheckStakeCoverSetIdentifiersSkeleton(const std::vector<Ou
 // Revised spec StakeVerify steps 1-6 only. This composes the caller-supplied
 // prefix/context facts with step 6 identifiers and stops before output lookup.
 StakeVerificationCoverSetSkeletonResult CheckStakeVerificationCoverSetSkeleton(const StakeTx& tx, const CHelsingState& helsingState, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m);
+// Revised spec StakeVerify step 7 explicit predicates only: output lookup,
+// helsing_eligible, and caller-supplied Spark maturity/cover-set rule status.
+StakeValidationResult CheckStakeCoverSetOutputRulesSkeleton(const std::vector<OutputId>& inCoinIDs, const ValidationStateView& view, const std::map<OutputId, bool>& outputSatisfiesSparkRules);
+// Revised spec StakeVerify steps 1-7 only. This composes caller-supplied
+// context/Spark facts and stops before statement hashes and proof verification.
+StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& outputSatisfiesSparkRules);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

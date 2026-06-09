@@ -54,6 +54,8 @@ const char* StakeValidationResultToString(StakeValidationResult result)
         return "INVALID_OUTPUT_RECORD";
     case StakeValidationResult::OUTPUT_NOT_ELIGIBLE:
         return "OUTPUT_NOT_ELIGIBLE";
+    case StakeValidationResult::OUTPUT_SPARK_RULES_FAILED:
+        return "OUTPUT_SPARK_RULES_FAILED";
     }
 
     return "UNKNOWN";
@@ -341,6 +343,66 @@ StakeVerificationCoverSetSkeletonResult CheckStakeVerificationCoverSetSkeleton(
     }
 
     result.cover_set_result = CheckStakeCoverSetIdentifiersSkeleton(tx.inCoinIDs, n, m);
+    return result;
+}
+
+StakeValidationResult CheckStakeCoverSetOutputRulesSkeleton(const std::vector<OutputId>& inCoinIDs, const ValidationStateView& view, const std::map<OutputId, bool>& outputSatisfiesSparkRules)
+{
+    for (const OutputId& output_id : inCoinIDs) {
+        const SparkOutputRecord* output = view.FindSparkOutput(output_id);
+        if (output == nullptr) {
+            return StakeValidationResult::OUTPUT_NOT_FOUND;
+        }
+        if (!output->helsing_eligible) {
+            return StakeValidationResult::OUTPUT_NOT_ELIGIBLE;
+        }
+        const auto rulesIt = outputSatisfiesSparkRules.find(output_id);
+        if (rulesIt == outputSatisfiesSparkRules.end() || !rulesIt->second) {
+            return StakeValidationResult::OUTPUT_SPARK_RULES_FAILED;
+        }
+    }
+
+    return StakeValidationResult::OK;
+}
+
+StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(
+    const StakeTx& tx,
+    const CHelsingState& helsingState,
+    const ValidationStateView& view,
+    CAmount stakeValue,
+    CAmount vMax,
+    bool vMaxLessThanGroupOrder,
+    bool canonicalEncodingsValid,
+    bool canonicalContextValid,
+    bool payoutAddressValid,
+    bool updatePublicKeyValid,
+    bool nodeSigningKeyMaterialValid,
+    size_t n,
+    size_t m,
+    const std::map<OutputId, bool>& outputSatisfiesSparkRules)
+{
+    StakeVerificationOutputSkeletonResult result;
+    result.cover_set_result = CheckStakeVerificationCoverSetSkeleton(
+        tx,
+        helsingState,
+        stakeValue,
+        vMax,
+        vMaxLessThanGroupOrder,
+        canonicalEncodingsValid,
+        canonicalContextValid,
+        payoutAddressValid,
+        updatePublicKeyValid,
+        nodeSigningKeyMaterialValid,
+        n,
+        m);
+    if (result.cover_set_result.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||
+        result.cover_set_result.context_result.tag_result != StakeValidationResult::OK ||
+        !result.cover_set_result.context_result.context_valid ||
+        result.cover_set_result.cover_set_result != StakeValidationResult::OK) {
+        return result;
+    }
+
+    result.output_result = CheckStakeCoverSetOutputRulesSkeleton(tx.inCoinIDs, view, outputSatisfiesSparkRules);
     return result;
 }
 

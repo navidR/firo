@@ -32,6 +32,8 @@ Current scope:
 - `CheckStakeVerificationContextSkeleton` composes revised spec `StakeVerify` steps 1-5 only: field presence, caller-supplied canonical encodings, caller-supplied value parameters, parent-state tag checks, and caller-supplied context facts. It deliberately stops before same-block `BlockSpentTags`, cover-set lookup, statement hashes, and proof verification.
 - `CheckStakeCoverSetIdentifiersSkeleton` checks revised spec `StakeVerify` step 6 only: `len(InCoinIDs) = N = n^m` and strictly sorted distinct output identifiers. It deliberately stops before output lookup, output eligibility, Spark maturity, statement hashes, and proof verification.
 - `CheckStakeVerificationCoverSetSkeleton` composes revised spec `StakeVerify` steps 1-6 only using caller-supplied canonical/context facts and public cover-set parameters. It deliberately stops before output lookup, output eligibility, Spark maturity, statement hashes, and proof verification.
+- `CheckStakeCoverSetOutputRulesSkeleton` checks revised spec `StakeVerify` step 7 explicit predicates only: each `output_id` exists in `SparkOutputs`, `helsing_eligible` is true, and caller-supplied Spark maturity/cover-set rules pass. It assumes `SparkOutputs` records already came from ordinary Spark consensus validation and does not define those Spark rules.
+- `CheckStakeVerificationOutputsSkeleton` composes revised spec `StakeVerify` steps 1-7 only using caller-supplied canonical/context/Spark facts. It deliberately stops before `incoins_root`, `context_hash`, `stake_stmt`, `ParVerify`, `RepVerify`, and `TagVerify`.
 - `IsExpectedPayoutAmountInRangeSkeleton` checks the revised spec `PayoutVerify` step 10 equality and integer range for caller-supplied values.
 - `IsPayoutValueParameterInRangeSkeleton` checks revised spec `PayoutVerify` step 10 for caller-supplied `V_PAYOUT`, expected amount, `V_MAX`, and `V_MAX < q`; it does not expose the scalar order, perform scalar conversion, or recompute payout amounts.
 - `IsCompletePayoutTxSkeleton` checks that caller-supplied `PayoutTxSkeleton` identity/address/coin fields are populated before future payout verification; it does not define payout address or coin encodings.
@@ -63,8 +65,8 @@ Not implemented yet:
 
 - canonical `stake_stmt`, `incoins_root`, and context hashing
 - canonical `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction
-- final `StakeVerify` steps 7-12 after Spark output lookup/maturity rules, statement hashes, and proof verification are implemented
-- wiring cover-set output checks into `StakeVerify` after Spark maturity and cover-set eligibility rules are selected, without changing the step-1-through-6 helper into a full verifier
+- final `StakeVerify` steps 8-12 after statement hashes and proof verification are implemented
+- replacing caller-supplied Spark maturity/cover-set facts with concrete Spark consensus checks without changing the step-1-through-7 helper into a full verifier
 - Spark maturity and cover-set eligibility rules using current height and consensus maturity parameters
 - wiring value-domain checks for `V_STAKE`, `V_PAYOUT`, `V_MAX < q`, scalar conversion bounds, and ordinary fees outside the collateral proof
 - any decision to reintroduce an optional collateral margin as a consensus policy
