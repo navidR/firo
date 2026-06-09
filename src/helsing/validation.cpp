@@ -207,6 +207,15 @@ bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx)
            !tx.sig_update.empty();
 }
 
+bool IsCompleteStakeTxSkeleton(const StakeTx& tx)
+{
+    return !tx.inCoinIDs.empty() &&
+           !tx.m.bytes.empty() &&
+           !tx.pi_par.empty() &&
+           !tx.pi_val.empty() &&
+           !tx.pi_tag.empty();
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {

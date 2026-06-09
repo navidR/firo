@@ -101,6 +101,9 @@ PayoutPublicValidationResult CheckPayoutPublicFieldsSkeleton(const PayoutTxSkele
 // Revised spec StakeUpdateTx field-completeness only. This does not parse contexts,
 // extract update_pk, define enc_context(m_new), or verify sig_update.
 bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx);
+// Revised spec StakeTx field-completeness only. This does not check output-id grammar,
+// group-element encodings, context grammar, value parameters, or proof validity.
+bool IsCompleteStakeTxSkeleton(const StakeTx& tx);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

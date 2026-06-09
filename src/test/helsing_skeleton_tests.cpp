@@ -355,6 +355,63 @@ BOOST_AUTO_TEST_CASE(expected_payout_amount_helper_checks_equality_and_range)
     BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::max()));
 }
 
+BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_accepts_populated_fields)
+{
+    const helsing::StakeTx tx = ValidStakeTx();
+
+    BOOST_CHECK(helsing::IsCompleteStakeTxSkeleton(tx));
+}
+
+BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_rejects_missing_fields)
+{
+    helsing::StakeTx tx;
+    BOOST_CHECK(!helsing::IsCompleteStakeTxSkeleton(tx));
+
+    tx.inCoinIDs = {helsing::OutputId()};
+    tx.m.bytes = {0x6d};
+    tx.pi_par.bytes = {0x01};
+    tx.pi_val.bytes = {0x02};
+    tx.pi_tag.bytes = {0x03};
+    BOOST_REQUIRE(helsing::IsCompleteStakeTxSkeleton(tx));
+
+    helsing::StakeTx changed = tx;
+    changed.inCoinIDs.clear();
+    BOOST_CHECK(!helsing::IsCompleteStakeTxSkeleton(changed));
+
+    changed = tx;
+    changed.m.bytes.clear();
+    BOOST_CHECK(!helsing::IsCompleteStakeTxSkeleton(changed));
+
+    changed = tx;
+    changed.pi_par.bytes.clear();
+    BOOST_CHECK(!helsing::IsCompleteStakeTxSkeleton(changed));
+
+    changed = tx;
+    changed.pi_val.bytes.clear();
+    BOOST_CHECK(!helsing::IsCompleteStakeTxSkeleton(changed));
+
+    changed = tx;
+    changed.pi_tag.bytes.clear();
+    BOOST_CHECK(!helsing::IsCompleteStakeTxSkeleton(changed));
+}
+
+BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_does_not_define_context_or_proof_grammar)
+{
+    helsing::StakeTx tx;
+    tx.inCoinIDs = {helsing::OutputId()};
+    tx.m.bytes = {0x00};
+    tx.pi_par.bytes = {0x00};
+    tx.pi_val.bytes = {0x00};
+    tx.pi_tag.bytes = {0x00};
+    BOOST_CHECK(helsing::IsCompleteStakeTxSkeleton(tx));
+
+    tx.m.bytes = {0xff, 0x00, 0x6d};
+    tx.pi_par.bytes = {0xff, 0x00, 0x01};
+    tx.pi_val.bytes = {0xff, 0x00, 0x02};
+    tx.pi_tag.bytes = {0xff, 0x00, 0x03};
+    BOOST_CHECK(helsing::IsCompleteStakeTxSkeleton(tx));
+}
+
 BOOST_AUTO_TEST_CASE(payout_tx_completeness_skeleton_accepts_populated_fields)
 {
     helsing::PayoutTxSkeleton tx;
