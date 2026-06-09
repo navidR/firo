@@ -153,6 +153,12 @@ bool IsCompletePayoutBlockContextSkeleton(const PayoutBlockContextSkeleton& cont
            !context.selected_stake_id.IsNull();
 }
 
+bool DoesPayoutContextMatchTxSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context)
+{
+    return tx.payout_index == context.payout_index &&
+           tx.selected_stake_id == context.selected_stake_id;
+}
+
 bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx)
 {
     return !tx.stake_id.IsNull() &&
