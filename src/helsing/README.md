@@ -24,6 +24,7 @@ Current scope:
 - `IsExpectedPayoutAmountInRangeSkeleton` checks the revised spec `PayoutVerify` step 10 equality and integer range for caller-supplied values.
 - `IsCompletePayoutTxSkeleton` checks that caller-supplied `PayoutTxSkeleton` identity/address/coin fields are populated before future payout verification; it does not define payout address or coin encodings.
 - `DoesPayoutAddressMatchRegisteredSkeleton` checks revised spec `PayoutVerify` step 8 byte equality against a caller-supplied, already extracted registered payout address.
+- `DoesPayoutStakeMatchExpectedSkeleton` checks revised spec `PayoutVerify` step 9 equality against a caller-supplied, already recomputed deterministic selected stake.
 - `DoesPayoutCoinMatchExpectedSkeleton` checks revised spec `PayoutVerify` step 13 byte equality against a caller-supplied, already recomputed payout coin.
 - `IsHelsingStakeValueWithMarginInRangeSkeleton` checks the revised spec optional collateral-margin integer sum rule for caller-supplied `V_STAKE`, `margin`, and `V_MAX`.
 - `CHelsingState` models `SpentTags`, `ActiveTags`, and `StakeRecords`.

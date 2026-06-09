@@ -65,6 +65,9 @@ bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx);
 // Revised spec PayoutVerify step 8 subset: compare the transaction address with the
 // caller-supplied, already extracted registered address. This does not parse context m.
 bool DoesPayoutAddressMatchRegisteredSkeleton(const PayoutTxSkeleton& tx, const PayoutAddressBlob& registeredAddress);
+// Revised spec PayoutVerify step 9 subset: compare the transaction selected stake
+// with the caller-supplied, already recomputed deterministic selection.
+bool DoesPayoutStakeMatchExpectedSkeleton(const PayoutTxSkeleton& tx, const uint256& expectedStakeId);
 // Revised spec PayoutVerify step 13 subset: compare the transaction coin with the
 // caller-supplied, already recomputed payout coin. This does not construct j or run Payout.
 bool DoesPayoutCoinMatchExpectedSkeleton(const PayoutTxSkeleton& tx, const PayoutCoinBlob& expectedCoin);

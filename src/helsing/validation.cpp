@@ -140,6 +140,13 @@ bool DoesPayoutAddressMatchRegisteredSkeleton(const PayoutTxSkeleton& tx, const 
     return !tx.addr_pk.empty() && !registeredAddress.empty() && tx.addr_pk.bytes == registeredAddress.bytes;
 }
 
+bool DoesPayoutStakeMatchExpectedSkeleton(const PayoutTxSkeleton& tx, const uint256& expectedStakeId)
+{
+    return !tx.selected_stake_id.IsNull() &&
+           !expectedStakeId.IsNull() &&
+           tx.selected_stake_id == expectedStakeId;
+}
+
 bool DoesPayoutCoinMatchExpectedSkeleton(const PayoutTxSkeleton& tx, const PayoutCoinBlob& expectedCoin)
 {
     return !tx.coin.empty() && !expectedCoin.empty() && tx.coin.bytes == expectedCoin.bytes;

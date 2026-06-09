@@ -491,6 +491,42 @@ BOOST_AUTO_TEST_CASE(payout_address_match_skeleton_rejects_mismatch_and_empty_bl
     BOOST_CHECK(!helsing::DoesPayoutAddressMatchRegisteredSkeleton(tx, registeredAddress));
 }
 
+BOOST_AUTO_TEST_CASE(payout_stake_match_skeleton_compares_recomputed_selection)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(251);
+    tx.payout_index = 19;
+    tx.addr_pk.bytes = {0x61};
+    tx.V_PAYOUT = 46;
+    tx.coin.bytes = {0x63};
+
+    BOOST_CHECK(helsing::DoesPayoutStakeMatchExpectedSkeleton(tx, tx.selected_stake_id));
+
+    helsing::PayoutTxSkeleton changed = tx;
+    changed.payout_index = 20;
+    changed.addr_pk.bytes = {0x64};
+    changed.V_PAYOUT = 47;
+    changed.coin.bytes = {0x64};
+    BOOST_CHECK(helsing::DoesPayoutStakeMatchExpectedSkeleton(changed, tx.selected_stake_id));
+}
+
+BOOST_AUTO_TEST_CASE(payout_stake_match_skeleton_rejects_mismatch_and_null_ids)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(252);
+    const uint256 expectedStakeId = DeterministicHash(253);
+
+    BOOST_CHECK(!helsing::DoesPayoutStakeMatchExpectedSkeleton(tx, expectedStakeId));
+
+    BOOST_CHECK(helsing::DoesPayoutStakeMatchExpectedSkeleton(tx, tx.selected_stake_id));
+
+    tx.selected_stake_id.SetNull();
+    BOOST_CHECK(!helsing::DoesPayoutStakeMatchExpectedSkeleton(tx, expectedStakeId));
+
+    tx.selected_stake_id = DeterministicHash(254);
+    BOOST_CHECK(!helsing::DoesPayoutStakeMatchExpectedSkeleton(tx, uint256()));
+}
+
 BOOST_AUTO_TEST_CASE(payout_coin_match_skeleton_compares_recomputed_coin)
 {
     helsing::PayoutTxSkeleton tx;
