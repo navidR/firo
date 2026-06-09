@@ -75,6 +75,9 @@ bool IsValidCoverSetCardinality(size_t count, size_t n, size_t m);
 bool IsStakeMatureForPayout(int activationHeight, int currentHeight, int stakeMaturity);
 // Revised spec integer-domain value bound. The caller must separately enforce V_MAX < q.
 bool IsHelsingValueInRange(CAmount value, CAmount vMax);
+// Revised spec section 20 value-parameter bounds for caller-supplied public values.
+// This does not expose q or perform scalar conversion; the caller supplies V_MAX < q.
+bool AreHelsingValueParametersInRangeSkeleton(CAmount stakeValue, CAmount payoutValue, CAmount vMax, bool vMaxLessThanGroupOrder);
 // Revised spec PayoutVerify step 10 subset: V_PAYOUT equals the caller-recomputed expected amount
 // and satisfies the integer-domain range. The caller must separately enforce V_MAX < q.
 bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax);

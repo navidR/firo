@@ -123,6 +123,13 @@ bool IsHelsingValueInRange(CAmount value, CAmount vMax)
     return vMax > 0 && value >= 0 && value < vMax;
 }
 
+bool AreHelsingValueParametersInRangeSkeleton(CAmount stakeValue, CAmount payoutValue, CAmount vMax, bool vMaxLessThanGroupOrder)
+{
+    return vMaxLessThanGroupOrder &&
+           IsHelsingValueInRange(stakeValue, vMax) &&
+           IsHelsingValueInRange(payoutValue, vMax);
+}
+
 bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax)
 {
     return payoutValue == expectedAmount && IsHelsingValueInRange(payoutValue, vMax);
