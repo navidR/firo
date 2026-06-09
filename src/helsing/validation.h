@@ -103,6 +103,11 @@ bool ArePayoutIndexesDistinctSkeleton(const std::vector<PayoutTxSkeleton>& payou
 // Structural skeleton for revised-spec StakeUpdateVerify steps 1-3 only.
 StakeValidationResult CheckStakeUpdateEligibilitySkeleton(const uint256& stake_id, const ValidationStateView& view);
 
+// Block-level skeleton for revised-spec ValidateBlock step 4 and StakeUpdateVerify steps 1-3 only.
+// This deliberately stops before context parsing, signature verification, effective-height rules,
+// and same-block duplicate-update policy.
+StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view);
+
 } // namespace helsing
 
 #endif // FIRO_HELSING_VALIDATION_H

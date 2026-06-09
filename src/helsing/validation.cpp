@@ -454,4 +454,16 @@ StakeValidationResult CheckStakeUpdateEligibilitySkeleton(const uint256& stake_i
     return StakeValidationResult::OK;
 }
 
+StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view)
+{
+    for (const StakeUpdateTx& tx : update_txs) {
+        const StakeValidationResult result = CheckStakeUpdateEligibilitySkeleton(tx.stake_id, view);
+        if (result != StakeValidationResult::OK) {
+            return result;
+        }
+    }
+
+    return StakeValidationResult::OK;
+}
+
 } // namespace helsing

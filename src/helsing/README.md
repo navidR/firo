@@ -27,6 +27,7 @@ Current scope:
 - `CheckPayoutEligibilitySkeleton` performs revised spec `PayoutVerify` steps 3-7 only: stake record lookup, active status, spent-tag checks, and payout maturity.
 - `ArePayoutIndexesDistinctSkeleton` checks the revised spec section 16 duplicate-`payout_index` rule for a caller-supplied payout set.
 - `CheckStakeUpdateEligibilitySkeleton` performs revised spec `StakeUpdateVerify` steps 1-3 only: stake record lookup, active status, and spent-tag checks.
+- `CheckStakeUpdateBlockSkeleton` performs revised spec `ValidateBlock` step 4 and `StakeUpdateVerify` steps 1-3 only for a caller-supplied update set; it deliberately stops before context parsing, signature verification, effective-height rules, and same-block duplicate-update policy.
 - `ApplyAcceptedStakesSkeleton` applies already accepted new stakes to in-memory `ActiveTags` and `StakeRecords`; it takes caller-supplied `stake_id` values because canonical stake-id hashing is not implemented.
 - `ApplyAcceptedStakeUpdateSkeleton` applies an already accepted update to `StakeRecords` by changing only `m` and `last_update_height`; it does not validate contexts or signatures.
 - `ApplyAcceptedStakeUpdatesSkeleton` applies already accepted stake updates as an all-or-nothing batch; duplicate updates for the same `stake_id` are rejected by the unwired skeleton because the revised spec does not define same-block duplicate-update ordering.
