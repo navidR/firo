@@ -248,6 +248,18 @@ StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const
     return StakeVerificationPrefixSkeletonResult::OK;
 }
 
+StakeValidationResult CheckStakeTagStateSkeleton(const GroupElement& tag, const CHelsingState& helsingState)
+{
+    if (helsingState.IsSpentTag(tag)) {
+        return StakeValidationResult::TAG_ALREADY_SPENT;
+    }
+    if (helsingState.IsActiveTag(tag)) {
+        return StakeValidationResult::TAG_ALREADY_ACTIVE;
+    }
+
+    return StakeValidationResult::OK;
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {

@@ -128,6 +128,9 @@ bool IsCompleteStakeTxSkeleton(const StakeTx& tx);
 // Revised spec StakeVerify steps 1-3 only. The caller supplies the result of
 // canonical-encoding validation because the consensus grammar is not implemented here.
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid);
+// Revised spec StakeVerify step 4 only, against parent consensus state.
+// Same-block BlockSpentTags remain a separate block-validation pre-pass concern.
+StakeValidationResult CheckStakeTagStateSkeleton(const GroupElement& tag, const CHelsingState& helsingState);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

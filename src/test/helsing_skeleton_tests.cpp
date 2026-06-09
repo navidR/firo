@@ -448,6 +448,66 @@ BOOST_AUTO_TEST_CASE(stake_verification_prefix_skeleton_does_not_define_canonica
     BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, 0, 1, true, true) == helsing::StakeVerificationPrefixSkeletonResult::OK);
 }
 
+BOOST_AUTO_TEST_CASE(stake_tag_state_skeleton_accepts_unused_parent_tag)
+{
+    helsing::CHelsingState state;
+    const GroupElement tag = DeterministicPoint(60);
+    const GroupElement activeOtherTag = DeterministicPoint(61);
+    const GroupElement spentOtherTag = DeterministicPoint(62);
+
+    BOOST_CHECK(state.AddActiveStake(ActiveRecord(63, activeOtherTag)));
+    BOOST_CHECK(state.AddSpentTag(spentOtherTag, 200));
+
+    BOOST_CHECK(helsing::CheckStakeTagStateSkeleton(tag, state) == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(stake_tag_state_skeleton_rejects_prior_spent_tag)
+{
+    helsing::CHelsingState state;
+    const GroupElement tag = DeterministicPoint(64);
+    const GroupElement activeOtherTag = DeterministicPoint(65);
+
+    BOOST_CHECK(state.AddSpentTag(tag, 201));
+    BOOST_CHECK(state.AddActiveStake(ActiveRecord(66, activeOtherTag)));
+
+    BOOST_CHECK(helsing::CheckStakeTagStateSkeleton(tag, state) == helsing::StakeValidationResult::TAG_ALREADY_SPENT);
+}
+
+BOOST_AUTO_TEST_CASE(stake_tag_state_skeleton_rejects_active_tag)
+{
+    helsing::CHelsingState state;
+    const GroupElement tag = DeterministicPoint(67);
+    const GroupElement spentOtherTag = DeterministicPoint(68);
+
+    BOOST_CHECK(state.AddActiveStake(ActiveRecord(69, tag)));
+    BOOST_CHECK(state.AddSpentTag(spentOtherTag, 202));
+
+    BOOST_CHECK(helsing::CheckStakeTagStateSkeleton(tag, state) == helsing::StakeValidationResult::TAG_ALREADY_ACTIVE);
+}
+
+BOOST_AUTO_TEST_CASE(stake_tag_state_skeleton_does_not_mutate_state)
+{
+    helsing::CHelsingState state;
+    const GroupElement activeTag = DeterministicPoint(70);
+    const GroupElement spentTag = DeterministicPoint(71);
+    const GroupElement freshTag = DeterministicPoint(72);
+
+    BOOST_CHECK(state.AddActiveStake(ActiveRecord(73, activeTag)));
+    BOOST_CHECK(state.AddSpentTag(spentTag, 203));
+
+    BOOST_CHECK(helsing::CheckStakeTagStateSkeleton(freshTag, state) == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(helsing::CheckStakeTagStateSkeleton(activeTag, state) == helsing::StakeValidationResult::TAG_ALREADY_ACTIVE);
+    BOOST_CHECK(helsing::CheckStakeTagStateSkeleton(spentTag, state) == helsing::StakeValidationResult::TAG_ALREADY_SPENT);
+
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(activeTag));
+    BOOST_CHECK(state.IsSpentTag(spentTag));
+    BOOST_CHECK(!state.IsActiveTag(freshTag));
+    BOOST_CHECK(!state.IsSpentTag(freshTag));
+}
+
 BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_accepts_populated_fields)
 {
     const helsing::StakeTx tx = ValidStakeTx();
