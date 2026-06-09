@@ -9,6 +9,7 @@ Current scope:
 - `StakeTx` models `HelsingStakeTx = {InCoinIDs, S_prime, C_prime, T, m, Pi_par, Pi_val, Pi_tag}`.
 - `StakeUpdateTx` models the revised spec fields `{stake_id, m_new, sig_update}` as a byte-carrying data structure only.
 - `PayoutTxSkeleton` models the revised spec fields `{selected_stake_id, payout_index, addr_pk, V_PAYOUT, Coin}` as a byte-carrying data structure only.
+- `PayoutBlockContextSkeleton` models the revised spec section 16 payout-id input fields `{chain_id, block_height, prev_block_hash, payout_index, selected_stake_id}` without defining or computing `j`.
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
 - `ExtractSparkOutputRecords` builds a consensus-inert `(txid, vout) -> SparkOutputRecord` view from valid Spark mint and spend-created output scripts.
 - `IsValidCoverSetCardinality` checks the revised spec formula `len(InCoinIDs) = N = n^m` for caller-supplied public parameters.
@@ -40,6 +41,7 @@ Not implemented yet:
 - consensus block-level duplicate new stake tag integration
 - full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, and deterministic Spark payout coin comparison
 - deterministic payout ordinal selection and payout identifier `j` construction
+- canonical `chain_id`, `enc_int`, `enc_hash`, and `enc_bytes` encodings for payout-id construction
 - real payout address and payout coin encodings for `PayoutTxSkeleton`
 - canonical stake context grammar, including payout address, update key, node signing material, and rejection of empty or non-canonical contexts
 - full stake update verification, including `update_pk` extraction, canonical `m_new` validation, `enc_context(m_new)`, canonical `sig_update`, update signature verification, and update effective-height rules

@@ -143,6 +143,15 @@ void CheckPayoutTxSkeletonEqual(const helsing::PayoutTxSkeleton& a, const helsin
     BOOST_CHECK(a.coin.bytes == b.coin.bytes);
 }
 
+void CheckPayoutBlockContextSkeletonEqual(const helsing::PayoutBlockContextSkeleton& a, const helsing::PayoutBlockContextSkeleton& b)
+{
+    BOOST_CHECK(a.chain_id == b.chain_id);
+    BOOST_CHECK_EQUAL(a.block_height, b.block_height);
+    BOOST_CHECK(a.prev_block_hash == b.prev_block_hash);
+    BOOST_CHECK_EQUAL(a.payout_index, b.payout_index);
+    BOOST_CHECK(a.selected_stake_id == b.selected_stake_id);
+}
+
 template <typename T>
 std::string WireHex(const T& obj)
 {
@@ -2594,6 +2603,75 @@ BOOST_AUTO_TEST_CASE(payout_tx_skeleton_wire_hash_is_field_sensitive)
     BOOST_CHECK(WireHash(changed) != baseHash);
 }
 
+BOOST_AUTO_TEST_CASE(payout_block_context_skeleton_serialization_roundtrip)
+{
+    helsing::PayoutBlockContextSkeleton context;
+    context.chain_id = {0x66, 0x69, 0x72, 0x6f};
+    context.block_height = 123456;
+    context.prev_block_hash = DeterministicHash(171);
+    context.payout_index = 9;
+    context.selected_stake_id = DeterministicHash(172);
+
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << context;
+
+    helsing::PayoutBlockContextSkeleton decoded;
+    stream >> decoded;
+
+    CheckPayoutBlockContextSkeletonEqual(decoded, context);
+}
+
+BOOST_AUTO_TEST_CASE(payout_block_context_skeleton_wire_regression_vectors)
+{
+    helsing::PayoutBlockContextSkeleton context;
+    context.chain_id = {0x66, 0x69, 0x72, 0x6f};
+    context.block_height = 123456;
+    context.prev_block_hash = DeterministicHash(171);
+    context.payout_index = 9;
+    context.selected_stake_id = DeterministicHash(172);
+
+    const std::string chainId = "046669726f";
+    const std::string blockHeight = "40e20100";
+    const std::string prevBlockHash = WireHex(context.prev_block_hash);
+    const std::string payoutIndex = "09000000";
+    const std::string selectedStakeId = WireHex(context.selected_stake_id);
+
+    BOOST_CHECK_EQUAL(prevBlockHash, "ab00000000000000000000000000000000000000000000000000000000000000");
+    BOOST_CHECK_EQUAL(selectedStakeId, "ac00000000000000000000000000000000000000000000000000000000000000");
+    BOOST_CHECK_EQUAL(WireHex(context), chainId + blockHeight + prevBlockHash + payoutIndex + selectedStakeId);
+}
+
+BOOST_AUTO_TEST_CASE(payout_block_context_skeleton_wire_hash_is_field_sensitive)
+{
+    helsing::PayoutBlockContextSkeleton context;
+    context.chain_id = {0x66, 0x69, 0x72, 0x6f};
+    context.block_height = 123456;
+    context.prev_block_hash = DeterministicHash(173);
+    context.payout_index = 10;
+    context.selected_stake_id = DeterministicHash(174);
+    const uint256 baseHash = WireHash(context);
+
+    helsing::PayoutBlockContextSkeleton changed = context;
+    changed.chain_id.push_back(0x00);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = context;
+    ++changed.block_height;
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = context;
+    changed.prev_block_hash = DeterministicHash(175);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = context;
+    ++changed.payout_index;
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = context;
+    changed.selected_stake_id = DeterministicHash(176);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+}
+
 BOOST_AUTO_TEST_CASE(payout_index_skeleton_accepts_empty_single_and_distinct_indexes)
 {
     BOOST_CHECK(helsing::ArePayoutIndexesDistinctSkeleton({}));
@@ -2725,6 +2803,23 @@ BOOST_AUTO_TEST_CASE(stake_wire_deserialization_rejects_truncated_or_noncanonica
     nonCanonicalPayoutCoin.write("\xfd\x00\x00", 3);
     helsing::PayoutCoinBlob decodedPayoutCoin;
     BOOST_CHECK_THROW(nonCanonicalPayoutCoin >> decodedPayoutCoin, std::ios_base::failure);
+
+    const std::vector<unsigned char> serializedPayoutContext = ParseHex(WireHex(helsing::PayoutBlockContextSkeleton()));
+    BOOST_REQUIRE(!serializedPayoutContext.empty());
+    for (size_t prefixSize = 0; prefixSize < serializedPayoutContext.size(); ++prefixSize) {
+        BOOST_TEST_CONTEXT("payoutContextPrefixSize=" << prefixSize)
+        {
+            std::vector<unsigned char> prefix(serializedPayoutContext.begin(), serializedPayoutContext.begin() + prefixSize);
+            CDataStream truncated(prefix, SER_NETWORK, PROTOCOL_VERSION);
+            helsing::PayoutBlockContextSkeleton decodedPayoutContext;
+            BOOST_CHECK_THROW(truncated >> decodedPayoutContext, std::ios_base::failure);
+        }
+    }
+
+    CDataStream nonCanonicalPayoutChainId(SER_NETWORK, PROTOCOL_VERSION);
+    nonCanonicalPayoutChainId.write("\xfd\x00\x00", 3);
+    helsing::PayoutBlockContextSkeleton decodedPayoutContext;
+    BOOST_CHECK_THROW(nonCanonicalPayoutChainId >> decodedPayoutContext, std::ios_base::failure);
 }
 
 BOOST_AUTO_TEST_CASE(default_stake_tx_serialization_roundtrip)
@@ -2764,6 +2859,19 @@ BOOST_AUTO_TEST_CASE(default_payout_tx_skeleton_serialization_roundtrip)
     stream >> decoded;
 
     CheckPayoutTxSkeletonEqual(decoded, tx);
+}
+
+BOOST_AUTO_TEST_CASE(default_payout_block_context_skeleton_serialization_roundtrip)
+{
+    helsing::PayoutBlockContextSkeleton context;
+
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << context;
+
+    helsing::PayoutBlockContextSkeleton decoded;
+    stream >> decoded;
+
+    CheckPayoutBlockContextSkeletonEqual(decoded, context);
 }
 
 BOOST_AUTO_TEST_CASE(stake_tx_serialization_preserves_malformed_incoinids)

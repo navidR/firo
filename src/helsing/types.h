@@ -195,6 +195,28 @@ struct PayoutTxSkeleton {
     }
 };
 
+// Revised spec section 16 block-context fields for payout-id construction.
+// This does not define the consensus hash or enc_* grammar for j.
+struct PayoutBlockContextSkeleton {
+    std::vector<unsigned char> chain_id;
+    int32_t block_height{-1};
+    uint256 prev_block_hash;
+    uint32_t payout_index{0};
+    uint256 selected_stake_id;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(chain_id);
+        READWRITE(block_height);
+        READWRITE(prev_block_hash);
+        READWRITE(payout_index);
+        READWRITE(selected_stake_id);
+    }
+};
+
 enum class StakeStatus : uint8_t {
     ACTIVE = 0,
     SPENT = 1,
