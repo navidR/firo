@@ -54,7 +54,7 @@ const StakeRecord* CHelsingState::GetStakeRecord(const uint256& stake_id) const
 
 bool CHelsingState::AddActiveStake(const StakeRecord& record)
 {
-    if (record.stake_id.IsNull() || !IsUsableTag(record.T) || IsSpentTag(record.T) || IsActiveTag(record.T)) {
+    if (record.stake_id.IsNull() || record.nHeight < 0 || !IsUsableTag(record.T) || IsSpentTag(record.T) || IsActiveTag(record.T)) {
         return false;
     }
     if (stakeRecords.count(record.stake_id) != 0) {
@@ -72,7 +72,7 @@ bool CHelsingState::AddActiveStake(const StakeRecord& record)
 
 bool CHelsingState::AddSpentTag(const GroupElement& tag, int nHeight)
 {
-    if (!IsUsableTag(tag)) {
+    if (!IsUsableTag(tag) || nHeight < 0) {
         return false;
     }
 

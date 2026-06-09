@@ -16,12 +16,15 @@ enum class StakeValidationResult {
     OK,
     EMPTY_INCOINIDS,
     INCOINIDS_NOT_SORTED_DISTINCT,
+    INVALID_OUTPUT_ID,
     INVALID_GROUP_ELEMENT,
     MISSING_PROOF,
     TAG_ALREADY_SPENT,
     TAG_SPENT_IN_BLOCK,
     TAG_ALREADY_ACTIVE,
     OUTPUT_NOT_FOUND,
+    OUTPUT_ID_MISMATCH,
+    INVALID_OUTPUT_RECORD,
     OUTPUT_NOT_ELIGIBLE,
 };
 
@@ -37,7 +40,9 @@ struct ValidationStateView {
 };
 
 bool IsStrictlySortedAndDistinct(const std::vector<OutputId>& output_ids);
+bool IsValidOutputId(const OutputId& output_id);
 bool IsValidPublicPoint(const GroupElement& point);
+bool IsValidSparkOutputRecord(const SparkOutputRecord& output);
 
 // Structural skeleton for revised-spec StakeVerify. Proof verification is intentionally TODO.
 StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStateView& view);

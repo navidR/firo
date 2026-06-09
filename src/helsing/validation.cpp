@@ -15,6 +15,8 @@ const char* StakeValidationResultToString(StakeValidationResult result)
         return "EMPTY_INCOINIDS";
     case StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT:
         return "INCOINIDS_NOT_SORTED_DISTINCT";
+    case StakeValidationResult::INVALID_OUTPUT_ID:
+        return "INVALID_OUTPUT_ID";
     case StakeValidationResult::INVALID_GROUP_ELEMENT:
         return "INVALID_GROUP_ELEMENT";
     case StakeValidationResult::MISSING_PROOF:
@@ -27,6 +29,10 @@ const char* StakeValidationResultToString(StakeValidationResult result)
         return "TAG_ALREADY_ACTIVE";
     case StakeValidationResult::OUTPUT_NOT_FOUND:
         return "OUTPUT_NOT_FOUND";
+    case StakeValidationResult::OUTPUT_ID_MISMATCH:
+        return "OUTPUT_ID_MISMATCH";
+    case StakeValidationResult::INVALID_OUTPUT_RECORD:
+        return "INVALID_OUTPUT_RECORD";
     case StakeValidationResult::OUTPUT_NOT_ELIGIBLE:
         return "OUTPUT_NOT_ELIGIBLE";
     }
@@ -64,9 +70,24 @@ bool IsStrictlySortedAndDistinct(const std::vector<OutputId>& output_ids)
     return true;
 }
 
+bool IsValidOutputId(const OutputId& output_id)
+{
+    return !output_id.txid.IsNull();
+}
+
 bool IsValidPublicPoint(const GroupElement& point)
 {
     return point.isMember() && !point.isInfinity();
+}
+
+bool IsValidSparkOutputRecord(const SparkOutputRecord& output)
+{
+    return IsValidOutputId(output.output_id) &&
+           IsValidPublicPoint(output.S) &&
+           IsValidPublicPoint(output.C) &&
+           IsValidPublicPoint(output.K) &&
+           output.nHeight >= 0 &&
+           (output.type == SparkOutputType::MINT || output.type == SparkOutputType::SPEND);
 }
 
 StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStateView& view)
@@ -76,6 +97,11 @@ StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStat
     }
     if (!IsStrictlySortedAndDistinct(tx.inCoinIDs)) {
         return StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT;
+    }
+    for (const auto& output_id : tx.inCoinIDs) {
+        if (!IsValidOutputId(output_id)) {
+            return StakeValidationResult::INVALID_OUTPUT_ID;
+        }
     }
     if (!IsValidPublicPoint(tx.S_prime) || !IsValidPublicPoint(tx.C_prime) || !IsValidPublicPoint(tx.T)) {
         return StakeValidationResult::INVALID_GROUP_ELEMENT;
@@ -100,6 +126,12 @@ StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStat
         const SparkOutputRecord* output = view.FindSparkOutput(output_id);
         if (output == nullptr) {
             return StakeValidationResult::OUTPUT_NOT_FOUND;
+        }
+        if (output->output_id != output_id) {
+            return StakeValidationResult::OUTPUT_ID_MISMATCH;
+        }
+        if (!IsValidSparkOutputRecord(*output)) {
+            return StakeValidationResult::INVALID_OUTPUT_RECORD;
         }
         if (!output->helsing_eligible) {
             return StakeValidationResult::OUTPUT_NOT_ELIGIBLE;
