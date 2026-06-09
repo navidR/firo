@@ -89,6 +89,34 @@ struct SignatureBlob {
     }
 };
 
+struct PayoutAddressBlob {
+    std::vector<unsigned char> bytes;
+
+    bool empty() const { return bytes.empty(); }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(bytes);
+    }
+};
+
+struct PayoutCoinBlob {
+    std::vector<unsigned char> bytes;
+
+    bool empty() const { return bytes.empty(); }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(bytes);
+    }
+};
+
 enum class SparkOutputType : uint8_t {
     UNKNOWN = 0,
     MINT = 1,
@@ -144,6 +172,26 @@ struct StakeUpdateTx {
         READWRITE(stake_id);
         READWRITE(m_new);
         READWRITE(sig_update);
+    }
+};
+
+struct PayoutTxSkeleton {
+    uint256 selected_stake_id;
+    uint32_t payout_index{0};
+    PayoutAddressBlob addr_pk;
+    CAmount V_PAYOUT{0};
+    PayoutCoinBlob coin;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(selected_stake_id);
+        READWRITE(payout_index);
+        READWRITE(addr_pk);
+        READWRITE(V_PAYOUT);
+        READWRITE(coin);
     }
 };
 
