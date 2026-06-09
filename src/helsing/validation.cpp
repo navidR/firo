@@ -20,6 +20,8 @@ const char* StakeValidationResultToString(StakeValidationResult result)
         return "OK";
     case StakeValidationResult::EMPTY_INCOINIDS:
         return "EMPTY_INCOINIDS";
+    case StakeValidationResult::INVALID_COVER_SET_CARDINALITY:
+        return "INVALID_COVER_SET_CARDINALITY";
     case StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT:
         return "INCOINIDS_NOT_SORTED_DISTINCT";
     case StakeValidationResult::INVALID_OUTPUT_ID:
@@ -249,6 +251,39 @@ StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStat
     }
 
     for (const auto& output_id : tx.inCoinIDs) {
+        const SparkOutputRecord* output = view.FindSparkOutput(output_id);
+        if (output == nullptr) {
+            return StakeValidationResult::OUTPUT_NOT_FOUND;
+        }
+        if (output->output_id != output_id) {
+            return StakeValidationResult::OUTPUT_ID_MISMATCH;
+        }
+        if (!IsValidSparkOutputRecord(*output)) {
+            return StakeValidationResult::INVALID_OUTPUT_RECORD;
+        }
+        if (!output->helsing_eligible) {
+            return StakeValidationResult::OUTPUT_NOT_ELIGIBLE;
+        }
+    }
+
+    return StakeValidationResult::OK;
+}
+
+StakeValidationResult CheckCoverSetOutputsSkeleton(const std::vector<OutputId>& inCoinIDs, const ValidationStateView& view, size_t n, size_t m)
+{
+    if (!IsValidCoverSetCardinality(inCoinIDs.size(), n, m)) {
+        return StakeValidationResult::INVALID_COVER_SET_CARDINALITY;
+    }
+    if (!IsStrictlySortedAndDistinct(inCoinIDs)) {
+        return StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT;
+    }
+    for (const auto& output_id : inCoinIDs) {
+        if (!IsValidOutputId(output_id)) {
+            return StakeValidationResult::INVALID_OUTPUT_ID;
+        }
+    }
+
+    for (const auto& output_id : inCoinIDs) {
         const SparkOutputRecord* output = view.FindSparkOutput(output_id);
         if (output == nullptr) {
             return StakeValidationResult::OUTPUT_NOT_FOUND;

@@ -18,6 +18,7 @@ namespace helsing {
 enum class StakeValidationResult {
     OK,
     EMPTY_INCOINIDS,
+    INVALID_COVER_SET_CARDINALITY,
     INCOINIDS_NOT_SORTED_DISTINCT,
     INVALID_OUTPUT_ID,
     INVALID_GROUP_ELEMENT,
@@ -70,6 +71,10 @@ bool ExtractSparkOutputRecords(const CTransaction& tx, int nHeight, std::map<Out
 
 // Structural skeleton for revised-spec StakeVerify. Proof verification is intentionally TODO.
 StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStateView& view);
+
+// Revised-spec cover-set output checks with caller-supplied public parameters.
+// This stops before Spark maturity/cover-set rules and proof verification.
+StakeValidationResult CheckCoverSetOutputsSkeleton(const std::vector<OutputId>& inCoinIDs, const ValidationStateView& view, size_t n, size_t m);
 
 // Non-mutating block-level skeleton for same-block Helsing stake checks.
 StakeValidationResult CheckStakeBlockSkeleton(const std::vector<StakeTx>& stake_txs, const ValidationStateView& view);

@@ -320,6 +320,77 @@ BOOST_AUTO_TEST_CASE(value_range_helper_checks_revised_spec_integer_domain)
     BOOST_CHECK(!helsing::IsHelsingValueInRange(std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max()));
 }
 
+BOOST_AUTO_TEST_CASE(cover_set_output_skeleton_accepts_valid_public_power)
+{
+    const std::vector<helsing::OutputId> inCoinIDs = {Output(1, 0), Output(2, 0), Output(3, 0), Output(4, 0)};
+    helsing::ValidationStateView view;
+    unsigned char pointTag = 20;
+    for (const helsing::OutputId& output_id : inCoinIDs) {
+        view.sparkOutputs.emplace(output_id, EligibleOutput(output_id, pointTag));
+        pointTag += 10;
+    }
+
+    BOOST_CHECK(helsing::CheckCoverSetOutputsSkeleton(inCoinIDs, view, 2, 2) == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(cover_set_output_skeleton_cardinality_precedes_other_failures)
+{
+    const std::vector<helsing::OutputId> inCoinIDs = {Output(2, 0), Output(1, 0), helsing::OutputId()};
+    helsing::ValidationStateView view;
+
+    BOOST_CHECK(helsing::CheckCoverSetOutputsSkeleton(inCoinIDs, view, 2, 2) == helsing::StakeValidationResult::INVALID_COVER_SET_CARDINALITY);
+}
+
+BOOST_AUTO_TEST_CASE(cover_set_output_skeleton_order_precedes_id_and_lookup_failures)
+{
+    const std::vector<helsing::OutputId> inCoinIDs = {Output(2, 0), Output(1, 0), helsing::OutputId(), Output(3, 0)};
+    helsing::ValidationStateView view;
+
+    BOOST_CHECK(helsing::CheckCoverSetOutputsSkeleton(inCoinIDs, view, 2, 2) == helsing::StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT);
+}
+
+BOOST_AUTO_TEST_CASE(cover_set_output_skeleton_id_precedes_lookup_failures)
+{
+    const std::vector<helsing::OutputId> inCoinIDs = {helsing::OutputId(), Output(1, 0), Output(2, 0), Output(3, 0)};
+    helsing::ValidationStateView view;
+
+    BOOST_CHECK(helsing::CheckCoverSetOutputsSkeleton(inCoinIDs, view, 2, 2) == helsing::StakeValidationResult::INVALID_OUTPUT_ID);
+}
+
+BOOST_AUTO_TEST_CASE(cover_set_output_skeleton_checks_output_records_in_spec_order)
+{
+    const std::vector<helsing::OutputId> inCoinIDs = {Output(1, 0), Output(2, 0), Output(3, 0), Output(4, 0)};
+    helsing::ValidationStateView view;
+    unsigned char pointTag = 20;
+    for (const helsing::OutputId& output_id : inCoinIDs) {
+        view.sparkOutputs.emplace(output_id, EligibleOutput(output_id, pointTag));
+        pointTag += 10;
+    }
+
+    view.sparkOutputs.erase(inCoinIDs[0]);
+    BOOST_CHECK(helsing::CheckCoverSetOutputsSkeleton(inCoinIDs, view, 2, 2) == helsing::StakeValidationResult::OUTPUT_NOT_FOUND);
+
+    view.sparkOutputs.clear();
+    pointTag = 20;
+    for (const helsing::OutputId& output_id : inCoinIDs) {
+        view.sparkOutputs.emplace(output_id, EligibleOutput(output_id, pointTag));
+        pointTag += 10;
+    }
+    view.sparkOutputs[inCoinIDs[0]].output_id = Output(99, 0);
+    view.sparkOutputs[inCoinIDs[0]].S = GroupElement();
+    view.sparkOutputs[inCoinIDs[0]].helsing_eligible = false;
+    BOOST_CHECK(helsing::CheckCoverSetOutputsSkeleton(inCoinIDs, view, 2, 2) == helsing::StakeValidationResult::OUTPUT_ID_MISMATCH);
+
+    view.sparkOutputs[inCoinIDs[0]] = EligibleOutput(inCoinIDs[0], 20);
+    view.sparkOutputs[inCoinIDs[0]].S = GroupElement();
+    view.sparkOutputs[inCoinIDs[0]].helsing_eligible = false;
+    BOOST_CHECK(helsing::CheckCoverSetOutputsSkeleton(inCoinIDs, view, 2, 2) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
+
+    view.sparkOutputs[inCoinIDs[0]] = EligibleOutput(inCoinIDs[0], 20);
+    view.sparkOutputs[inCoinIDs[0]].helsing_eligible = false;
+    BOOST_CHECK(helsing::CheckCoverSetOutputsSkeleton(inCoinIDs, view, 2, 2) == helsing::StakeValidationResult::OUTPUT_NOT_ELIGIBLE);
+}
+
 BOOST_AUTO_TEST_CASE(output_id_helper_rejects_null_txid)
 {
     BOOST_CHECK(!helsing::IsValidOutputId(helsing::OutputId()));
@@ -2129,6 +2200,7 @@ BOOST_AUTO_TEST_CASE(validation_result_strings_cover_all_values)
 {
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::OK), "OK");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::EMPTY_INCOINIDS), "EMPTY_INCOINIDS");
+    BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::INVALID_COVER_SET_CARDINALITY), "INVALID_COVER_SET_CARDINALITY");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT), "INCOINIDS_NOT_SORTED_DISTINCT");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::INVALID_OUTPUT_ID), "INVALID_OUTPUT_ID");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::INVALID_GROUP_ELEMENT), "INVALID_GROUP_ELEMENT");

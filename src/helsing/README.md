@@ -15,6 +15,7 @@ Current scope:
 - `IsHelsingValueInRange` checks the revised spec integer-domain bound `0 <= value < V_MAX` for caller-supplied values.
 - `CHelsingState` models `SpentTags`, `ActiveTags`, and `StakeRecords`.
 - `BuildBlockSpentTagsSkeleton` models the revised spec block pre-pass minimum rule for duplicate Spark spend tags and tags already in `SpentTags`; it assumes ordinary Spark spend validation supplied valid revealed tags.
+- `CheckCoverSetOutputsSkeleton` performs revised spec cover-set output checks for caller-supplied public parameters: `N = n^m`, sorted distinct output identifiers, output lookup, output record consistency, and `helsing_eligible`.
 - `CheckStakeSkeleton` performs structural checks only: sorted distinct `InCoinIDs`, non-infinity public group elements, non-empty proof blobs, tag conflicts, output existence, output record consistency, and `helsing_eligible`.
 - `CheckStakeBlockSkeleton` performs non-mutating block-level tag-state checks before per-stake skeleton validation, including duplicate new stake tags in the same block.
 - `CheckPayoutEligibilitySkeleton` performs revised spec `PayoutVerify` steps 3-7 only: stake record lookup, active status, spent-tag checks, and payout maturity.
@@ -24,7 +25,7 @@ Not implemented yet:
 
 - canonical `stake_stmt`, `incoins_root`, and context hashing
 - final `StakeVerify` check ordering matching the revised spec once value parameters and context validation are wired
-- wiring cover-set cardinality into `StakeVerify` after public Helsing parameters are selected
+- wiring cover-set output checks into `StakeVerify` after public Helsing parameters are selected
 - Spark maturity and cover-set eligibility rules using current height and consensus maturity parameters
 - wiring value-domain checks for `V_STAKE`, `V_PAYOUT`, `V_MAX < q`, scalar conversion bounds, and fees outside the collateral proof
 - `ParVerify`, `RepVerify`, and `TagVerify`
