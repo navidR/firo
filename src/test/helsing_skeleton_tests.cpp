@@ -281,6 +281,22 @@ BOOST_AUTO_TEST_CASE(cover_set_cardinality_requires_exact_public_power)
     BOOST_CHECK(!helsing::IsValidCoverSetCardinality(std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max(), 2));
 }
 
+BOOST_AUTO_TEST_CASE(payout_maturity_helper_checks_revised_spec_inequality)
+{
+    BOOST_CHECK(helsing::IsStakeMatureForPayout(100, 110, 10));
+    BOOST_CHECK(helsing::IsStakeMatureForPayout(100, 100, 0));
+    BOOST_CHECK(helsing::IsStakeMatureForPayout(0, 0, 0));
+    BOOST_CHECK(helsing::IsStakeMatureForPayout(std::numeric_limits<int>::max(), std::numeric_limits<int>::max(), 0));
+
+    BOOST_CHECK(!helsing::IsStakeMatureForPayout(100, 109, 10));
+    BOOST_CHECK(!helsing::IsStakeMatureForPayout(100, 99, 0));
+    BOOST_CHECK(!helsing::IsStakeMatureForPayout(-1, 100, 0));
+    BOOST_CHECK(!helsing::IsStakeMatureForPayout(100, -1, 0));
+    BOOST_CHECK(!helsing::IsStakeMatureForPayout(100, 110, -1));
+    BOOST_CHECK(!helsing::IsStakeMatureForPayout(std::numeric_limits<int>::max(), std::numeric_limits<int>::max(), 1));
+    BOOST_CHECK(!helsing::IsStakeMatureForPayout(std::numeric_limits<int>::max() - 1, std::numeric_limits<int>::max(), 2));
+}
+
 BOOST_AUTO_TEST_CASE(output_id_helper_rejects_null_txid)
 {
     BOOST_CHECK(!helsing::IsValidOutputId(helsing::OutputId()));

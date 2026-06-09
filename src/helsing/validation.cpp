@@ -98,6 +98,18 @@ bool IsValidCoverSetCardinality(size_t count, size_t n, size_t m)
     return count == expected;
 }
 
+bool IsStakeMatureForPayout(int activationHeight, int currentHeight, int stakeMaturity)
+{
+    if (activationHeight < 0 || currentHeight < 0 || stakeMaturity < 0) {
+        return false;
+    }
+    if (activationHeight > std::numeric_limits<int>::max() - stakeMaturity) {
+        return false;
+    }
+
+    return activationHeight + stakeMaturity <= currentHeight;
+}
+
 bool IsValidOutputId(const OutputId& output_id)
 {
     return !output_id.txid.IsNull();
