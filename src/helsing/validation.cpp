@@ -128,6 +128,13 @@ bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expected
     return payoutValue == expectedAmount && IsHelsingValueInRange(payoutValue, vMax);
 }
 
+bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx)
+{
+    return !tx.selected_stake_id.IsNull() &&
+           !tx.addr_pk.empty() &&
+           !tx.coin.empty();
+}
+
 bool DoesPayoutAddressMatchRegisteredSkeleton(const PayoutTxSkeleton& tx, const PayoutAddressBlob& registeredAddress)
 {
     return !tx.addr_pk.empty() && !registeredAddress.empty() && tx.addr_pk.bytes == registeredAddress.bytes;

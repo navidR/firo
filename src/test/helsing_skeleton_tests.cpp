@@ -355,6 +355,54 @@ BOOST_AUTO_TEST_CASE(expected_payout_amount_helper_checks_equality_and_range)
     BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::max()));
 }
 
+BOOST_AUTO_TEST_CASE(payout_tx_completeness_skeleton_accepts_populated_fields)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(232);
+    tx.payout_index = std::numeric_limits<uint32_t>::max();
+    tx.addr_pk.bytes = {0x61, 0x64, 0x64, 0x72};
+    tx.V_PAYOUT = 0;
+    tx.coin.bytes = {0x63, 0x6f, 0x69, 0x6e};
+
+    BOOST_CHECK(helsing::IsCompletePayoutTxSkeleton(tx));
+}
+
+BOOST_AUTO_TEST_CASE(payout_tx_completeness_skeleton_rejects_missing_fields)
+{
+    helsing::PayoutTxSkeleton tx;
+    BOOST_CHECK(!helsing::IsCompletePayoutTxSkeleton(tx));
+
+    tx.selected_stake_id = DeterministicHash(233);
+    tx.addr_pk.bytes = {0x61};
+    tx.coin.bytes = {0x63};
+    BOOST_REQUIRE(helsing::IsCompletePayoutTxSkeleton(tx));
+
+    helsing::PayoutTxSkeleton changed = tx;
+    changed.selected_stake_id.SetNull();
+    BOOST_CHECK(!helsing::IsCompletePayoutTxSkeleton(changed));
+
+    changed = tx;
+    changed.addr_pk.bytes.clear();
+    BOOST_CHECK(!helsing::IsCompletePayoutTxSkeleton(changed));
+
+    changed = tx;
+    changed.coin.bytes.clear();
+    BOOST_CHECK(!helsing::IsCompletePayoutTxSkeleton(changed));
+}
+
+BOOST_AUTO_TEST_CASE(payout_tx_completeness_skeleton_does_not_define_blob_grammar)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(234);
+    tx.addr_pk.bytes = {0x00};
+    tx.coin.bytes = {0x00};
+    BOOST_CHECK(helsing::IsCompletePayoutTxSkeleton(tx));
+
+    tx.addr_pk.bytes = {0xff, 0x00, 0x61};
+    tx.coin.bytes = {0xff, 0x00, 0x63};
+    BOOST_CHECK(helsing::IsCompletePayoutTxSkeleton(tx));
+}
+
 BOOST_AUTO_TEST_CASE(stake_update_completeness_skeleton_accepts_populated_fields)
 {
     helsing::StakeUpdateTx tx;

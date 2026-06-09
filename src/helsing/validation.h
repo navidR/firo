@@ -59,6 +59,9 @@ bool IsHelsingValueInRange(CAmount value, CAmount vMax);
 // Revised spec PayoutVerify step 10 subset: V_PAYOUT equals the caller-recomputed expected amount
 // and satisfies the integer-domain range. The caller must separately enforce V_MAX < q.
 bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax);
+// Revised spec PayoutTx field-completeness only. This does not check canonical
+// encodings, value-domain parameters, registered address, selected stake, j, or payout coin.
+bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx);
 // Revised spec PayoutVerify step 8 subset: compare the transaction address with the
 // caller-supplied, already extracted registered address. This does not parse context m.
 bool DoesPayoutAddressMatchRegisteredSkeleton(const PayoutTxSkeleton& tx, const PayoutAddressBlob& registeredAddress);
