@@ -84,6 +84,22 @@ bool CHelsingState::AddAcceptedStake(const uint256& stake_id, const StakeTx& tx,
     return AddActiveStake(record);
 }
 
+bool CHelsingState::ApplyAcceptedStakeUpdateSkeleton(const uint256& stake_id, const StakeContext& m_new, int nHeight)
+{
+    if (nHeight < 0) {
+        return false;
+    }
+
+    auto recordIt = stakeRecords.find(stake_id);
+    if (recordIt == stakeRecords.end() || recordIt->second.status != StakeStatus::ACTIVE) {
+        return false;
+    }
+
+    recordIt->second.m = m_new;
+    recordIt->second.nLastUpdateHeight = nHeight;
+    return true;
+}
+
 bool CHelsingState::AddSpentTag(const GroupElement& tag, int nHeight)
 {
     if (!IsUsableTag(tag) || nHeight < 0) {
