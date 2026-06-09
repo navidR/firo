@@ -4,6 +4,9 @@
 
 #include "helsing/validation.h"
 #include "hash.h"
+#include "libspark/mint_transaction.h"
+#include "primitives/transaction.h"
+#include "script/script.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
@@ -12,6 +15,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <limits>
+#include <map>
 
 namespace {
 
@@ -134,6 +138,72 @@ template <typename T>
 uint256 WireHash(const T& obj)
 {
     return SerializeHash(obj, SER_NETWORK, PROTOCOL_VERSION);
+}
+
+std::vector<unsigned char> SparkSerialContext(unsigned char tag)
+{
+    return {0x68, tag};
+}
+
+struct SparkOutputFixture {
+    CScript script;
+    spark::Coin coin;
+};
+
+SparkOutputFixture SparkMintOutput(uint64_t value, unsigned char tag)
+{
+    auto params = spark::Params::get_default();
+    const spark::SpendKey spend_key(params);
+    const spark::FullViewKey full_view_key(spend_key);
+    const spark::IncomingViewKey incoming_view_key(full_view_key);
+    const spark::Address address(incoming_view_key, tag);
+
+    spark::MintedCoinData mintedCoin;
+    mintedCoin.address = address;
+    mintedCoin.v = value;
+    mintedCoin.memo = "helsing mint";
+
+    spark::MintTransaction sparkMint(params, {mintedCoin}, SparkSerialContext(tag));
+    std::vector<CDataStream> serializedCoins = sparkMint.getMintedCoinsSerialized();
+
+    SparkOutputFixture fixture;
+    fixture.script << OP_SPARKMINT;
+    fixture.script.insert(fixture.script.end(), serializedCoins[0].begin(), serializedCoins[0].end());
+
+    std::vector<spark::Coin> coins;
+    sparkMint.getCoins(coins);
+    fixture.coin = coins[0];
+    return fixture;
+}
+
+SparkOutputFixture SparkSMintOutput(uint64_t value, unsigned char tag)
+{
+    auto params = spark::Params::get_default();
+    const spark::SpendKey spend_key(params);
+    const spark::FullViewKey full_view_key(spend_key);
+    const spark::IncomingViewKey incoming_view_key(full_view_key);
+    const spark::Address address(incoming_view_key, tag);
+
+    SparkOutputFixture fixture;
+    fixture.coin = spark::Coin(params, spark::COIN_TYPE_SPEND, Scalar(uint64_t(tag) + uint64_t(1)), address, value, "helsing smint", SparkSerialContext(tag));
+
+    CDataStream serialized(SER_NETWORK, PROTOCOL_VERSION);
+    serialized << fixture.coin;
+    fixture.script << OP_SPARKSMINT;
+    fixture.script.insert(fixture.script.end(), serialized.begin(), serialized.end());
+    return fixture;
+}
+
+void CheckSparkRecordMatchesCoin(const helsing::SparkOutputRecord& record, const helsing::OutputId& output_id, const spark::Coin& coin, int nHeight, helsing::SparkOutputType type)
+{
+    CheckOutputIdEqual(record.output_id, output_id);
+    BOOST_CHECK(record.S == coin.S);
+    BOOST_CHECK(record.C == coin.C);
+    BOOST_CHECK(record.K == coin.K);
+    BOOST_CHECK_EQUAL(record.nHeight, nHeight);
+    BOOST_CHECK(record.type == type);
+    BOOST_CHECK(!record.helsing_eligible);
+    BOOST_CHECK(helsing::IsValidSparkOutputRecord(record));
 }
 
 } // namespace
@@ -271,6 +341,158 @@ BOOST_AUTO_TEST_CASE(spark_output_record_helper_allows_ineligible_valid_records)
     record.helsing_eligible = false;
 
     BOOST_CHECK(helsing::IsValidSparkOutputRecord(record));
+}
+
+BOOST_AUTO_TEST_CASE(extracts_spark_mint_outputs_by_txid_vout)
+{
+    const SparkOutputFixture first = SparkMintOutput(1, 41);
+    const SparkOutputFixture second = SparkMintOutput(2, 42);
+
+    CMutableTransaction mtx;
+    mtx.vout.emplace_back(0, CScript() << OP_RETURN);
+    mtx.vout.emplace_back(1, first.script);
+    mtx.vout.emplace_back(2, second.script);
+    const CTransaction tx(mtx);
+
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    BOOST_CHECK(helsing::ExtractSparkOutputRecords(tx, 200, outputs));
+    BOOST_CHECK_EQUAL(outputs.size(), 2U);
+
+    const helsing::OutputId firstId(tx.GetHash(), 1);
+    const helsing::OutputId secondId(tx.GetHash(), 2);
+    BOOST_REQUIRE(outputs.count(firstId) == 1);
+    BOOST_REQUIRE(outputs.count(secondId) == 1);
+    CheckSparkRecordMatchesCoin(outputs.at(firstId), firstId, first.coin, 200, helsing::SparkOutputType::MINT);
+    CheckSparkRecordMatchesCoin(outputs.at(secondId), secondId, second.coin, 200, helsing::SparkOutputType::MINT);
+}
+
+BOOST_AUTO_TEST_CASE(extracts_spark_spend_created_outputs_by_txid_vout)
+{
+    const SparkOutputFixture smint = SparkSMintOutput(3, 43);
+
+    CMutableTransaction mtx;
+    mtx.nVersion = 3;
+    mtx.nType = TRANSACTION_SPARK;
+    mtx.vout.emplace_back(0, smint.script);
+    const CTransaction tx(mtx);
+
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    BOOST_CHECK(helsing::ExtractSparkOutputRecords(tx, 201, outputs));
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+
+    const helsing::OutputId outputId(tx.GetHash(), 0);
+    BOOST_REQUIRE(outputs.count(outputId) == 1);
+    CheckSparkRecordMatchesCoin(outputs.at(outputId), outputId, smint.coin, 201, helsing::SparkOutputType::SPEND);
+}
+
+BOOST_AUTO_TEST_CASE(extractor_preserves_duplicate_serial_commitments_under_distinct_output_ids)
+{
+    const SparkOutputFixture duplicate = SparkMintOutput(4, 44);
+
+    CMutableTransaction mtx;
+    mtx.vout.emplace_back(1, duplicate.script);
+    mtx.vout.emplace_back(1, duplicate.script);
+    const CTransaction tx(mtx);
+
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    BOOST_CHECK(helsing::ExtractSparkOutputRecords(tx, 202, outputs));
+    BOOST_CHECK_EQUAL(outputs.size(), 2U);
+
+    const helsing::OutputId firstId(tx.GetHash(), 0);
+    const helsing::OutputId secondId(tx.GetHash(), 1);
+    BOOST_REQUIRE(outputs.count(firstId) == 1);
+    BOOST_REQUIRE(outputs.count(secondId) == 1);
+    BOOST_CHECK(outputs.at(firstId).S == outputs.at(secondId).S);
+    BOOST_CHECK(outputs.at(firstId).output_id != outputs.at(secondId).output_id);
+}
+
+BOOST_AUTO_TEST_CASE(extractor_appends_records_for_block_view_accumulation)
+{
+    const SparkOutputFixture first = SparkMintOutput(5, 45);
+    const SparkOutputFixture second = SparkSMintOutput(6, 46);
+
+    CMutableTransaction firstMtx;
+    firstMtx.vout.emplace_back(1, first.script);
+    const CTransaction firstTx(firstMtx);
+
+    CMutableTransaction secondMtx;
+    secondMtx.nVersion = 3;
+    secondMtx.nType = TRANSACTION_SPARK;
+    secondMtx.vout.emplace_back(0, second.script);
+    const CTransaction secondTx(secondMtx);
+
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    BOOST_CHECK(helsing::ExtractSparkOutputRecords(firstTx, 203, outputs));
+    BOOST_CHECK(helsing::ExtractSparkOutputRecords(secondTx, 204, outputs));
+    BOOST_CHECK_EQUAL(outputs.size(), 2U);
+
+    const helsing::OutputId firstId(firstTx.GetHash(), 0);
+    const helsing::OutputId secondId(secondTx.GetHash(), 0);
+    BOOST_REQUIRE(outputs.count(firstId) == 1);
+    BOOST_REQUIRE(outputs.count(secondId) == 1);
+    CheckSparkRecordMatchesCoin(outputs.at(firstId), firstId, first.coin, 203, helsing::SparkOutputType::MINT);
+    CheckSparkRecordMatchesCoin(outputs.at(secondId), secondId, second.coin, 204, helsing::SparkOutputType::SPEND);
+}
+
+BOOST_AUTO_TEST_CASE(extractor_rejects_malformed_spark_outputs_without_partial_records)
+{
+    const SparkOutputFixture valid = SparkMintOutput(7, 47);
+    CScript malformed;
+    malformed << OP_SPARKMINT;
+
+    CMutableTransaction mtx;
+    mtx.vout.emplace_back(1, valid.script);
+    mtx.vout.emplace_back(1, malformed);
+    const CTransaction tx(mtx);
+
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId existing = Output(9, 0);
+    outputs.emplace(existing, EligibleOutput(existing, 90));
+    BOOST_CHECK(!helsing::ExtractSparkOutputRecords(tx, 205, outputs));
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+    BOOST_CHECK(outputs.count(existing) == 1);
+}
+
+BOOST_AUTO_TEST_CASE(extractor_rejects_duplicate_output_id_without_partial_records)
+{
+    const SparkOutputFixture first = SparkMintOutput(8, 48);
+    const SparkOutputFixture second = SparkMintOutput(9, 49);
+
+    CMutableTransaction mtx;
+    mtx.vout.emplace_back(1, first.script);
+    mtx.vout.emplace_back(1, second.script);
+    const CTransaction tx(mtx);
+
+    const helsing::OutputId existing(tx.GetHash(), 1);
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    outputs.emplace(existing, EligibleOutput(existing, 91));
+
+    BOOST_CHECK(!helsing::ExtractSparkOutputRecords(tx, 206, outputs));
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+    BOOST_CHECK(outputs.count(existing) == 1);
+}
+
+BOOST_AUTO_TEST_CASE(extractor_ignores_non_spark_transactions_and_rejects_negative_height)
+{
+    const SparkOutputFixture smint = SparkSMintOutput(10, 50);
+
+    CMutableTransaction mtx;
+    mtx.vout.emplace_back(1, smint.script);
+    const CTransaction tx(mtx);
+
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    BOOST_CHECK(helsing::ExtractSparkOutputRecords(tx, 204, outputs));
+    BOOST_CHECK(outputs.empty());
+
+    const SparkOutputFixture mint = SparkMintOutput(11, 51);
+    CMutableTransaction sparkMintTx;
+    sparkMintTx.vout.emplace_back(1, mint.script);
+    const CTransaction sparkTx(sparkMintTx);
+    const helsing::OutputId existing = Output(10, 0);
+    outputs.emplace(existing, EligibleOutput(existing, 91));
+    BOOST_CHECK(!helsing::ExtractSparkOutputRecords(sparkTx, -1, outputs));
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+    BOOST_CHECK(outputs.count(existing) == 1);
 }
 
 BOOST_AUTO_TEST_CASE(default_objects_are_structurally_invalid)

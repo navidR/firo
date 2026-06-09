@@ -10,6 +10,8 @@
 #include <map>
 #include <unordered_set>
 
+class CTransaction;
+
 namespace helsing {
 
 enum class StakeValidationResult {
@@ -44,6 +46,10 @@ bool IsStrictlySortedAndDistinct(const std::vector<OutputId>& output_ids);
 bool IsValidOutputId(const OutputId& output_id);
 bool IsValidPublicPoint(const GroupElement& point);
 bool IsValidSparkOutputRecord(const SparkOutputRecord& output);
+
+// Appends Spark mint/spend-created output records keyed by (txid, vout).
+// Leaves outputs unchanged on parse failure or duplicate output_id.
+bool ExtractSparkOutputRecords(const CTransaction& tx, int nHeight, std::map<OutputId, SparkOutputRecord>& outputs);
 
 // Structural skeleton for revised-spec StakeVerify. Proof verification is intentionally TODO.
 StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStateView& view);

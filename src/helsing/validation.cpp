@@ -4,6 +4,12 @@
 
 #include "helsing/validation.h"
 
+#include "primitives/transaction.h"
+#include "spark/state.h"
+
+#include <exception>
+#include <utility>
+
 namespace helsing {
 
 const char* StakeValidationResultToString(StakeValidationResult result)
@@ -90,6 +96,60 @@ bool IsValidSparkOutputRecord(const SparkOutputRecord& output)
            IsValidPublicPoint(output.K) &&
            output.nHeight >= 0 &&
            (output.type == SparkOutputType::MINT || output.type == SparkOutputType::SPEND);
+}
+
+bool ExtractSparkOutputRecords(const CTransaction& tx, int nHeight, std::map<OutputId, SparkOutputRecord>& outputs)
+{
+    if (nHeight < 0) {
+        return false;
+    }
+    if (!tx.IsSparkTransaction()) {
+        return true;
+    }
+
+    std::map<OutputId, SparkOutputRecord> extracted;
+    const uint256 txid = tx.GetHash();
+    for (uint32_t n = 0; n < tx.vout.size(); ++n) {
+        const CScript& script = tx.vout[n].scriptPubKey;
+        SparkOutputType type = SparkOutputType::UNKNOWN;
+        if (script.IsSparkMint()) {
+            type = SparkOutputType::MINT;
+        } else if (script.IsSparkSMint()) {
+            type = SparkOutputType::SPEND;
+        } else {
+            continue;
+        }
+
+        spark::Coin coin(spark::Params::get_default());
+        try {
+            spark::ParseSparkMintCoin(script, coin);
+        } catch (const std::exception&) {
+            return false;
+        }
+
+        SparkOutputRecord record;
+        record.output_id = OutputId(txid, n);
+        record.S = coin.S;
+        record.C = coin.C;
+        record.K = coin.K;
+        record.nHeight = nHeight;
+        record.type = type;
+        record.helsing_eligible = false;
+        if (!extracted.emplace(record.output_id, record).second) {
+            return false;
+        }
+    }
+
+    for (const auto& output : extracted) {
+        if (outputs.count(output.first) != 0) {
+            return false;
+        }
+    }
+
+    for (auto& output : extracted) {
+        outputs.emplace(output.first, std::move(output.second));
+    }
+    return true;
 }
 
 StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStateView& view)

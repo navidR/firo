@@ -8,13 +8,13 @@ Current scope:
 - `OutputId` models the revised spec identity `output_id = (txid, vout)`.
 - `StakeTx` models `HelsingStakeTx = {InCoinIDs, S_prime, C_prime, T, m, Pi_par, Pi_val, Pi_tag}`.
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
+- `ExtractSparkOutputRecords` builds a consensus-inert `(txid, vout) -> SparkOutputRecord` view from valid Spark mint and spend-created output scripts.
 - `CHelsingState` models `SpentTags`, `ActiveTags`, and `StakeRecords`.
 - `CheckStakeSkeleton` performs structural checks only: sorted distinct `InCoinIDs`, non-infinity public group elements, non-empty proof blobs, tag conflicts, output existence, output record consistency, and `helsing_eligible`.
 - `CheckStakeBlockSkeleton` performs non-mutating block-level tag-state checks before per-stake skeleton validation, including duplicate new stake tags in the same block.
 
 Not implemented yet:
 
-- extraction of `SparkOutputs[(txid, vout)]` from real Spark mint/spend outputs
 - canonical `stake_stmt`, `incoins_root`, and context hashing
 - final `StakeVerify` check ordering matching the revised spec once value parameters and context validation are wired
 - cover-set cardinality from public Helsing parameters
