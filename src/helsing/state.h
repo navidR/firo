@@ -29,6 +29,7 @@ public:
     bool ApplyAcceptedStakesSkeleton(const std::vector<std::pair<uint256, StakeTx>>& acceptedStakes, int nHeight);
     bool ApplyAcceptedStakeUpdateSkeleton(const uint256& stake_id, const StakeContext& m_new, int nHeight);
     bool ApplyAcceptedStakeUpdatesSkeleton(const std::vector<std::pair<uint256, StakeContext>>& acceptedUpdates, int nHeight);
+    bool ApplyAcceptedBlockSkeleton(const std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags, const std::vector<std::pair<uint256, StakeTx>>& acceptedStakes, const std::vector<std::pair<uint256, StakeContext>>& acceptedUpdates, int nHeight);
     bool ApplyBlockSpentTagsSkeleton(const std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags, int nHeight);
     bool AddSpentTag(const GroupElement& tag, int nHeight);
     bool RevokeStake(const uint256& stake_id);

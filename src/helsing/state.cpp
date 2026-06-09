@@ -143,6 +143,38 @@ bool CHelsingState::ApplyAcceptedStakeUpdatesSkeleton(const std::vector<std::pai
     return true;
 }
 
+bool CHelsingState::ApplyAcceptedBlockSkeleton(
+    const std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags,
+    const std::vector<std::pair<uint256, StakeTx>>& acceptedStakes,
+    const std::vector<std::pair<uint256, StakeContext>>& acceptedUpdates,
+    int nHeight)
+{
+    if (nHeight < 0) {
+        return false;
+    }
+
+    for (const auto& acceptedUpdate : acceptedUpdates) {
+        const StakeRecord* record = GetStakeRecord(acceptedUpdate.first);
+        if (record == nullptr || record->status != StakeStatus::ACTIVE || blockSpentTags.count(record->T) != 0) {
+            return false;
+        }
+    }
+
+    CHelsingState next = *this;
+    if (!next.ApplyBlockSpentTagsSkeleton(blockSpentTags, nHeight)) {
+        return false;
+    }
+    if (!next.ApplyAcceptedStakesSkeleton(acceptedStakes, nHeight)) {
+        return false;
+    }
+    if (!next.ApplyAcceptedStakeUpdatesSkeleton(acceptedUpdates, nHeight)) {
+        return false;
+    }
+
+    *this = next;
+    return true;
+}
+
 bool CHelsingState::ApplyBlockSpentTagsSkeleton(const std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags, int nHeight)
 {
     if (nHeight < 0) {

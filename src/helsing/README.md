@@ -29,6 +29,7 @@ Current scope:
 - `ApplyAcceptedStakeUpdateSkeleton` applies an already accepted update to `StakeRecords` by changing only `m` and `last_update_height`; it does not validate contexts or signatures.
 - `ApplyAcceptedStakeUpdatesSkeleton` applies already accepted stake updates as an all-or-nothing batch; duplicate updates for the same `stake_id` are rejected by the unwired skeleton because the revised spec does not define same-block duplicate-update ordering.
 - `ApplyBlockSpentTagsSkeleton` applies an already validated `BlockSpentTags` set to in-memory `SpentTags`, `ActiveTags`, and matching `StakeRecords`.
+- `ApplyAcceptedBlockSkeleton` applies revised spec section 12 steps 6-8 to already accepted block data in order: block spent tags, accepted new stakes, then accepted stake updates. It is in-memory only and stops before accepted payout outputs.
 
 Not implemented yet:
 
@@ -53,6 +54,7 @@ Not implemented yet:
 - full stake update verification, including `update_pk` extraction, canonical `m_new` validation, `enc_context(m_new)`, canonical `sig_update`, update signature verification, and update effective-height rules
 - consensus wiring for applying accepted stake updates during deterministic block application
 - consensus policy for multiple `StakeUpdate` transactions targeting the same `stake_id` in one block
+- accepted payout-output application to `SparkOutputs`
 - masternode registration/update/payout transaction wiring
 - consensus activation rules
 
