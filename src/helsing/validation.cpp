@@ -32,6 +32,8 @@ const char* StakeValidationResultToString(StakeValidationResult result)
         return "TAG_ALREADY_SPENT";
     case StakeValidationResult::TAG_SPENT_IN_BLOCK:
         return "TAG_SPENT_IN_BLOCK";
+    case StakeValidationResult::DUPLICATE_SPENT_TAG_IN_BLOCK:
+        return "DUPLICATE_SPENT_TAG_IN_BLOCK";
     case StakeValidationResult::TAG_ALREADY_ACTIVE:
         return "TAG_ALREADY_ACTIVE";
     case StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK:
@@ -114,6 +116,27 @@ bool IsValidSparkOutputRecord(const SparkOutputRecord& output)
            IsValidPublicPoint(output.K) &&
            output.nHeight >= 0 &&
            (output.type == SparkOutputType::MINT || output.type == SparkOutputType::SPEND);
+}
+
+StakeValidationResult BuildBlockSpentTagsSkeleton(const std::vector<GroupElement>& spentTags, const CHelsingState* helsingState, std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags)
+{
+    std::unordered_set<GroupElement, spark::CLTagHash> collected;
+    for (const GroupElement& tag : spentTags) {
+        if (!collected.insert(tag).second) {
+            return StakeValidationResult::DUPLICATE_SPENT_TAG_IN_BLOCK;
+        }
+    }
+
+    if (helsingState != nullptr) {
+        for (const GroupElement& tag : collected) {
+            if (helsingState->IsSpentTag(tag)) {
+                return StakeValidationResult::TAG_ALREADY_SPENT;
+            }
+        }
+    }
+
+    blockSpentTags = std::move(collected);
+    return StakeValidationResult::OK;
 }
 
 bool ExtractSparkOutputRecords(const CTransaction& tx, int nHeight, std::map<OutputId, SparkOutputRecord>& outputs)

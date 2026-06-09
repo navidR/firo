@@ -24,6 +24,7 @@ enum class StakeValidationResult {
     MISSING_PROOF,
     TAG_ALREADY_SPENT,
     TAG_SPENT_IN_BLOCK,
+    DUPLICATE_SPENT_TAG_IN_BLOCK,
     TAG_ALREADY_ACTIVE,
     DUPLICATE_STAKE_TAG_IN_BLOCK,
     OUTPUT_NOT_FOUND,
@@ -49,6 +50,11 @@ bool IsValidCoverSetCardinality(size_t count, size_t n, size_t m);
 bool IsValidOutputId(const OutputId& output_id);
 bool IsValidPublicPoint(const GroupElement& point);
 bool IsValidSparkOutputRecord(const SparkOutputRecord& output);
+
+// Models revised spec ValidateBlock step 2 after ordinary Spark spend validation.
+// The caller supplies tags revealed by valid Spark spends; this only checks
+// same-block duplicates and tags already present in Helsing SpentTags.
+StakeValidationResult BuildBlockSpentTagsSkeleton(const std::vector<GroupElement>& spentTags, const CHelsingState* helsingState, std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags);
 
 // Appends Spark mint/spend-created output records keyed by (txid, vout).
 // Leaves outputs unchanged on parse failure or duplicate output_id.

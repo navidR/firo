@@ -16,6 +16,7 @@
 
 #include <limits>
 #include <map>
+#include <unordered_set>
 
 namespace {
 
@@ -829,6 +830,69 @@ BOOST_AUTO_TEST_CASE(block_spent_tags_work_without_persistent_state)
     BOOST_CHECK(view.helsingState == nullptr);
     BOOST_CHECK(view.HasBlockSpentTag(tx.T));
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(block_spent_tag_builder_accepts_distinct_tags)
+{
+    const GroupElement tagA = DeterministicPoint(132);
+    const GroupElement tagB = DeterministicPoint(133);
+    const GroupElement sentinel = DeterministicPoint(134);
+
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    blockSpentTags.insert(sentinel);
+
+    BOOST_CHECK(helsing::BuildBlockSpentTagsSkeleton({tagA, tagB}, nullptr, blockSpentTags) == helsing::StakeValidationResult::OK);
+    BOOST_CHECK_EQUAL(blockSpentTags.size(), 2U);
+    BOOST_CHECK(blockSpentTags.count(tagA) == 1);
+    BOOST_CHECK(blockSpentTags.count(tagB) == 1);
+    BOOST_CHECK(blockSpentTags.count(sentinel) == 0);
+}
+
+BOOST_AUTO_TEST_CASE(block_spent_tag_builder_rejects_duplicates_without_mutation)
+{
+    const GroupElement tag = DeterministicPoint(135);
+    const GroupElement sentinel = DeterministicPoint(136);
+
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    blockSpentTags.insert(sentinel);
+
+    BOOST_CHECK(helsing::BuildBlockSpentTagsSkeleton({tag, tag}, nullptr, blockSpentTags) == helsing::StakeValidationResult::DUPLICATE_SPENT_TAG_IN_BLOCK);
+    BOOST_CHECK_EQUAL(blockSpentTags.size(), 1U);
+    BOOST_CHECK(blockSpentTags.count(sentinel) == 1);
+    BOOST_CHECK(blockSpentTags.count(tag) == 0);
+}
+
+BOOST_AUTO_TEST_CASE(block_spent_tag_builder_rejects_prior_spent_tags_without_mutation)
+{
+    const GroupElement spentTag = DeterministicPoint(137);
+    const GroupElement freshTag = DeterministicPoint(138);
+    const GroupElement sentinel = DeterministicPoint(139);
+    helsing::CHelsingState state;
+    BOOST_CHECK(state.AddSpentTag(spentTag, 300));
+
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    blockSpentTags.insert(sentinel);
+
+    BOOST_CHECK(helsing::BuildBlockSpentTagsSkeleton({freshTag, spentTag}, &state, blockSpentTags) == helsing::StakeValidationResult::TAG_ALREADY_SPENT);
+    BOOST_CHECK_EQUAL(blockSpentTags.size(), 1U);
+    BOOST_CHECK(blockSpentTags.count(sentinel) == 1);
+    BOOST_CHECK(blockSpentTags.count(freshTag) == 0);
+    BOOST_CHECK(blockSpentTags.count(spentTag) == 0);
+}
+
+BOOST_AUTO_TEST_CASE(block_spent_tag_builder_duplicate_precedes_prior_spent)
+{
+    const GroupElement spentTag = DeterministicPoint(140);
+    const GroupElement sentinel = DeterministicPoint(141);
+    helsing::CHelsingState state;
+    BOOST_CHECK(state.AddSpentTag(spentTag, 301));
+
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    blockSpentTags.insert(sentinel);
+
+    BOOST_CHECK(helsing::BuildBlockSpentTagsSkeleton({spentTag, spentTag}, &state, blockSpentTags) == helsing::StakeValidationResult::DUPLICATE_SPENT_TAG_IN_BLOCK);
+    BOOST_CHECK_EQUAL(blockSpentTags.size(), 1U);
+    BOOST_CHECK(blockSpentTags.count(sentinel) == 1);
 }
 
 BOOST_AUTO_TEST_CASE(block_skeleton_accepts_empty_and_distinct_new_stake_tags)
@@ -1908,6 +1972,7 @@ BOOST_AUTO_TEST_CASE(validation_result_strings_cover_all_values)
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::MISSING_PROOF), "MISSING_PROOF");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::TAG_ALREADY_SPENT), "TAG_ALREADY_SPENT");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK), "TAG_SPENT_IN_BLOCK");
+    BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::DUPLICATE_SPENT_TAG_IN_BLOCK), "DUPLICATE_SPENT_TAG_IN_BLOCK");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::TAG_ALREADY_ACTIVE), "TAG_ALREADY_ACTIVE");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK), "DUPLICATE_STAKE_TAG_IN_BLOCK");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::OUTPUT_NOT_FOUND), "OUTPUT_NOT_FOUND");
