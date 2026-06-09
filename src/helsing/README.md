@@ -27,6 +27,7 @@ Current scope:
 - `AreHelsingValueParametersInRangeSkeleton` checks revised spec section 20 integer-domain bounds for caller-supplied `V_STAKE`, `V_PAYOUT`, and `V_MAX`, plus a caller-supplied `V_MAX < q` result; it does not expose the scalar order or perform scalar conversion.
 - `IsStakeValueParameterInRangeSkeleton` checks revised spec `StakeVerify` step 3 for caller-supplied `V_STAKE`, `V_MAX`, and `V_MAX < q`; it does not expose the scalar order, perform scalar conversion, or verify the collateral proof.
 - `IsExpectedPayoutAmountInRangeSkeleton` checks the revised spec `PayoutVerify` step 10 equality and integer range for caller-supplied values.
+- `IsPayoutValueParameterInRangeSkeleton` checks revised spec `PayoutVerify` step 10 for caller-supplied `V_PAYOUT`, expected amount, `V_MAX`, and `V_MAX < q`; it does not expose the scalar order, perform scalar conversion, or recompute payout amounts.
 - `IsCompletePayoutTxSkeleton` checks that caller-supplied `PayoutTxSkeleton` identity/address/coin fields are populated before future payout verification; it does not define payout address or coin encodings.
 - `DoesPayoutAddressMatchRegisteredSkeleton` checks revised spec `PayoutVerify` step 8 byte equality against a caller-supplied, already extracted registered payout address.
 - `DoesPayoutStakeMatchExpectedSkeleton` checks revised spec `PayoutVerify` step 9 equality against a caller-supplied, already recomputed deterministic selected stake.

@@ -84,6 +84,9 @@ bool IsStakeValueParameterInRangeSkeleton(CAmount stakeValue, CAmount vMax, bool
 // Revised spec PayoutVerify step 10 subset: V_PAYOUT equals the caller-recomputed expected amount
 // and satisfies the integer-domain range. The caller must separately enforce V_MAX < q.
 bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax);
+// Revised spec PayoutVerify step 10 value-domain subset for caller-supplied public values.
+// This does not expose q or perform scalar conversion; the caller supplies V_MAX < q.
+bool IsPayoutValueParameterInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax, bool vMaxLessThanGroupOrder);
 // Revised spec PayoutTx field-completeness only. This does not check canonical
 // encodings, value-domain parameters, registered address, selected stake, j, or payout coin.
 bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx);

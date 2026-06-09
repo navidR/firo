@@ -140,6 +140,11 @@ bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expected
     return payoutValue == expectedAmount && IsHelsingValueInRange(payoutValue, vMax);
 }
 
+bool IsPayoutValueParameterInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax, bool vMaxLessThanGroupOrder)
+{
+    return vMaxLessThanGroupOrder && IsExpectedPayoutAmountInRangeSkeleton(payoutValue, expectedAmount, vMax);
+}
+
 bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx)
 {
     return !tx.selected_stake_id.IsNull() &&
