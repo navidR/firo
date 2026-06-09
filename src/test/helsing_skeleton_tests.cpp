@@ -787,6 +787,152 @@ BOOST_AUTO_TEST_CASE(apply_accepted_payout_output_records_skeleton_rejects_dupli
     BOOST_CHECK(outputs.count(existing) == 1);
 }
 
+BOOST_AUTO_TEST_CASE(apply_accepted_block_with_payout_outputs_skeleton_applies_steps_six_through_nine_atomically)
+{
+    helsing::CHelsingState state;
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::StakeRecord updateRecord = ActiveRecord(210, DeterministicPoint(223));
+    const helsing::StakeRecord spentRecord = ActiveRecord(211, DeterministicPoint(224));
+    const helsing::OutputId existingOutputId = Output(21, 0);
+    const helsing::OutputId payoutOutputId = Output(22, 0);
+    const helsing::SparkOutputRecord existingOutput = EligibleOutput(existingOutputId, 105);
+    helsing::SparkOutputRecord payoutOutput = EligibleOutput(payoutOutputId, 106);
+    helsing::StakeTx newStake = ValidStakeTx();
+    newStake.T = DeterministicPoint(225);
+    newStake.m.bytes = {0x62, 0x6c, 0x6f, 0x63, 0x6b};
+    helsing::StakeContext updatedContext;
+    updatedContext.bytes = {0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x5f, 0x75, 0x70, 0x64};
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    const uint256 newStakeId = DeterministicHash(212);
+    blockSpentTags.insert(spentRecord.T);
+    payoutOutput.helsing_eligible = false;
+
+    BOOST_CHECK(state.AddActiveStake(updateRecord));
+    BOOST_CHECK(state.AddActiveStake(spentRecord));
+    BOOST_CHECK(outputs.emplace(existingOutputId, existingOutput).second);
+
+    BOOST_CHECK(helsing::ApplyAcceptedBlockWithPayoutOutputsSkeleton(state, outputs, blockSpentTags, {{newStakeId, newStake}}, {{updateRecord.stake_id, updatedContext}}, {payoutOutput}, 430));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 3U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 2U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsSpentTag(spentRecord.T));
+    BOOST_CHECK(!state.IsActiveTag(spentRecord.T));
+    BOOST_CHECK(state.IsActiveTag(updateRecord.T));
+    BOOST_CHECK(state.IsActiveTag(newStake.T));
+    BOOST_CHECK_EQUAL(outputs.size(), 2U);
+    BOOST_REQUIRE(outputs.count(existingOutputId) == 1);
+    BOOST_REQUIRE(outputs.count(payoutOutputId) == 1);
+    BOOST_CHECK(outputs.at(existingOutputId).S == existingOutput.S);
+    BOOST_CHECK(outputs.at(payoutOutputId).S == payoutOutput.S);
+    BOOST_CHECK(!outputs.at(payoutOutputId).helsing_eligible);
+
+    const helsing::StakeRecord* updatedStored = state.GetStakeRecord(updateRecord.stake_id);
+    const helsing::StakeRecord* spentStored = state.GetStakeRecord(spentRecord.stake_id);
+    const helsing::StakeRecord* newStored = state.GetStakeRecord(newStakeId);
+    BOOST_REQUIRE(updatedStored != nullptr);
+    BOOST_REQUIRE(spentStored != nullptr);
+    BOOST_REQUIRE(newStored != nullptr);
+    BOOST_CHECK(updatedStored->m.bytes == updatedContext.bytes);
+    BOOST_CHECK_EQUAL(updatedStored->nLastUpdateHeight, 430);
+    BOOST_CHECK(updatedStored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK(spentStored->status == helsing::StakeStatus::SPENT);
+    BOOST_CHECK_EQUAL(spentStored->nSpentHeight, 430);
+    BOOST_CHECK(newStored->T == newStake.T);
+    BOOST_CHECK_EQUAL(newStored->nHeight, 430);
+    BOOST_CHECK(newStored->status == helsing::StakeStatus::ACTIVE);
+}
+
+BOOST_AUTO_TEST_CASE(apply_accepted_block_with_payout_outputs_skeleton_accepts_empty_block)
+{
+    helsing::CHelsingState state;
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::StakeRecord activeRecord = ActiveRecord(213, DeterministicPoint(226));
+    const helsing::OutputId existingOutputId = Output(23, 0);
+    const helsing::SparkOutputRecord existingOutput = EligibleOutput(existingOutputId, 107);
+
+    BOOST_CHECK(state.AddActiveStake(activeRecord));
+    BOOST_CHECK(outputs.emplace(existingOutputId, existingOutput).second);
+
+    BOOST_CHECK(helsing::ApplyAcceptedBlockWithPayoutOutputsSkeleton(state, outputs, {}, {}, {}, {}, 431));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(activeRecord.T));
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+    BOOST_CHECK(outputs.at(existingOutputId).S == existingOutput.S);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(activeRecord.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == activeRecord.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, activeRecord.nLastUpdateHeight);
+}
+
+BOOST_AUTO_TEST_CASE(apply_accepted_block_with_payout_outputs_skeleton_rejects_state_failure_without_output_mutation)
+{
+    helsing::CHelsingState state;
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::StakeRecord activeRecord = ActiveRecord(214, DeterministicPoint(227));
+    const helsing::OutputId existingOutputId = Output(24, 0);
+    const helsing::OutputId payoutOutputId = Output(25, 0);
+    const helsing::SparkOutputRecord existingOutput = EligibleOutput(existingOutputId, 108);
+    helsing::SparkOutputRecord payoutOutput = EligibleOutput(payoutOutputId, 109);
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    blockSpentTags.insert(activeRecord.T);
+
+    BOOST_CHECK(state.AddActiveStake(activeRecord));
+    BOOST_CHECK(outputs.emplace(existingOutputId, existingOutput).second);
+    BOOST_CHECK(!helsing::ApplyAcceptedBlockWithPayoutOutputsSkeleton(state, outputs, blockSpentTags, {}, {{activeRecord.stake_id, helsing::StakeContext()}}, {payoutOutput}, 432));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(activeRecord.T));
+    BOOST_CHECK(!state.IsSpentTag(activeRecord.T));
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+    BOOST_CHECK(outputs.count(existingOutputId) == 1);
+    BOOST_CHECK(outputs.count(payoutOutputId) == 0);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(activeRecord.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == activeRecord.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, activeRecord.nLastUpdateHeight);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
+BOOST_AUTO_TEST_CASE(apply_accepted_block_with_payout_outputs_skeleton_rejects_output_failure_without_state_mutation)
+{
+    helsing::CHelsingState state;
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::StakeRecord spentRecord = ActiveRecord(215, DeterministicPoint(228));
+    const helsing::OutputId existingOutputId = Output(26, 0);
+    const helsing::OutputId payoutOutputId = Output(27, 0);
+    const helsing::SparkOutputRecord existingOutput = EligibleOutput(existingOutputId, 110);
+    helsing::SparkOutputRecord payoutOutput = EligibleOutput(payoutOutputId, 111);
+    payoutOutput.S = GroupElement();
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    blockSpentTags.insert(spentRecord.T);
+
+    BOOST_CHECK(state.AddActiveStake(spentRecord));
+    BOOST_CHECK(outputs.emplace(existingOutputId, existingOutput).second);
+    BOOST_CHECK(!helsing::ApplyAcceptedBlockWithPayoutOutputsSkeleton(state, outputs, blockSpentTags, {}, {}, {payoutOutput}, 433));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(spentRecord.T));
+    BOOST_CHECK(!state.IsSpentTag(spentRecord.T));
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+    BOOST_CHECK(outputs.count(existingOutputId) == 1);
+    BOOST_CHECK(outputs.count(payoutOutputId) == 0);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(spentRecord.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+}
+
 BOOST_AUTO_TEST_CASE(default_objects_are_structurally_invalid)
 {
     helsing::SparkOutputRecord output;

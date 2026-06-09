@@ -79,6 +79,10 @@ bool ExtractSparkOutputRecords(const CTransaction& tx, int nHeight, std::map<Out
 // The caller supplies records after payout-coin verification; this only inserts by output_id.
 bool ApplyAcceptedPayoutOutputRecordsSkeleton(const std::vector<SparkOutputRecord>& acceptedOutputs, std::map<OutputId, SparkOutputRecord>& outputs);
 
+// Applies revised spec ValidateBlock steps 6-9 to already accepted block data.
+// This is in-memory only and does not perform StakeVerify, StakeUpdateVerify, or PayoutVerify.
+bool ApplyAcceptedBlockWithPayoutOutputsSkeleton(CHelsingState& helsingState, std::map<OutputId, SparkOutputRecord>& outputs, const std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags, const std::vector<std::pair<uint256, StakeTx>>& acceptedStakes, const std::vector<std::pair<uint256, StakeContext>>& acceptedUpdates, const std::vector<SparkOutputRecord>& acceptedPayoutOutputs, int nHeight);
+
 // Structural skeleton for revised-spec StakeVerify. Proof verification is intentionally TODO.
 StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStateView& view);
 

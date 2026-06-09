@@ -251,6 +251,30 @@ bool ApplyAcceptedPayoutOutputRecordsSkeleton(const std::vector<SparkOutputRecor
     return true;
 }
 
+bool ApplyAcceptedBlockWithPayoutOutputsSkeleton(
+    CHelsingState& helsingState,
+    std::map<OutputId, SparkOutputRecord>& outputs,
+    const std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags,
+    const std::vector<std::pair<uint256, StakeTx>>& acceptedStakes,
+    const std::vector<std::pair<uint256, StakeContext>>& acceptedUpdates,
+    const std::vector<SparkOutputRecord>& acceptedPayoutOutputs,
+    int nHeight)
+{
+    CHelsingState nextState = helsingState;
+    std::map<OutputId, SparkOutputRecord> nextOutputs(outputs);
+
+    if (!nextState.ApplyAcceptedBlockSkeleton(blockSpentTags, acceptedStakes, acceptedUpdates, nHeight)) {
+        return false;
+    }
+    if (!ApplyAcceptedPayoutOutputRecordsSkeleton(acceptedPayoutOutputs, nextOutputs)) {
+        return false;
+    }
+
+    helsingState = nextState;
+    outputs = std::move(nextOutputs);
+    return true;
+}
+
 StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStateView& view)
 {
     if (tx.inCoinIDs.empty()) {

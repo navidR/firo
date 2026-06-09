@@ -13,6 +13,7 @@ Current scope:
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
 - `ExtractSparkOutputRecords` builds a consensus-inert `(txid, vout) -> SparkOutputRecord` view from valid Spark mint and spend-created output scripts.
 - `ApplyAcceptedPayoutOutputRecordsSkeleton` applies already accepted payout output records to `SparkOutputs` by `(txid, vout)` only; it does not recompute payout coins or decide Helsing eligibility.
+- `ApplyAcceptedBlockWithPayoutOutputsSkeleton` applies revised spec section 12 steps 6-9 to in-memory Helsing state and `SparkOutputs` atomically for already accepted block data.
 - `IsValidCoverSetCardinality` checks the revised spec formula `len(InCoinIDs) = N = n^m` for caller-supplied public parameters.
 - `IsStakeMatureForPayout` checks the revised spec payout maturity inequality for caller-supplied heights and `STAKE_MATURITY`.
 - `IsHelsingValueInRange` checks the revised spec integer-domain bound `0 <= value < V_MAX` for caller-supplied values.
@@ -56,7 +57,6 @@ Not implemented yet:
 - full stake update verification, including `update_pk` extraction, canonical `m_new` validation, `enc_context(m_new)`, canonical `sig_update`, update signature verification, and update effective-height rules
 - consensus wiring for applying accepted stake updates during deterministic block application
 - consensus policy for multiple `StakeUpdate` transactions targeting the same `stake_id` in one block
-- accepted payout-output application to `SparkOutputs`
 - masternode registration/update/payout transaction wiring
 - consensus activation rules
 
