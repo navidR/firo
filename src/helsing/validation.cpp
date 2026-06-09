@@ -296,6 +296,54 @@ StakeVerificationContextSkeletonResult CheckStakeVerificationContextSkeleton(
     return result;
 }
 
+StakeValidationResult CheckStakeCoverSetIdentifiersSkeleton(const std::vector<OutputId>& inCoinIDs, size_t n, size_t m)
+{
+    if (!IsValidCoverSetCardinality(inCoinIDs.size(), n, m)) {
+        return StakeValidationResult::INVALID_COVER_SET_CARDINALITY;
+    }
+    if (!IsStrictlySortedAndDistinct(inCoinIDs)) {
+        return StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT;
+    }
+
+    return StakeValidationResult::OK;
+}
+
+StakeVerificationCoverSetSkeletonResult CheckStakeVerificationCoverSetSkeleton(
+    const StakeTx& tx,
+    const CHelsingState& helsingState,
+    CAmount stakeValue,
+    CAmount vMax,
+    bool vMaxLessThanGroupOrder,
+    bool canonicalEncodingsValid,
+    bool canonicalContextValid,
+    bool payoutAddressValid,
+    bool updatePublicKeyValid,
+    bool nodeSigningKeyMaterialValid,
+    size_t n,
+    size_t m)
+{
+    StakeVerificationCoverSetSkeletonResult result;
+    result.context_result = CheckStakeVerificationContextSkeleton(
+        tx,
+        helsingState,
+        stakeValue,
+        vMax,
+        vMaxLessThanGroupOrder,
+        canonicalEncodingsValid,
+        canonicalContextValid,
+        payoutAddressValid,
+        updatePublicKeyValid,
+        nodeSigningKeyMaterialValid);
+    if (result.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||
+        result.context_result.tag_result != StakeValidationResult::OK ||
+        !result.context_result.context_valid) {
+        return result;
+    }
+
+    result.cover_set_result = CheckStakeCoverSetIdentifiersSkeleton(tx.inCoinIDs, n, m);
+    return result;
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {

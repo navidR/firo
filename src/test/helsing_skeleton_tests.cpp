@@ -633,6 +633,100 @@ BOOST_AUTO_TEST_CASE(stake_verification_context_skeleton_does_not_mutate_state)
     BOOST_CHECK(!state.IsSpentTag(tx.T));
 }
 
+BOOST_AUTO_TEST_CASE(stake_cover_set_identifier_skeleton_accepts_public_power_sorted_distinct_ids)
+{
+    const std::vector<helsing::OutputId> inCoinIDs = {Output(1, 0), Output(1, 1), Output(2, 0), Output(3, 0)};
+
+    BOOST_CHECK(helsing::CheckStakeCoverSetIdentifiersSkeleton(inCoinIDs, 2, 2) == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(stake_cover_set_identifier_skeleton_preserves_step_six_precedence)
+{
+    BOOST_CHECK(helsing::CheckStakeCoverSetIdentifiersSkeleton({Output(3, 0), Output(1, 0), Output(1, 0)}, 2, 2) == helsing::StakeValidationResult::INVALID_COVER_SET_CARDINALITY);
+    BOOST_CHECK(helsing::CheckStakeCoverSetIdentifiersSkeleton({Output(1, 0), Output(1, 0), Output(2, 0), Output(3, 0)}, 2, 2) == helsing::StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT);
+    BOOST_CHECK(helsing::CheckStakeCoverSetIdentifiersSkeleton({Output(2, 0), Output(1, 1), Output(3, 0), Output(4, 0)}, 2, 2) == helsing::StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT);
+}
+
+BOOST_AUTO_TEST_CASE(stake_cover_set_identifier_skeleton_stops_before_output_lookup)
+{
+    const std::vector<helsing::OutputId> inCoinIDs = {helsing::OutputId(), Output(1, 0), Output(2, 0), Output(3, 0)};
+
+    BOOST_CHECK(helsing::CheckStakeCoverSetIdentifiersSkeleton(inCoinIDs, 2, 2) == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(stake_verification_cover_set_skeleton_accepts_steps_one_through_six)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {Output(1, 0), Output(1, 1), Output(2, 0), Output(3, 0)};
+
+    helsing::CHelsingState state;
+    const helsing::StakeVerificationCoverSetSkeletonResult result = helsing::CheckStakeVerificationCoverSetSkeleton(tx, state, 0, 1, true, true, true, true, true, true, 2, 2);
+
+    BOOST_CHECK(result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.context_result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.context_result.context_valid);
+    BOOST_CHECK(result.cover_set_result == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(stake_verification_cover_set_skeleton_preserves_steps_one_through_six_precedence)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {Output(2, 0), Output(1, 0), Output(1, 0)};
+    helsing::CHelsingState state;
+
+    helsing::StakeVerificationCoverSetSkeletonResult result = helsing::CheckStakeVerificationCoverSetSkeleton(tx, state, -1, 0, false, false, false, false, false, false, 2, 2);
+    BOOST_CHECK(result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::MALFORMED_OR_NONCANONICAL);
+    BOOST_CHECK(result.context_result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.context_result.context_valid);
+    BOOST_CHECK(result.cover_set_result == helsing::StakeValidationResult::OK);
+
+    BOOST_CHECK(state.AddSpentTag(tx.T, 207));
+    result = helsing::CheckStakeVerificationCoverSetSkeleton(tx, state, 0, 1, true, true, false, false, false, false, 2, 2);
+    BOOST_CHECK(result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.context_result.tag_result == helsing::StakeValidationResult::TAG_ALREADY_SPENT);
+    BOOST_CHECK(result.context_result.context_valid);
+    BOOST_CHECK(result.cover_set_result == helsing::StakeValidationResult::OK);
+
+    state.Reset();
+    result = helsing::CheckStakeVerificationCoverSetSkeleton(tx, state, 0, 1, true, true, false, true, true, true, 2, 2);
+    BOOST_CHECK(result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.context_result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(!result.context_result.context_valid);
+    BOOST_CHECK(result.cover_set_result == helsing::StakeValidationResult::OK);
+
+    result = helsing::CheckStakeVerificationCoverSetSkeleton(tx, state, 0, 1, true, true, true, true, true, true, 2, 2);
+    BOOST_CHECK(result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.context_result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.context_result.context_valid);
+    BOOST_CHECK(result.cover_set_result == helsing::StakeValidationResult::INVALID_COVER_SET_CARDINALITY);
+
+    tx.inCoinIDs = {Output(2, 0), Output(1, 0), Output(3, 0), Output(4, 0)};
+    result = helsing::CheckStakeVerificationCoverSetSkeleton(tx, state, 0, 1, true, true, true, true, true, true, 2, 2);
+    BOOST_CHECK(result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.context_result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.context_result.context_valid);
+    BOOST_CHECK(result.cover_set_result == helsing::StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT);
+}
+
+BOOST_AUTO_TEST_CASE(stake_verification_cover_set_skeleton_stops_before_outputs_and_proofs)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {helsing::OutputId(), Output(1, 0), Output(2, 0), Output(3, 0)};
+    tx.S_prime = GroupElement();
+    tx.C_prime = GroupElement();
+    tx.pi_par.bytes = {0x00};
+    tx.pi_val.bytes = {0xff};
+    tx.pi_tag.bytes = {0x00, 0xff};
+
+    helsing::CHelsingState state;
+    const helsing::StakeVerificationCoverSetSkeletonResult result = helsing::CheckStakeVerificationCoverSetSkeleton(tx, state, 0, 1, true, true, true, true, true, true, 2, 2);
+
+    BOOST_CHECK(result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.context_result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.context_result.context_valid);
+    BOOST_CHECK(result.cover_set_result == helsing::StakeValidationResult::OK);
+}
+
 BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_accepts_populated_fields)
 {
     const helsing::StakeTx tx = ValidStakeTx();

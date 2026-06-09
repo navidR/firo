@@ -71,6 +71,11 @@ struct StakeVerificationContextSkeletonResult {
     bool context_valid{true};
 };
 
+struct StakeVerificationCoverSetSkeletonResult {
+    StakeVerificationContextSkeletonResult context_result;
+    StakeValidationResult cover_set_result{StakeValidationResult::OK};
+};
+
 struct ValidationStateView {
     std::map<OutputId, SparkOutputRecord> sparkOutputs;
     std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
@@ -143,6 +148,12 @@ bool IsStakeContextValidSkeleton(const StakeContext& context, bool canonicalCont
 // Revised spec StakeVerify steps 1-5 only. The caller supplies canonical
 // encoding and context-validation facts; this stops before cover sets and proofs.
 StakeVerificationContextSkeletonResult CheckStakeVerificationContextSkeleton(const StakeTx& tx, const CHelsingState& helsingState, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid);
+// Revised spec StakeVerify step 6 only: check public cover-set identifier count
+// and sorted-distinct order. Output lookup, maturity, and Spark rules are step 7.
+StakeValidationResult CheckStakeCoverSetIdentifiersSkeleton(const std::vector<OutputId>& inCoinIDs, size_t n, size_t m);
+// Revised spec StakeVerify steps 1-6 only. This composes the caller-supplied
+// prefix/context facts with step 6 identifiers and stops before output lookup.
+StakeVerificationCoverSetSkeletonResult CheckStakeVerificationCoverSetSkeleton(const StakeTx& tx, const CHelsingState& helsingState, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);
