@@ -141,6 +141,22 @@ BOOST_AUTO_TEST_CASE(output_id_equality_ordering_and_serialization)
     CheckOutputIdEqual(decodedMax, tx1vMax);
 }
 
+BOOST_AUTO_TEST_CASE(output_id_map_key_uses_txid_and_vout)
+{
+    std::map<helsing::OutputId, int> index;
+
+    BOOST_CHECK(index.emplace(Output(1, 0), 10).second);
+    BOOST_CHECK(index.emplace(Output(1, 1), 11).second);
+    BOOST_CHECK(index.emplace(Output(2, 0), 20).second);
+    BOOST_CHECK(!index.emplace(Output(1, 0), 99).second);
+
+    BOOST_CHECK_EQUAL(index.size(), 3U);
+    BOOST_CHECK_EQUAL(index.at(Output(1, 0)), 10);
+    BOOST_CHECK_EQUAL(index.at(Output(1, 1)), 11);
+    BOOST_CHECK_EQUAL(index.at(Output(2, 0)), 20);
+    BOOST_CHECK(index.find(helsing::OutputId(Output(1, 0).txid, 2)) == index.end());
+}
+
 BOOST_AUTO_TEST_CASE(sorted_distinct_helper_covers_boundaries)
 {
     BOOST_CHECK(!helsing::IsStrictlySortedAndDistinct({}));
@@ -214,6 +230,36 @@ BOOST_AUTO_TEST_CASE(spark_output_record_helper_rejects_malformed_records)
     record = EligibleOutput(Output(1, 0), 20);
     record.type = static_cast<helsing::SparkOutputType>(255);
     BOOST_CHECK(!helsing::IsValidSparkOutputRecord(record));
+
+    record = EligibleOutput(Output(1, 0), 20);
+    record.type = static_cast<helsing::SparkOutputType>(3);
+    BOOST_CHECK(!helsing::IsValidSparkOutputRecord(record));
+
+    record = EligibleOutput(Output(1, 0), 20);
+    record.nHeight = 0;
+    BOOST_CHECK(helsing::IsValidSparkOutputRecord(record));
+}
+
+BOOST_AUTO_TEST_CASE(spark_output_record_helper_allows_ineligible_valid_records)
+{
+    helsing::SparkOutputRecord record = EligibleOutput(Output(1, 0), 20);
+    record.helsing_eligible = false;
+
+    BOOST_CHECK(helsing::IsValidSparkOutputRecord(record));
+}
+
+BOOST_AUTO_TEST_CASE(default_objects_are_structurally_invalid)
+{
+    helsing::SparkOutputRecord output;
+    BOOST_CHECK(!helsing::IsValidSparkOutputRecord(output));
+
+    helsing::StakeTx tx;
+    helsing::ValidationStateView view;
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::EMPTY_INCOINIDS);
+
+    tx.inCoinIDs = {Output(1, 0)};
+    view.sparkOutputs.emplace(tx.inCoinIDs[0], EligibleOutput(tx.inCoinIDs[0], 20));
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_GROUP_ELEMENT);
 }
 
 BOOST_AUTO_TEST_CASE(rejects_empty_incoinids)
@@ -294,6 +340,17 @@ BOOST_AUTO_TEST_CASE(rejects_invalid_public_points)
     tx = ValidStakeTx();
     view = ValidView(tx);
     tx.T = NonMemberPoint();
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_GROUP_ELEMENT);
+}
+
+BOOST_AUTO_TEST_CASE(validation_invalid_tag_precedes_block_spent_tag)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    helsing::ValidationStateView view = ValidView(tx);
+
+    tx.T = GroupElement();
+    view.blockSpentTags.insert(tx.T);
+
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_GROUP_ELEMENT);
 }
 
@@ -567,6 +624,29 @@ BOOST_AUTO_TEST_CASE(state_rejects_negative_activation_height_without_mutation)
     BOOST_CHECK(!state.IsActiveTag(record.T));
 }
 
+BOOST_AUTO_TEST_CASE(state_rejects_negative_activation_height_without_mutating_populated_state)
+{
+    helsing::CHelsingState state;
+    const GroupElement activeTag = DeterministicPoint(69);
+    const GroupElement spentOnlyTag = DeterministicPoint(70);
+    const helsing::StakeRecord activeRecord = ActiveRecord(108, activeTag);
+    helsing::StakeRecord rejectedRecord = ActiveRecord(109, DeterministicPoint(71));
+    rejectedRecord.nHeight = -1;
+
+    BOOST_CHECK(state.AddActiveStake(activeRecord));
+    BOOST_CHECK(state.AddSpentTag(spentOnlyTag, 172));
+    BOOST_CHECK(!state.AddActiveStake(rejectedRecord));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(activeTag));
+    BOOST_CHECK(state.IsSpentTag(spentOnlyTag));
+    BOOST_CHECK(!state.IsActiveTag(rejectedRecord.T));
+    BOOST_CHECK(state.GetStakeRecord(activeRecord.stake_id) != nullptr);
+    BOOST_CHECK(state.GetStakeRecord(rejectedRecord.stake_id) == nullptr);
+}
+
 BOOST_AUTO_TEST_CASE(state_rejects_negative_spent_height_without_mutation)
 {
     helsing::CHelsingState state;
@@ -586,6 +666,26 @@ BOOST_AUTO_TEST_CASE(state_rejects_negative_spent_height_without_mutation)
     BOOST_REQUIRE(stored != nullptr);
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
     BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+}
+
+BOOST_AUTO_TEST_CASE(state_add_spent_tag_accepts_zero_height)
+{
+    helsing::CHelsingState state;
+    const GroupElement tag = DeterministicPoint(72);
+    const helsing::StakeRecord record = ActiveRecord(110, tag);
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(state.AddSpentTag(tag, 0));
+
+    BOOST_CHECK(state.IsSpentTag(tag));
+    BOOST_CHECK(!state.IsActiveTag(tag));
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 0U);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::SPENT);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, 0);
 }
 
 BOOST_AUTO_TEST_CASE(state_active_stake_lifecycle)
@@ -631,6 +731,38 @@ BOOST_AUTO_TEST_CASE(state_add_active_normalizes_record_fields)
 
     const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
     BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+
+    helsing::StakeRecord revokedRecord = ActiveRecord(102, DeterministicPoint(64));
+    revokedRecord.status = helsing::StakeStatus::REVOKED;
+    revokedRecord.nSpentHeight = 456;
+    BOOST_CHECK(state.AddActiveStake(revokedRecord));
+
+    stored = state.GetStakeRecord(revokedRecord.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+
+    helsing::StakeRecord invalidStatusRecord = ActiveRecord(103, DeterministicPoint(65));
+    invalidStatusRecord.status = static_cast<helsing::StakeStatus>(255);
+    invalidStatusRecord.nSpentHeight = 789;
+    BOOST_CHECK(state.AddActiveStake(invalidStatusRecord));
+
+    stored = state.GetStakeRecord(invalidStatusRecord.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+
+    helsing::StakeRecord boundaryRecord = ActiveRecord(124, DeterministicPoint(73));
+    boundaryRecord.nHeight = 0;
+    boundaryRecord.nSpentHeight = std::numeric_limits<int>::max();
+    boundaryRecord.status = static_cast<helsing::StakeStatus>(255);
+    BOOST_CHECK(state.AddActiveStake(boundaryRecord));
+
+    stored = state.GetStakeRecord(boundaryRecord.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK_EQUAL(stored->nHeight, 0);
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
     BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
 }
@@ -686,6 +818,46 @@ BOOST_AUTO_TEST_CASE(state_failed_add_active_stake_is_noop_for_all_indexes)
     BOOST_CHECK(stored->T == tag);
 }
 
+BOOST_AUTO_TEST_CASE(state_failed_duplicate_add_active_does_not_overwrite_existing_record)
+{
+    helsing::CHelsingState state;
+    const GroupElement tag = DeterministicPoint(74);
+    const helsing::StakeRecord record = ActiveRecord(125, tag);
+    helsing::StakeRecord duplicateStakeId = ActiveRecord(125, DeterministicPoint(75));
+    duplicateStakeId.m.bytes = {0xde, 0xad};
+    duplicateStakeId.nHeight = 999;
+    duplicateStakeId.nSpentHeight = 888;
+    duplicateStakeId.status = helsing::StakeStatus::SPENT;
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(!state.AddActiveStake(duplicateStakeId));
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->stake_id == record.stake_id);
+    BOOST_CHECK(stored->T == record.T);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nHeight, record.nHeight);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK(!state.IsActiveTag(duplicateStakeId.T));
+
+    helsing::StakeRecord duplicateTag = ActiveRecord(126, tag);
+    duplicateTag.m.bytes = {0xbe, 0xef};
+    duplicateTag.nHeight = 1000;
+    BOOST_CHECK(!state.AddActiveStake(duplicateTag));
+
+    stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->stake_id == record.stake_id);
+    BOOST_CHECK(stored->T == record.T);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nHeight, record.nHeight);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK(state.GetStakeRecord(duplicateTag.stake_id) == nullptr);
+}
+
 BOOST_AUTO_TEST_CASE(state_rejects_null_stake_id)
 {
     helsing::CHelsingState state;
@@ -695,6 +867,59 @@ BOOST_AUTO_TEST_CASE(state_rejects_null_stake_id)
     BOOST_CHECK(!state.AddActiveStake(record));
     BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 0U);
     BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 0U);
+}
+
+BOOST_AUTO_TEST_CASE(state_rejects_null_stake_id_without_mutating_populated_state)
+{
+    helsing::CHelsingState state;
+    const GroupElement activeTag = DeterministicPoint(76);
+    const GroupElement spentOnlyTag = DeterministicPoint(77);
+    const helsing::StakeRecord activeRecord = ActiveRecord(127, activeTag);
+    helsing::StakeRecord rejectedRecord = ActiveRecord(128, DeterministicPoint(78));
+    rejectedRecord.stake_id.SetNull();
+
+    BOOST_CHECK(state.AddActiveStake(activeRecord));
+    BOOST_CHECK(state.AddSpentTag(spentOnlyTag, 173));
+    BOOST_CHECK(!state.AddActiveStake(rejectedRecord));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(activeTag));
+    BOOST_CHECK(state.IsSpentTag(spentOnlyTag));
+    BOOST_CHECK(!state.IsActiveTag(rejectedRecord.T));
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(activeRecord.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->T == activeTag);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
+BOOST_AUTO_TEST_CASE(state_rejects_nonmember_tags_without_mutation)
+{
+    helsing::CHelsingState state;
+    const GroupElement validTag = DeterministicPoint(66);
+    const GroupElement invalidTag = NonMemberPoint();
+    const helsing::StakeRecord validRecord = ActiveRecord(104, validTag);
+    helsing::StakeRecord invalidRecord = ActiveRecord(105, invalidTag);
+
+    BOOST_CHECK(state.AddActiveStake(validRecord));
+    BOOST_CHECK(!state.AddActiveStake(invalidRecord));
+    BOOST_CHECK(!state.AddSpentTag(invalidTag, 170));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(validTag));
+    BOOST_CHECK(!state.IsActiveTag(invalidTag));
+    BOOST_CHECK(!state.IsSpentTag(invalidTag));
+    BOOST_CHECK(state.GetStakeRecord(validRecord.stake_id) != nullptr);
+    BOOST_CHECK(state.GetStakeRecord(invalidRecord.stake_id) == nullptr);
+
+    uint256 activeStakeId = DeterministicHash(252);
+    const uint256 sentinel = activeStakeId;
+    BOOST_CHECK(!state.GetActiveStakeId(invalidTag, activeStakeId));
+    BOOST_CHECK(activeStakeId == sentinel);
 }
 
 BOOST_AUTO_TEST_CASE(state_spent_tag_deactivates_matching_stake)
@@ -726,6 +951,41 @@ BOOST_AUTO_TEST_CASE(state_spent_tag_deactivates_matching_stake)
     BOOST_CHECK_EQUAL(stored->nSpentHeight, 130);
 }
 
+BOOST_AUTO_TEST_CASE(state_get_active_stake_id_failure_preserves_output_after_deactivation)
+{
+    helsing::CHelsingState state;
+    const GroupElement spentTag = DeterministicPoint(67);
+    const GroupElement revokedTag = DeterministicPoint(68);
+    const helsing::StakeRecord spentRecord = ActiveRecord(106, spentTag);
+    const helsing::StakeRecord revokedRecord = ActiveRecord(107, revokedTag);
+
+    BOOST_CHECK(state.AddActiveStake(spentRecord));
+    BOOST_CHECK(state.AddActiveStake(revokedRecord));
+    BOOST_CHECK(state.AddSpentTag(spentTag, 171));
+    BOOST_CHECK(state.RevokeStake(revokedRecord.stake_id));
+
+    uint256 activeStakeId = DeterministicHash(250);
+    const uint256 spentSentinel = activeStakeId;
+    BOOST_CHECK(!state.GetActiveStakeId(spentTag, activeStakeId));
+    BOOST_CHECK(activeStakeId == spentSentinel);
+
+    activeStakeId = DeterministicHash(251);
+    const uint256 revokedSentinel = activeStakeId;
+    BOOST_CHECK(!state.GetActiveStakeId(revokedTag, activeStakeId));
+    BOOST_CHECK(activeStakeId == revokedSentinel);
+
+    const GroupElement unknownTag = DeterministicPoint(79);
+    activeStakeId = DeterministicHash(253);
+    const uint256 unknownSentinel = activeStakeId;
+    BOOST_CHECK(!state.GetActiveStakeId(unknownTag, activeStakeId));
+    BOOST_CHECK(activeStakeId == unknownSentinel);
+
+    activeStakeId = DeterministicHash(254);
+    const uint256 invalidSentinel = activeStakeId;
+    BOOST_CHECK(!state.GetActiveStakeId(NonMemberPoint(), activeStakeId));
+    BOOST_CHECK(activeStakeId == invalidSentinel);
+}
+
 BOOST_AUTO_TEST_CASE(state_spending_one_of_multiple_active_stakes_updates_only_matching_indexes)
 {
     helsing::CHelsingState state;
@@ -754,6 +1014,30 @@ BOOST_AUTO_TEST_CASE(state_spending_one_of_multiple_active_stakes_updates_only_m
     BOOST_CHECK_EQUAL(storedA->nSpentHeight, 140);
     BOOST_CHECK(storedB->status == helsing::StakeStatus::ACTIVE);
     BOOST_CHECK_EQUAL(storedB->nSpentHeight, -1);
+}
+
+BOOST_AUTO_TEST_CASE(state_duplicate_spent_only_tag_does_not_touch_unrelated_active_record)
+{
+    helsing::CHelsingState state;
+    const GroupElement activeTag = DeterministicPoint(80);
+    const GroupElement spentOnlyTag = DeterministicPoint(81);
+    const helsing::StakeRecord activeRecord = ActiveRecord(129, activeTag);
+
+    BOOST_CHECK(state.AddActiveStake(activeRecord));
+    BOOST_CHECK(state.AddSpentTag(spentOnlyTag, 174));
+    BOOST_CHECK(!state.AddSpentTag(spentOnlyTag, 175));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(activeTag));
+    BOOST_CHECK(state.IsSpentTag(spentOnlyTag));
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(activeRecord.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->T == activeTag);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
 }
 
 BOOST_AUTO_TEST_CASE(state_revoke_active_stake)
@@ -796,6 +1080,30 @@ BOOST_AUTO_TEST_CASE(state_revoke_unknown_stake_is_noop_on_populated_state)
     const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
     BOOST_REQUIRE(stored != nullptr);
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
+BOOST_AUTO_TEST_CASE(state_revoke_null_stake_id_is_noop_on_populated_state)
+{
+    helsing::CHelsingState state;
+    const GroupElement activeTag = DeterministicPoint(82);
+    const GroupElement spentTag = DeterministicPoint(83);
+    const helsing::StakeRecord record = ActiveRecord(130, activeTag);
+    uint256 nullStakeId;
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(state.AddSpentTag(spentTag, 176));
+    BOOST_CHECK(!state.RevokeStake(nullStakeId));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(activeTag));
+    BOOST_CHECK(state.IsSpentTag(spentTag));
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
 }
 
 BOOST_AUTO_TEST_CASE(state_revoke_keeps_record_and_frees_active_tag_index)
@@ -911,6 +1219,17 @@ BOOST_AUTO_TEST_CASE(accepts_mint_and_spend_output_types)
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::OK);
 }
 
+BOOST_AUTO_TEST_CASE(validation_accepts_single_input_current_skeleton)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {Output(8, 0)};
+
+    helsing::ValidationStateView view;
+    view.sparkOutputs.emplace(tx.inCoinIDs[0], EligibleOutput(tx.inCoinIDs[0], 90));
+
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::OK);
+}
+
 BOOST_AUTO_TEST_CASE(rejects_mismatched_output_record_id)
 {
     helsing::StakeTx tx = ValidStakeTx();
@@ -956,6 +1275,10 @@ BOOST_AUTO_TEST_CASE(rejects_malformed_output_records)
     view = ValidView(tx);
     view.sparkOutputs[tx.inCoinIDs[0]].type = static_cast<helsing::SparkOutputType>(255);
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
+
+    view = ValidView(tx);
+    view.sparkOutputs[tx.inCoinIDs[0]].type = static_cast<helsing::SparkOutputType>(3);
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
 }
 
 BOOST_AUTO_TEST_CASE(rejects_missing_second_output)
@@ -981,8 +1304,51 @@ BOOST_AUTO_TEST_CASE(rejects_bad_second_output_records)
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
 
     view = ValidView(tx);
+    view.sparkOutputs[tx.inCoinIDs[1]].C = GroupElement();
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
+
+    view = ValidView(tx);
+    view.sparkOutputs[tx.inCoinIDs[1]].K = NonMemberPoint();
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
+
+    view = ValidView(tx);
+    view.sparkOutputs[tx.inCoinIDs[1]].nHeight = -1;
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
+
+    view = ValidView(tx);
+    view.sparkOutputs[tx.inCoinIDs[1]].type = static_cast<helsing::SparkOutputType>(255);
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
+
+    view = ValidView(tx);
     view.sparkOutputs[tx.inCoinIDs[1]].helsing_eligible = false;
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::OUTPUT_NOT_ELIGIBLE);
+}
+
+BOOST_AUTO_TEST_CASE(validation_checks_all_outputs_beyond_second)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {Output(1, 0), Output(2, 0), Output(3, 0)};
+    helsing::ValidationStateView view = ValidView(tx);
+
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::OUTPUT_NOT_FOUND);
+
+    view = ValidView(tx);
+    view.sparkOutputs.emplace(tx.inCoinIDs[2], EligibleOutput(tx.inCoinIDs[2], 70));
+    view.sparkOutputs[tx.inCoinIDs[2]].output_id = Output(99, 0);
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::OUTPUT_ID_MISMATCH);
+
+    view = ValidView(tx);
+    view.sparkOutputs.emplace(tx.inCoinIDs[2], EligibleOutput(tx.inCoinIDs[2], 70));
+    view.sparkOutputs[tx.inCoinIDs[2]].S = GroupElement();
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
+
+    view = ValidView(tx);
+    view.sparkOutputs.emplace(tx.inCoinIDs[2], EligibleOutput(tx.inCoinIDs[2], 70));
+    view.sparkOutputs[tx.inCoinIDs[2]].helsing_eligible = false;
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::OUTPUT_NOT_ELIGIBLE);
+
+    view.sparkOutputs[tx.inCoinIDs[2]].helsing_eligible = true;
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::OK);
 }
 
 BOOST_AUTO_TEST_CASE(validation_uses_full_output_id_not_txid_only)
@@ -1044,6 +1410,22 @@ BOOST_AUTO_TEST_CASE(validation_output_record_precedence_is_stable)
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
 }
 
+BOOST_AUTO_TEST_CASE(validation_output_record_precedence_is_stable_on_second_output)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    helsing::ValidationStateView view = ValidView(tx);
+
+    view.sparkOutputs[tx.inCoinIDs[1]].output_id = Output(99, 0);
+    view.sparkOutputs[tx.inCoinIDs[1]].S = GroupElement();
+    view.sparkOutputs[tx.inCoinIDs[1]].helsing_eligible = false;
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::OUTPUT_ID_MISMATCH);
+
+    view = ValidView(tx);
+    view.sparkOutputs[tx.inCoinIDs[1]].S = GroupElement();
+    view.sparkOutputs[tx.inCoinIDs[1]].helsing_eligible = false;
+    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
+}
+
 BOOST_AUTO_TEST_CASE(validation_state_view_lookup_helpers)
 {
     helsing::StakeTx tx = ValidStakeTx();
@@ -1064,6 +1446,7 @@ BOOST_AUTO_TEST_CASE(validation_state_view_lookup_helpers)
     BOOST_CHECK(!view.HasBlockSpentTag(tx.T));
     view.blockSpentTags.insert(tx.T);
     BOOST_CHECK(view.HasBlockSpentTag(tx.T));
+    BOOST_CHECK(!view.HasBlockSpentTag(DeterministicPoint(91)));
 }
 
 BOOST_AUTO_TEST_CASE(validation_result_strings_cover_all_values)
@@ -1082,6 +1465,7 @@ BOOST_AUTO_TEST_CASE(validation_result_strings_cover_all_values)
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::INVALID_OUTPUT_RECORD), "INVALID_OUTPUT_RECORD");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::OUTPUT_NOT_ELIGIBLE), "OUTPUT_NOT_ELIGIBLE");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(static_cast<helsing::StakeValidationResult>(255)), "UNKNOWN");
+    BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(static_cast<helsing::StakeValidationResult>(-1)), "UNKNOWN");
 }
 
 BOOST_AUTO_TEST_CASE(stake_tx_serialization_roundtrip)
@@ -1100,6 +1484,34 @@ BOOST_AUTO_TEST_CASE(stake_tx_serialization_roundtrip)
     stream >> decoded;
 
     CheckStakeTxEqual(decoded, tx);
+}
+
+BOOST_AUTO_TEST_CASE(default_stake_tx_serialization_roundtrip)
+{
+    helsing::StakeTx tx;
+
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << tx;
+
+    helsing::StakeTx decoded;
+    stream >> decoded;
+
+    CheckStakeTxEqual(decoded, tx);
+}
+
+BOOST_AUTO_TEST_CASE(stake_tx_serialization_preserves_malformed_incoinids)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {Output(2, 0), Output(1, 0), Output(1, 0), helsing::OutputId()};
+
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << tx;
+
+    helsing::StakeTx decoded;
+    stream >> decoded;
+
+    CheckStakeTxEqual(decoded, tx);
+    BOOST_CHECK(!helsing::IsStrictlySortedAndDistinct(decoded.inCoinIDs));
 }
 
 BOOST_AUTO_TEST_CASE(proof_blob_empty_reflects_serialized_content)
