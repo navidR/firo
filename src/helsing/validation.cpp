@@ -269,6 +269,33 @@ bool IsStakeContextValidSkeleton(const StakeContext& context, bool canonicalCont
            nodeSigningKeyMaterialValid;
 }
 
+StakeVerificationContextSkeletonResult CheckStakeVerificationContextSkeleton(
+    const StakeTx& tx,
+    const CHelsingState& helsingState,
+    CAmount stakeValue,
+    CAmount vMax,
+    bool vMaxLessThanGroupOrder,
+    bool canonicalEncodingsValid,
+    bool canonicalContextValid,
+    bool payoutAddressValid,
+    bool updatePublicKeyValid,
+    bool nodeSigningKeyMaterialValid)
+{
+    StakeVerificationContextSkeletonResult result;
+    result.prefix_result = CheckStakeVerificationPrefixSkeleton(tx, stakeValue, vMax, vMaxLessThanGroupOrder, canonicalEncodingsValid);
+    if (result.prefix_result != StakeVerificationPrefixSkeletonResult::OK) {
+        return result;
+    }
+
+    result.tag_result = CheckStakeTagStateSkeleton(tx.T, helsingState);
+    if (result.tag_result != StakeValidationResult::OK) {
+        return result;
+    }
+
+    result.context_valid = IsStakeContextValidSkeleton(tx.m, canonicalContextValid, payoutAddressValid, updatePublicKeyValid, nodeSigningKeyMaterialValid);
+    return result;
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {

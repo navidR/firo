@@ -29,6 +29,7 @@ Current scope:
 - `CheckStakeVerificationPrefixSkeleton` checks revised spec `StakeVerify` steps 1-3 only: field presence, a caller-supplied canonical-encoding result, and caller-supplied `V_STAKE` value parameters. It deliberately stops before tag-state, context, cover-set, statement-hash, and proof verification.
 - `CheckStakeTagStateSkeleton` checks revised spec `StakeVerify` step 4 against parent state only: reject if `T` is already spent, then reject if `T` is already active. It does not inspect same-block `BlockSpentTags`.
 - `IsStakeContextValidSkeleton` checks revised spec `StakeVerify` step 5 only as a predicate over caller-supplied context-validation facts: non-empty context, canonical context, valid payout address, valid update key, and valid node signing key material. It does not define `enc_context(m)` or any concrete address/key grammar.
+- `CheckStakeVerificationContextSkeleton` composes revised spec `StakeVerify` steps 1-5 only: field presence, caller-supplied canonical encodings, caller-supplied value parameters, parent-state tag checks, and caller-supplied context facts. It deliberately stops before same-block `BlockSpentTags`, cover-set lookup, statement hashes, and proof verification.
 - `IsExpectedPayoutAmountInRangeSkeleton` checks the revised spec `PayoutVerify` step 10 equality and integer range for caller-supplied values.
 - `IsPayoutValueParameterInRangeSkeleton` checks revised spec `PayoutVerify` step 10 for caller-supplied `V_PAYOUT`, expected amount, `V_MAX`, and `V_MAX < q`; it does not expose the scalar order, perform scalar conversion, or recompute payout amounts.
 - `IsCompletePayoutTxSkeleton` checks that caller-supplied `PayoutTxSkeleton` identity/address/coin fields are populated before future payout verification; it does not define payout address or coin encodings.
@@ -60,8 +61,8 @@ Not implemented yet:
 
 - canonical `stake_stmt`, `incoins_root`, and context hashing
 - canonical `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction
-- final `StakeVerify` check ordering matching the revised spec once value parameters and context validation are wired
-- wiring cover-set output checks into `StakeVerify` after public Helsing parameters are selected
+- final `StakeVerify` steps 6-12 after public Helsing parameters, Spark maturity rules, statement hashes, and proof verification are implemented
+- wiring cover-set output checks into `StakeVerify` after public Helsing parameters are selected, without changing the step-1-through-5 helper into a full verifier
 - Spark maturity and cover-set eligibility rules using current height and consensus maturity parameters
 - wiring value-domain checks for `V_STAKE`, `V_PAYOUT`, `V_MAX < q`, scalar conversion bounds, and ordinary fees outside the collateral proof
 - any decision to reintroduce an optional collateral margin as a consensus policy

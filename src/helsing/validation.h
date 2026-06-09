@@ -65,6 +65,12 @@ struct StakeUpdateVerificationSkeletonResult {
     StakeValidationResult stake_result{StakeValidationResult::OK};
 };
 
+struct StakeVerificationContextSkeletonResult {
+    StakeVerificationPrefixSkeletonResult prefix_result{StakeVerificationPrefixSkeletonResult::OK};
+    StakeValidationResult tag_result{StakeValidationResult::OK};
+    bool context_valid{true};
+};
+
 struct ValidationStateView {
     std::map<OutputId, SparkOutputRecord> sparkOutputs;
     std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
@@ -134,6 +140,9 @@ StakeValidationResult CheckStakeTagStateSkeleton(const GroupElement& tag, const 
 // Revised spec StakeVerify step 5 predicate with caller-supplied context facts.
 // This does not define enc_context(m), address grammar, update-key grammar, or node-key grammar.
 bool IsStakeContextValidSkeleton(const StakeContext& context, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid);
+// Revised spec StakeVerify steps 1-5 only. The caller supplies canonical
+// encoding and context-validation facts; this stops before cover sets and proofs.
+StakeVerificationContextSkeletonResult CheckStakeVerificationContextSkeleton(const StakeTx& tx, const CHelsingState& helsingState, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

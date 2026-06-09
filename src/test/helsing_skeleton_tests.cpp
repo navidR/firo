@@ -540,6 +540,99 @@ BOOST_AUTO_TEST_CASE(stake_context_validation_skeleton_does_not_define_context_g
     BOOST_CHECK(helsing::IsStakeContextValidSkeleton(context, true, true, true, true));
 }
 
+BOOST_AUTO_TEST_CASE(stake_verification_context_skeleton_accepts_steps_one_through_five)
+{
+    const helsing::StakeTx tx = ValidStakeTx();
+    helsing::CHelsingState state;
+    BOOST_CHECK(state.AddActiveStake(ActiveRecord(74, DeterministicPoint(75))));
+    BOOST_CHECK(state.AddSpentTag(DeterministicPoint(76), 204));
+
+    const helsing::StakeVerificationContextSkeletonResult result = helsing::CheckStakeVerificationContextSkeleton(tx, state, MAX_MONEY - 1, MAX_MONEY, true, true, true, true, true, true);
+
+    BOOST_CHECK(result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.context_valid);
+}
+
+BOOST_AUTO_TEST_CASE(stake_verification_context_skeleton_preserves_steps_one_through_five_precedence)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    helsing::CHelsingState state;
+    BOOST_CHECK(state.AddSpentTag(tx.T, 205));
+
+    tx.inCoinIDs.clear();
+    helsing::StakeVerificationContextSkeletonResult result = helsing::CheckStakeVerificationContextSkeleton(tx, state, -1, 0, false, false, false, false, false, false);
+    BOOST_CHECK(result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::TX_INCOMPLETE);
+    BOOST_CHECK(result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.context_valid);
+
+    tx = ValidStakeTx();
+    result = helsing::CheckStakeVerificationContextSkeleton(tx, state, -1, 0, false, false, false, false, false, false);
+    BOOST_CHECK(result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::MALFORMED_OR_NONCANONICAL);
+    BOOST_CHECK(result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.context_valid);
+
+    result = helsing::CheckStakeVerificationContextSkeleton(tx, state, 0, 1, true, true, false, false, false, false);
+    BOOST_CHECK(result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.tag_result == helsing::StakeValidationResult::TAG_ALREADY_SPENT);
+    BOOST_CHECK(result.context_valid);
+
+    state.Reset();
+    BOOST_CHECK(state.AddActiveStake(ActiveRecord(77, tx.T)));
+    result = helsing::CheckStakeVerificationContextSkeleton(tx, state, 0, 1, true, true, false, false, false, false);
+    BOOST_CHECK(result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.tag_result == helsing::StakeValidationResult::TAG_ALREADY_ACTIVE);
+    BOOST_CHECK(result.context_valid);
+
+    state.Reset();
+    result = helsing::CheckStakeVerificationContextSkeleton(tx, state, 0, 1, true, true, true, true, false, true);
+    BOOST_CHECK(result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(!result.context_valid);
+}
+
+BOOST_AUTO_TEST_CASE(stake_verification_context_skeleton_stops_before_cover_sets_and_proofs)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {helsing::OutputId()};
+    tx.S_prime = GroupElement();
+    tx.C_prime = GroupElement();
+    tx.pi_par.bytes = {0x00};
+    tx.pi_val.bytes = {0xff};
+    tx.pi_tag.bytes = {0x00, 0xff};
+
+    helsing::CHelsingState state;
+    const helsing::StakeVerificationContextSkeletonResult result = helsing::CheckStakeVerificationContextSkeleton(tx, state, 0, 1, true, true, true, true, true, true);
+
+    BOOST_CHECK(result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.context_valid);
+}
+
+BOOST_AUTO_TEST_CASE(stake_verification_context_skeleton_does_not_mutate_state)
+{
+    const helsing::StakeTx tx = ValidStakeTx();
+    helsing::CHelsingState state;
+    const GroupElement activeTag = DeterministicPoint(78);
+    const GroupElement spentTag = DeterministicPoint(79);
+
+    BOOST_CHECK(state.AddActiveStake(ActiveRecord(80, activeTag)));
+    BOOST_CHECK(state.AddSpentTag(spentTag, 206));
+
+    const helsing::StakeVerificationContextSkeletonResult result = helsing::CheckStakeVerificationContextSkeleton(tx, state, 0, 1, true, true, true, true, true, true);
+    BOOST_CHECK(result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.tag_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.context_valid);
+
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(activeTag));
+    BOOST_CHECK(state.IsSpentTag(spentTag));
+    BOOST_CHECK(!state.IsActiveTag(tx.T));
+    BOOST_CHECK(!state.IsSpentTag(tx.T));
+}
+
 BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_accepts_populated_fields)
 {
     const helsing::StakeTx tx = ValidStakeTx();
