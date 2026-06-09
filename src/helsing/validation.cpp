@@ -159,6 +159,12 @@ bool DoesPayoutContextMatchTxSkeleton(const PayoutTxSkeleton& tx, const PayoutBl
            tx.selected_stake_id == context.selected_stake_id;
 }
 
+bool ArePayoutIdInputsCompleteSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context)
+{
+    return IsCompletePayoutBlockContextSkeleton(context) &&
+           DoesPayoutContextMatchTxSkeleton(tx, context);
+}
+
 bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx)
 {
     return !tx.stake_id.IsNull() &&

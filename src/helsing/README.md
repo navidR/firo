@@ -12,6 +12,7 @@ Current scope:
 - `PayoutBlockContextSkeleton` models the revised spec section 16 payout-id input fields `{chain_id, block_height, prev_block_hash, payout_index, selected_stake_id}` without defining or computing `j`.
 - `IsCompletePayoutBlockContextSkeleton` checks that caller-supplied section 16 payout-id input fields are populated before any future `j` construction; it does not define canonical `chain_id` or `enc_*` grammar.
 - `DoesPayoutContextMatchTxSkeleton` checks that caller-supplied payout tx and block-context skeletons agree on `payout_index` and `selected_stake_id`; it does not construct `j`.
+- `ArePayoutIdInputsCompleteSkeleton` checks only that section 16 payout-id inputs are available across the block context and tx identity fields before any future `j` construction.
 - `IsCompleteStakeUpdateTxSkeleton` checks that caller-supplied `StakeUpdateTx` fields are populated before any future signature verification; it does not define context grammar or verify `sig_update`.
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
 - `ExtractSparkOutputRecords` builds a consensus-inert `(txid, vout) -> SparkOutputRecord` view from valid Spark mint and spend-created output scripts.

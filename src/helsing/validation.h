@@ -74,6 +74,9 @@ bool IsCompletePayoutBlockContextSkeleton(const PayoutBlockContextSkeleton& cont
 // Revised spec section 16/18 tx-context consistency for fields that feed payout-id
 // construction. This does not define block_context grammar or construct j.
 bool DoesPayoutContextMatchTxSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context);
+// Revised spec section 16 payout-id input availability across tx and block context.
+// This does not define canonical encodings, selected-masternode rules, or construct j.
+bool ArePayoutIdInputsCompleteSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context);
 // Revised spec StakeUpdateTx field-completeness only. This does not parse contexts,
 // extract update_pk, define enc_context(m_new), or verify sig_update.
 bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx);
