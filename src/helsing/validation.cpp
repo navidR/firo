@@ -478,4 +478,25 @@ StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdat
     return StakeValidationResult::OK;
 }
 
+StakeValidationResult CheckBlockValidationPrefixSkeleton(
+    const std::vector<StakeTx>& stake_txs,
+    const std::vector<StakeUpdateTx>& update_txs,
+    const std::vector<PayoutTxSkeleton>& payout_txs,
+    const ValidationStateView& view,
+    int currentHeight,
+    int stakeMaturity)
+{
+    StakeValidationResult result = CheckStakeBlockSkeleton(stake_txs, view);
+    if (result != StakeValidationResult::OK) {
+        return result;
+    }
+
+    result = CheckStakeUpdateBlockSkeleton(update_txs, view);
+    if (result != StakeValidationResult::OK) {
+        return result;
+    }
+
+    return CheckPayoutBlockEligibilitySkeleton(payout_txs, view, currentHeight, stakeMaturity);
+}
+
 } // namespace helsing

@@ -113,6 +113,11 @@ StakeValidationResult CheckStakeUpdateEligibilitySkeleton(const uint256& stake_i
 // and same-block duplicate-update policy.
 StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view);
 
+// Block-level skeleton for revised-spec ValidateBlock steps 3-5 using the existing inert
+// stake, update, and payout prefix helpers. The caller must supply already collected
+// BlockSpentTags in view and this does not perform Spark spend validation or state mutation.
+StakeValidationResult CheckBlockValidationPrefixSkeleton(const std::vector<StakeTx>& stake_txs, const std::vector<StakeUpdateTx>& update_txs, const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& view, int currentHeight, int stakeMaturity);
+
 } // namespace helsing
 
 #endif // FIRO_HELSING_VALIDATION_H
