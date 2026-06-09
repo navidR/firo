@@ -16,6 +16,7 @@ Current scope:
 - `CheckStakeSkeleton` performs structural checks only: sorted distinct `InCoinIDs`, non-infinity public group elements, non-empty proof blobs, tag conflicts, output existence, output record consistency, and `helsing_eligible`.
 - `CheckStakeBlockSkeleton` performs non-mutating block-level tag-state checks before per-stake skeleton validation, including duplicate new stake tags in the same block.
 - `CheckPayoutEligibilitySkeleton` performs revised spec `PayoutVerify` steps 3-7 only: stake record lookup, active status, spent-tag checks, and payout maturity.
+- `CheckStakeUpdateEligibilitySkeleton` performs revised spec `StakeUpdateVerify` steps 1-3 only: stake record lookup, active status, and spent-tag checks.
 
 Not implemented yet:
 
@@ -29,6 +30,7 @@ Not implemented yet:
 - consensus block-level duplicate new stake tag integration
 - full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, and deterministic Spark payout coin comparison
 - canonical stake context grammar, including payout address, update key, node signing material, and rejection of empty or non-canonical contexts
+- full stake update verification, including `update_pk` extraction, canonical `m_new` validation, `enc_context(m_new)`, update signature verification, and update effective-height rules
 - masternode registration/update/payout transaction wiring
 - consensus activation rules
 

@@ -322,4 +322,27 @@ StakeValidationResult CheckPayoutEligibilitySkeleton(const uint256& stake_id, co
     return StakeValidationResult::OK;
 }
 
+StakeValidationResult CheckStakeUpdateEligibilitySkeleton(const uint256& stake_id, const ValidationStateView& view)
+{
+    if (view.helsingState == nullptr) {
+        return StakeValidationResult::STAKE_RECORD_NOT_FOUND;
+    }
+
+    const StakeRecord* record = view.helsingState->GetStakeRecord(stake_id);
+    if (record == nullptr) {
+        return StakeValidationResult::STAKE_RECORD_NOT_FOUND;
+    }
+    if (record->status != StakeStatus::ACTIVE) {
+        return StakeValidationResult::STAKE_NOT_ACTIVE;
+    }
+    if (view.helsingState->IsSpentTag(record->T)) {
+        return StakeValidationResult::TAG_ALREADY_SPENT;
+    }
+    if (view.HasBlockSpentTag(record->T)) {
+        return StakeValidationResult::TAG_SPENT_IN_BLOCK;
+    }
+
+    return StakeValidationResult::OK;
+}
+
 } // namespace helsing

@@ -75,6 +75,9 @@ StakeValidationResult CheckStakeBlockSkeleton(const std::vector<StakeTx>& stake_
 // Structural skeleton for revised-spec PayoutVerify steps 3-7 only.
 StakeValidationResult CheckPayoutEligibilitySkeleton(const uint256& stake_id, const ValidationStateView& view, int currentHeight, int stakeMaturity);
 
+// Structural skeleton for revised-spec StakeUpdateVerify steps 1-3 only.
+StakeValidationResult CheckStakeUpdateEligibilitySkeleton(const uint256& stake_id, const ValidationStateView& view);
+
 } // namespace helsing
 
 #endif // FIRO_HELSING_VALIDATION_H
