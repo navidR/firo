@@ -127,6 +127,13 @@ void CheckStakeTxEqual(const helsing::StakeTx& a, const helsing::StakeTx& b)
     BOOST_CHECK(a.pi_tag.bytes == b.pi_tag.bytes);
 }
 
+void CheckStakeUpdateTxEqual(const helsing::StakeUpdateTx& a, const helsing::StakeUpdateTx& b)
+{
+    BOOST_CHECK(a.stake_id == b.stake_id);
+    BOOST_CHECK(a.m_new.bytes == b.m_new.bytes);
+    BOOST_CHECK(a.sig_update.bytes == b.sig_update.bytes);
+}
+
 template <typename T>
 std::string WireHex(const T& obj)
 {
@@ -2217,6 +2224,60 @@ BOOST_AUTO_TEST_CASE(stake_tx_wire_hash_is_field_sensitive)
     BOOST_CHECK(WireHash(changed) != baseHash);
 }
 
+BOOST_AUTO_TEST_CASE(stake_update_tx_serialization_roundtrip)
+{
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = DeterministicHash(151);
+    tx.m_new.bytes = {0x6d, 0x5f, 0x6e, 0x65, 0x77};
+    tx.sig_update.bytes = {0x30, 0x44, 0x02, 0x20};
+
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << tx;
+
+    helsing::StakeUpdateTx decoded;
+    stream >> decoded;
+
+    CheckStakeUpdateTxEqual(decoded, tx);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_tx_wire_regression_vectors)
+{
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = DeterministicHash(152);
+    tx.m_new.bytes = {0x6d, 0x5f, 0x6e, 0x65, 0x77};
+    tx.sig_update.bytes = {0x30, 0x44, 0x02, 0x20};
+
+    const std::string stakeId = WireHex(tx.stake_id);
+    const std::string newContext = WireHex(tx.m_new);
+    const std::string updateSig = WireHex(tx.sig_update);
+
+    BOOST_CHECK_EQUAL(stakeId, "9800000000000000000000000000000000000000000000000000000000000000");
+    BOOST_CHECK_EQUAL(newContext, "056d5f6e6577");
+    BOOST_CHECK_EQUAL(updateSig, "0430440220");
+    BOOST_CHECK_EQUAL(WireHex(tx), stakeId + newContext + updateSig);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_tx_wire_hash_is_field_sensitive)
+{
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = DeterministicHash(153);
+    tx.m_new.bytes = {0x6d, 0x5f, 0x6e, 0x65, 0x77};
+    tx.sig_update.bytes = {0x30, 0x44, 0x02, 0x20};
+    const uint256 baseHash = WireHash(tx);
+
+    helsing::StakeUpdateTx changed = tx;
+    changed.stake_id = DeterministicHash(154);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = tx;
+    changed.m_new.bytes.push_back(0x01);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = tx;
+    changed.sig_update.bytes.push_back(0x01);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+}
+
 BOOST_AUTO_TEST_CASE(stake_wire_deserialization_rejects_truncated_or_noncanonical_streams)
 {
     std::vector<unsigned char> serializedOutput = ParseHex(WireHex(Output(1, 0)));
@@ -2253,6 +2314,23 @@ BOOST_AUTO_TEST_CASE(stake_wire_deserialization_rejects_truncated_or_noncanonica
     nonCanonicalProof.write("\xfd\xfc\x00", 3);
     helsing::ProofBlob decodedProof;
     BOOST_CHECK_THROW(nonCanonicalProof >> decodedProof, std::ios_base::failure);
+
+    const std::vector<unsigned char> serializedUpdate = ParseHex(WireHex(helsing::StakeUpdateTx()));
+    BOOST_REQUIRE(!serializedUpdate.empty());
+    for (size_t prefixSize = 0; prefixSize < serializedUpdate.size(); ++prefixSize) {
+        BOOST_TEST_CONTEXT("updatePrefixSize=" << prefixSize)
+        {
+            std::vector<unsigned char> prefix(serializedUpdate.begin(), serializedUpdate.begin() + prefixSize);
+            CDataStream truncated(prefix, SER_NETWORK, PROTOCOL_VERSION);
+            helsing::StakeUpdateTx decodedUpdate;
+            BOOST_CHECK_THROW(truncated >> decodedUpdate, std::ios_base::failure);
+        }
+    }
+
+    CDataStream nonCanonicalSignature(SER_NETWORK, PROTOCOL_VERSION);
+    nonCanonicalSignature.write("\xfd\x00\x00", 3);
+    helsing::SignatureBlob decodedSignature;
+    BOOST_CHECK_THROW(nonCanonicalSignature >> decodedSignature, std::ios_base::failure);
 }
 
 BOOST_AUTO_TEST_CASE(default_stake_tx_serialization_roundtrip)
@@ -2266,6 +2344,19 @@ BOOST_AUTO_TEST_CASE(default_stake_tx_serialization_roundtrip)
     stream >> decoded;
 
     CheckStakeTxEqual(decoded, tx);
+}
+
+BOOST_AUTO_TEST_CASE(default_stake_update_tx_serialization_roundtrip)
+{
+    helsing::StakeUpdateTx tx;
+
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << tx;
+
+    helsing::StakeUpdateTx decoded;
+    stream >> decoded;
+
+    CheckStakeUpdateTxEqual(decoded, tx);
 }
 
 BOOST_AUTO_TEST_CASE(stake_tx_serialization_preserves_malformed_incoinids)
@@ -2308,6 +2399,33 @@ BOOST_AUTO_TEST_CASE(proof_blob_empty_reflects_serialized_content)
 
     BOOST_CHECK(!decodedNonEmpty.empty());
     BOOST_CHECK(decodedNonEmpty.bytes == proof.bytes);
+}
+
+BOOST_AUTO_TEST_CASE(signature_blob_empty_reflects_serialized_content)
+{
+    helsing::SignatureBlob sig;
+    BOOST_CHECK(sig.empty());
+
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << sig;
+
+    helsing::SignatureBlob decodedEmpty;
+    stream >> decodedEmpty;
+
+    BOOST_CHECK(decodedEmpty.empty());
+    BOOST_CHECK(decodedEmpty.bytes.empty());
+
+    sig.bytes = {0x30, 0x44};
+    BOOST_CHECK(!sig.empty());
+
+    CDataStream nonEmptyStream(SER_NETWORK, PROTOCOL_VERSION);
+    nonEmptyStream << sig;
+
+    helsing::SignatureBlob decodedNonEmpty;
+    nonEmptyStream >> decodedNonEmpty;
+
+    BOOST_CHECK(!decodedNonEmpty.empty());
+    BOOST_CHECK(decodedNonEmpty.bytes == sig.bytes);
 }
 
 BOOST_AUTO_TEST_CASE(stake_context_serialization_roundtrip)

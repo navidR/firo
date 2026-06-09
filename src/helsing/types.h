@@ -75,6 +75,20 @@ struct ProofBlob {
     }
 };
 
+struct SignatureBlob {
+    std::vector<unsigned char> bytes;
+
+    bool empty() const { return bytes.empty(); }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(bytes);
+    }
+};
+
 enum class SparkOutputType : uint8_t {
     UNKNOWN = 0,
     MINT = 1,
@@ -114,6 +128,22 @@ struct StakeTx {
         READWRITE(pi_par);
         READWRITE(pi_val);
         READWRITE(pi_tag);
+    }
+};
+
+struct StakeUpdateTx {
+    uint256 stake_id;
+    StakeContext m_new;
+    SignatureBlob sig_update;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(stake_id);
+        READWRITE(m_new);
+        READWRITE(sig_update);
     }
 };
 
