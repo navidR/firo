@@ -346,6 +346,24 @@ BOOST_AUTO_TEST_CASE(expected_payout_amount_helper_checks_equality_and_range)
     BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::max()));
 }
 
+BOOST_AUTO_TEST_CASE(stake_margin_helper_checks_integer_sum_before_scalar_conversion)
+{
+    BOOST_CHECK(helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(0, 0, 1));
+    BOOST_CHECK(helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(1, 1, 3));
+    BOOST_CHECK(helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(MAX_MONEY - 2, 1, MAX_MONEY));
+    BOOST_CHECK(helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(std::numeric_limits<CAmount>::max() - 2, 1, std::numeric_limits<CAmount>::max()));
+
+    BOOST_CHECK(!helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(-1, 0, 1));
+    BOOST_CHECK(!helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(0, -1, 1));
+    BOOST_CHECK(!helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(0, 0, 0));
+    BOOST_CHECK(!helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(0, 0, -1));
+    BOOST_CHECK(!helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(1, 0, 1));
+    BOOST_CHECK(!helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(1, 1, 2));
+    BOOST_CHECK(!helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(1, 2, 2));
+    BOOST_CHECK(!helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(std::numeric_limits<CAmount>::max() - 1, 2, std::numeric_limits<CAmount>::max()));
+    BOOST_CHECK(!helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(std::numeric_limits<CAmount>::min(), 0, std::numeric_limits<CAmount>::max()));
+}
+
 BOOST_AUTO_TEST_CASE(cover_set_output_skeleton_accepts_valid_public_power)
 {
     const std::vector<helsing::OutputId> inCoinIDs = {Output(1, 0), Output(2, 0), Output(3, 0), Output(4, 0)};

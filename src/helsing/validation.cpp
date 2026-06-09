@@ -128,6 +128,18 @@ bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expected
     return payoutValue == expectedAmount && IsHelsingValueInRange(payoutValue, vMax);
 }
 
+bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
+{
+    if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {
+        return false;
+    }
+    if (stakeValue > std::numeric_limits<CAmount>::max() - margin) {
+        return false;
+    }
+
+    return stakeValue + margin < vMax;
+}
+
 bool IsValidOutputId(const OutputId& output_id)
 {
     return !output_id.txid.IsNull();
