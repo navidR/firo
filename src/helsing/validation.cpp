@@ -510,6 +510,28 @@ StakeValidationResult CheckPayoutBlockEligibilitySkeleton(const std::vector<Payo
     return StakeValidationResult::OK;
 }
 
+PayoutVerificationSkeletonResult CheckPayoutVerificationSkeleton(
+    const PayoutTxSkeleton& tx,
+    const ValidationStateView& view,
+    int currentHeight,
+    int stakeMaturity,
+    const PayoutBlockContextSkeleton& context,
+    const PayoutAddressBlob& registeredAddress,
+    const uint256& expectedStakeId,
+    CAmount expectedAmount,
+    CAmount vMax,
+    const PayoutCoinBlob& expectedCoin)
+{
+    PayoutVerificationSkeletonResult result;
+    result.stake_result = CheckPayoutEligibilitySkeleton(tx.selected_stake_id, view, currentHeight, stakeMaturity);
+    if (result.stake_result != StakeValidationResult::OK) {
+        return result;
+    }
+
+    result.public_result = CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, expectedStakeId, expectedAmount, vMax, expectedCoin);
+    return result;
+}
+
 bool ArePayoutIndexesDistinctSkeleton(const std::vector<PayoutTxSkeleton>& payout_txs)
 {
     std::unordered_set<uint32_t> payoutIndexes;

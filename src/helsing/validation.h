@@ -48,6 +48,11 @@ enum class PayoutPublicValidationResult {
     PAYOUT_COIN_MISMATCH,
 };
 
+struct PayoutVerificationSkeletonResult {
+    StakeValidationResult stake_result{StakeValidationResult::OK};
+    PayoutPublicValidationResult public_result{PayoutPublicValidationResult::OK};
+};
+
 struct ValidationStateView {
     std::map<OutputId, SparkOutputRecord> sparkOutputs;
     std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
@@ -137,6 +142,10 @@ StakeValidationResult CheckPayoutEligibilitySkeleton(const uint256& stake_id, co
 // This deliberately stops before payout index policy, address extraction, deterministic selection,
 // payout amount derivation, payout identifier construction, and payout coin recomputation.
 StakeValidationResult CheckPayoutBlockEligibilitySkeleton(const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& view, int currentHeight, int stakeMaturity);
+// Structural skeleton for revised-spec PayoutVerify steps 3-13 using caller-supplied
+// expected public values for steps that are not implemented yet. This does not parse
+// contexts, select masternodes, compute j, run Payout, or verify payout coins.
+PayoutVerificationSkeletonResult CheckPayoutVerificationSkeleton(const PayoutTxSkeleton& tx, const ValidationStateView& view, int currentHeight, int stakeMaturity, const PayoutBlockContextSkeleton& context, const PayoutAddressBlob& registeredAddress, const uint256& expectedStakeId, CAmount expectedAmount, CAmount vMax, const PayoutCoinBlob& expectedCoin);
 
 // Revised-spec section 16 requires distinct payout_index values when a block
 // contains more than one masternode payout.

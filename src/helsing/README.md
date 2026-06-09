@@ -35,6 +35,7 @@ Current scope:
 - `CheckStakeBlockSkeleton` performs non-mutating block-level tag-state checks before per-stake skeleton validation, including duplicate new stake tags in the same block.
 - `CheckPayoutEligibilitySkeleton` performs revised spec `PayoutVerify` steps 3-7 only: stake record lookup, active status, spent-tag checks, and payout maturity.
 - `CheckPayoutBlockEligibilitySkeleton` performs revised spec `ValidateBlock` step 5 and `PayoutVerify` steps 3-7 only for caller-supplied payout transactions; it deliberately stops before payout index policy, address extraction, deterministic selection, payout amount derivation, payout identifier construction, and payout coin recomputation.
+- `CheckPayoutVerificationSkeleton` composes revised spec `PayoutVerify` steps 3-13 using existing eligibility checks and caller-supplied expected public values; it deliberately does not parse contexts, select masternodes, compute `j`, run `Payout`, or verify payout coins.
 - `ArePayoutIndexesDistinctSkeleton` checks the revised spec section 16 duplicate-`payout_index` rule for a caller-supplied payout set.
 - `CheckStakeUpdateEligibilitySkeleton` performs revised spec `StakeUpdateVerify` steps 1-3 only: stake record lookup, active status, and spent-tag checks.
 - `CheckStakeUpdateBlockSkeleton` performs revised spec `ValidateBlock` step 4 and `StakeUpdateVerify` steps 1-3 only for a caller-supplied update set; it deliberately stops before context parsing, signature verification, effective-height rules, and same-block duplicate-update policy.
