@@ -172,6 +172,34 @@ bool ArePayoutIdInputsCompleteSkeleton(const PayoutTxSkeleton& tx, const PayoutB
            DoesPayoutContextMatchTxSkeleton(tx, context);
 }
 
+PayoutPublicValidationResult CheckPayoutPublicFieldsSkeleton(
+    const PayoutTxSkeleton& tx,
+    const PayoutBlockContextSkeleton& context,
+    const PayoutAddressBlob& registeredAddress,
+    const uint256& expectedStakeId,
+    CAmount expectedAmount,
+    CAmount vMax,
+    const PayoutCoinBlob& expectedCoin)
+{
+    if (!DoesPayoutAddressMatchRegisteredSkeleton(tx, registeredAddress)) {
+        return PayoutPublicValidationResult::ADDRESS_MISMATCH;
+    }
+    if (!DoesPayoutStakeMatchExpectedSkeleton(tx, expectedStakeId)) {
+        return PayoutPublicValidationResult::SELECTED_STAKE_MISMATCH;
+    }
+    if (!IsExpectedPayoutAmountInRangeSkeleton(tx.V_PAYOUT, expectedAmount, vMax)) {
+        return PayoutPublicValidationResult::INVALID_PAYOUT_AMOUNT;
+    }
+    if (!ArePayoutIdInputsCompleteSkeleton(tx, context)) {
+        return PayoutPublicValidationResult::INVALID_PAYOUT_ID_INPUTS;
+    }
+    if (!DoesPayoutCoinMatchExpectedSkeleton(tx, expectedCoin)) {
+        return PayoutPublicValidationResult::PAYOUT_COIN_MISMATCH;
+    }
+
+    return PayoutPublicValidationResult::OK;
+}
+
 bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx)
 {
     return !tx.stake_id.IsNull() &&

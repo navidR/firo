@@ -39,6 +39,15 @@ enum class StakeValidationResult {
 
 const char* StakeValidationResultToString(StakeValidationResult result);
 
+enum class PayoutPublicValidationResult {
+    OK,
+    ADDRESS_MISMATCH,
+    SELECTED_STAKE_MISMATCH,
+    INVALID_PAYOUT_AMOUNT,
+    INVALID_PAYOUT_ID_INPUTS,
+    PAYOUT_COIN_MISMATCH,
+};
+
 struct ValidationStateView {
     std::map<OutputId, SparkOutputRecord> sparkOutputs;
     std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
@@ -80,6 +89,10 @@ bool DoesPayoutContextMatchTxSkeleton(const PayoutTxSkeleton& tx, const PayoutBl
 // Revised spec section 16 payout-id input availability across tx and block context.
 // This does not define canonical encodings, selected-masternode rules, or construct j.
 bool ArePayoutIdInputsCompleteSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context);
+// Revised spec PayoutVerify public-field suffix, using only caller-supplied expected values.
+// This checks steps 8, 9, 10, 11 input availability, and 13 equality in order; it
+// does not parse contexts, select masternodes, compute j, run Payout, or verify proofs.
+PayoutPublicValidationResult CheckPayoutPublicFieldsSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context, const PayoutAddressBlob& registeredAddress, const uint256& expectedStakeId, CAmount expectedAmount, CAmount vMax, const PayoutCoinBlob& expectedCoin);
 // Revised spec StakeUpdateTx field-completeness only. This does not parse contexts,
 // extract update_pk, define enc_context(m_new), or verify sig_update.
 bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx);

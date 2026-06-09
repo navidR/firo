@@ -26,6 +26,7 @@ Current scope:
 - `DoesPayoutAddressMatchRegisteredSkeleton` checks revised spec `PayoutVerify` step 8 byte equality against a caller-supplied, already extracted registered payout address.
 - `DoesPayoutStakeMatchExpectedSkeleton` checks revised spec `PayoutVerify` step 9 equality against a caller-supplied, already recomputed deterministic selected stake.
 - `DoesPayoutCoinMatchExpectedSkeleton` checks revised spec `PayoutVerify` step 13 byte equality against a caller-supplied, already recomputed payout coin.
+- `CheckPayoutPublicFieldsSkeleton` composes caller-supplied payout public-field checks in revised spec `PayoutVerify` step 8, 9, 10, 11, and 13 order; it does not compute deterministic selection, `j`, or payout coins.
 - `IsHelsingStakeValueWithMarginInRangeSkeleton` checks the revised spec optional collateral-margin integer sum rule for caller-supplied `V_STAKE`, `margin`, and `V_MAX`.
 - `CHelsingState` models `SpentTags`, `ActiveTags`, and `StakeRecords`.
 - `BuildBlockSpentTagsSkeleton` models the revised spec block pre-pass minimum rule for duplicate Spark spend tags and tags already in `SpentTags`; it assumes ordinary Spark spend validation supplied valid revealed tags.
