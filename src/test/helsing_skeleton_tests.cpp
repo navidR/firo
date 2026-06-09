@@ -2559,6 +2559,62 @@ BOOST_AUTO_TEST_CASE(payout_tx_skeleton_wire_hash_is_field_sensitive)
     BOOST_CHECK(WireHash(changed) != baseHash);
 }
 
+BOOST_AUTO_TEST_CASE(payout_index_skeleton_accepts_empty_single_and_distinct_indexes)
+{
+    BOOST_CHECK(helsing::ArePayoutIndexesDistinctSkeleton({}));
+
+    helsing::PayoutTxSkeleton first;
+    first.selected_stake_id = DeterministicHash(163);
+    first.payout_index = 0;
+
+    helsing::PayoutTxSkeleton second;
+    second.selected_stake_id = DeterministicHash(164);
+    second.payout_index = 1;
+
+    helsing::PayoutTxSkeleton third;
+    third.selected_stake_id = DeterministicHash(165);
+    third.payout_index = std::numeric_limits<uint32_t>::max();
+
+    BOOST_CHECK(helsing::ArePayoutIndexesDistinctSkeleton({first}));
+    BOOST_CHECK(helsing::ArePayoutIndexesDistinctSkeleton({first, second, third}));
+}
+
+BOOST_AUTO_TEST_CASE(payout_index_skeleton_rejects_duplicate_indexes)
+{
+    helsing::PayoutTxSkeleton first;
+    first.selected_stake_id = DeterministicHash(166);
+    first.payout_index = 2;
+
+    helsing::PayoutTxSkeleton duplicate = first;
+    duplicate.selected_stake_id = DeterministicHash(167);
+
+    helsing::PayoutTxSkeleton later;
+    later.selected_stake_id = DeterministicHash(168);
+    later.payout_index = 3;
+
+    BOOST_CHECK(!helsing::ArePayoutIndexesDistinctSkeleton({first, duplicate}));
+    BOOST_CHECK(!helsing::ArePayoutIndexesDistinctSkeleton({first, later, duplicate}));
+}
+
+BOOST_AUTO_TEST_CASE(payout_index_skeleton_treats_stake_id_and_amount_as_irrelevant)
+{
+    helsing::PayoutTxSkeleton first;
+    first.selected_stake_id = DeterministicHash(169);
+    first.payout_index = 4;
+    first.V_PAYOUT = 10;
+
+    helsing::PayoutTxSkeleton second = first;
+    second.payout_index = 5;
+    second.V_PAYOUT = 10;
+
+    helsing::PayoutTxSkeleton duplicate = first;
+    duplicate.selected_stake_id = DeterministicHash(170);
+    duplicate.V_PAYOUT = 11;
+
+    BOOST_CHECK(helsing::ArePayoutIndexesDistinctSkeleton({first, second}));
+    BOOST_CHECK(!helsing::ArePayoutIndexesDistinctSkeleton({first, second, duplicate}));
+}
+
 BOOST_AUTO_TEST_CASE(stake_wire_deserialization_rejects_truncated_or_noncanonical_streams)
 {
     std::vector<unsigned char> serializedOutput = ParseHex(WireHex(Output(1, 0)));
