@@ -304,6 +304,22 @@ BOOST_AUTO_TEST_CASE(payout_maturity_helper_checks_revised_spec_inequality)
     BOOST_CHECK(!helsing::IsStakeMatureForPayout(std::numeric_limits<int>::max() - 1, std::numeric_limits<int>::max(), 2));
 }
 
+BOOST_AUTO_TEST_CASE(value_range_helper_checks_revised_spec_integer_domain)
+{
+    BOOST_CHECK(helsing::IsHelsingValueInRange(0, 1));
+    BOOST_CHECK(helsing::IsHelsingValueInRange(1, 2));
+    BOOST_CHECK(helsing::IsHelsingValueInRange(MAX_MONEY - 1, MAX_MONEY));
+    BOOST_CHECK(helsing::IsHelsingValueInRange(std::numeric_limits<CAmount>::max() - 1, std::numeric_limits<CAmount>::max()));
+
+    BOOST_CHECK(!helsing::IsHelsingValueInRange(-1, 1));
+    BOOST_CHECK(!helsing::IsHelsingValueInRange(1, 1));
+    BOOST_CHECK(!helsing::IsHelsingValueInRange(2, 1));
+    BOOST_CHECK(!helsing::IsHelsingValueInRange(0, 0));
+    BOOST_CHECK(!helsing::IsHelsingValueInRange(0, -1));
+    BOOST_CHECK(!helsing::IsHelsingValueInRange(std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::max()));
+    BOOST_CHECK(!helsing::IsHelsingValueInRange(std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max()));
+}
+
 BOOST_AUTO_TEST_CASE(output_id_helper_rejects_null_txid)
 {
     BOOST_CHECK(!helsing::IsValidOutputId(helsing::OutputId()));

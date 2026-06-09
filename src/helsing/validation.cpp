@@ -116,6 +116,11 @@ bool IsStakeMatureForPayout(int activationHeight, int currentHeight, int stakeMa
     return activationHeight + stakeMaturity <= currentHeight;
 }
 
+bool IsHelsingValueInRange(CAmount value, CAmount vMax)
+{
+    return vMax > 0 && value >= 0 && value < vMax;
+}
+
 bool IsValidOutputId(const OutputId& output_id)
 {
     return !output_id.txid.IsNull();
