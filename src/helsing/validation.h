@@ -65,6 +65,9 @@ bool DoesPayoutAddressMatchRegisteredSkeleton(const PayoutTxSkeleton& tx, const 
 // Revised spec PayoutVerify step 13 subset: compare the transaction coin with the
 // caller-supplied, already recomputed payout coin. This does not construct j or run Payout.
 bool DoesPayoutCoinMatchExpectedSkeleton(const PayoutTxSkeleton& tx, const PayoutCoinBlob& expectedCoin);
+// Revised spec section 16 payout-id input completeness only. This does not define
+// canonical chain_id/enc_* grammar, chain binding, selected-stake rules, or construct j.
+bool IsCompletePayoutBlockContextSkeleton(const PayoutBlockContextSkeleton& context);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

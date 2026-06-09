@@ -10,6 +10,7 @@ Current scope:
 - `StakeUpdateTx` models the revised spec fields `{stake_id, m_new, sig_update}` as a byte-carrying data structure only.
 - `PayoutTxSkeleton` models the revised spec fields `{selected_stake_id, payout_index, addr_pk, V_PAYOUT, Coin}` as a byte-carrying data structure only.
 - `PayoutBlockContextSkeleton` models the revised spec section 16 payout-id input fields `{chain_id, block_height, prev_block_hash, payout_index, selected_stake_id}` without defining or computing `j`.
+- `IsCompletePayoutBlockContextSkeleton` checks that caller-supplied section 16 payout-id input fields are populated before any future `j` construction; it does not define canonical `chain_id` or `enc_*` grammar.
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
 - `ExtractSparkOutputRecords` builds a consensus-inert `(txid, vout) -> SparkOutputRecord` view from valid Spark mint and spend-created output scripts.
 - `ApplyAcceptedPayoutOutputRecordsSkeleton` applies already accepted payout output records to `SparkOutputs` by `(txid, vout)` only; it does not recompute payout coins or decide Helsing eligibility.

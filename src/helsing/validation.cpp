@@ -138,6 +138,14 @@ bool DoesPayoutCoinMatchExpectedSkeleton(const PayoutTxSkeleton& tx, const Payou
     return !tx.coin.empty() && !expectedCoin.empty() && tx.coin.bytes == expectedCoin.bytes;
 }
 
+bool IsCompletePayoutBlockContextSkeleton(const PayoutBlockContextSkeleton& context)
+{
+    return !context.chain_id.empty() &&
+           context.block_height >= 0 &&
+           !context.prev_block_hash.IsNull() &&
+           !context.selected_stake_id.IsNull();
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {
