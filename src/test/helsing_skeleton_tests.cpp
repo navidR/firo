@@ -1822,6 +1822,159 @@ BOOST_AUTO_TEST_CASE(state_apply_accepted_stake_update_skeleton_rejects_negative
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(state_apply_accepted_stake_updates_skeleton_updates_all_records_atomically)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord firstRecord = ActiveRecord(186, DeterministicPoint(196));
+    const helsing::StakeRecord secondRecord = ActiveRecord(187, DeterministicPoint(197));
+    const helsing::StakeRecord untouchedRecord = ActiveRecord(188, DeterministicPoint(198));
+    const GroupElement spentOnlyTag = DeterministicPoint(199);
+    helsing::StakeContext firstContext;
+    helsing::StakeContext secondContext;
+    firstContext.bytes = {0x62, 0x61, 0x74, 0x63, 0x68, 0x31};
+    secondContext.bytes = {0x62, 0x61, 0x74, 0x63, 0x68, 0x32};
+
+    BOOST_CHECK(state.AddActiveStake(firstRecord));
+    BOOST_CHECK(state.AddActiveStake(secondRecord));
+    BOOST_CHECK(state.AddActiveStake(untouchedRecord));
+    BOOST_CHECK(state.AddSpentTag(spentOnlyTag, 414));
+
+    BOOST_CHECK(state.ApplyAcceptedStakeUpdatesSkeleton({{firstRecord.stake_id, firstContext}, {secondRecord.stake_id, secondContext}}, 415));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 3U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 3U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(firstRecord.T));
+    BOOST_CHECK(state.IsActiveTag(secondRecord.T));
+    BOOST_CHECK(state.IsActiveTag(untouchedRecord.T));
+    BOOST_CHECK(state.IsSpentTag(spentOnlyTag));
+
+    const helsing::StakeRecord* firstStored = state.GetStakeRecord(firstRecord.stake_id);
+    const helsing::StakeRecord* secondStored = state.GetStakeRecord(secondRecord.stake_id);
+    const helsing::StakeRecord* untouchedStored = state.GetStakeRecord(untouchedRecord.stake_id);
+    BOOST_REQUIRE(firstStored != nullptr);
+    BOOST_REQUIRE(secondStored != nullptr);
+    BOOST_REQUIRE(untouchedStored != nullptr);
+    BOOST_CHECK(firstStored->m.bytes == firstContext.bytes);
+    BOOST_CHECK(secondStored->m.bytes == secondContext.bytes);
+    BOOST_CHECK(untouchedStored->m.bytes == untouchedRecord.m.bytes);
+    BOOST_CHECK_EQUAL(firstStored->nLastUpdateHeight, 415);
+    BOOST_CHECK_EQUAL(secondStored->nLastUpdateHeight, 415);
+    BOOST_CHECK_EQUAL(untouchedStored->nLastUpdateHeight, untouchedRecord.nLastUpdateHeight);
+    BOOST_CHECK(firstStored->T == firstRecord.T);
+    BOOST_CHECK(secondStored->T == secondRecord.T);
+    BOOST_CHECK(untouchedStored->T == untouchedRecord.T);
+    BOOST_CHECK(firstStored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK(secondStored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK(untouchedStored->status == helsing::StakeStatus::ACTIVE);
+}
+
+BOOST_AUTO_TEST_CASE(state_apply_accepted_stake_updates_skeleton_accepts_empty_set)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord activeRecord = ActiveRecord(189, DeterministicPoint(200));
+    const GroupElement spentOnlyTag = DeterministicPoint(201);
+
+    BOOST_CHECK(state.AddActiveStake(activeRecord));
+    BOOST_CHECK(state.AddSpentTag(spentOnlyTag, 416));
+
+    BOOST_CHECK(state.ApplyAcceptedStakeUpdatesSkeleton({}, 417));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(activeRecord.T));
+    BOOST_CHECK(state.IsSpentTag(spentOnlyTag));
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(activeRecord.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == activeRecord.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, activeRecord.nLastUpdateHeight);
+}
+
+BOOST_AUTO_TEST_CASE(state_apply_accepted_stake_updates_skeleton_rejects_negative_height_without_mutation)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(190, DeterministicPoint(202));
+    helsing::StakeContext newContext;
+    newContext.bytes = {0x6e, 0x65, 0x67, 0x5f, 0x62, 0x61, 0x74, 0x63, 0x68};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(!state.ApplyAcceptedStakeUpdatesSkeleton({{record.stake_id, newContext}}, -1));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nLastUpdateHeight);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
+BOOST_AUTO_TEST_CASE(state_apply_accepted_stake_updates_skeleton_rejects_invalid_batch_without_partial_mutation)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord firstRecord = ActiveRecord(191, DeterministicPoint(203));
+    const helsing::StakeRecord secondRecord = ActiveRecord(192, DeterministicPoint(204));
+    const helsing::StakeRecord spentRecord = ActiveRecord(193, DeterministicPoint(205));
+    const helsing::StakeRecord revokedRecord = ActiveRecord(194, DeterministicPoint(206));
+    helsing::StakeContext firstContext;
+    helsing::StakeContext secondContext;
+    helsing::StakeContext thirdContext;
+    firstContext.bytes = {0x66, 0x69, 0x72, 0x73, 0x74};
+    secondContext.bytes = {0x73, 0x65, 0x63, 0x6f, 0x6e, 0x64};
+    thirdContext.bytes = {0x74, 0x68, 0x69, 0x72, 0x64};
+
+    BOOST_CHECK(state.AddActiveStake(firstRecord));
+    BOOST_CHECK(state.AddActiveStake(secondRecord));
+    BOOST_CHECK(state.AddActiveStake(spentRecord));
+    BOOST_CHECK(state.AddActiveStake(revokedRecord));
+    BOOST_CHECK(state.AddSpentTag(spentRecord.T, 418));
+    BOOST_CHECK(state.RevokeStake(revokedRecord.stake_id));
+
+    BOOST_CHECK(!state.ApplyAcceptedStakeUpdatesSkeleton({{firstRecord.stake_id, firstContext}, {DeterministicHash(195), secondContext}, {secondRecord.stake_id, thirdContext}}, 419));
+    BOOST_CHECK(!state.ApplyAcceptedStakeUpdatesSkeleton({{firstRecord.stake_id, firstContext}, {firstRecord.stake_id, secondContext}}, 420));
+    BOOST_CHECK(!state.ApplyAcceptedStakeUpdatesSkeleton({{spentRecord.stake_id, firstContext}}, 421));
+    BOOST_CHECK(!state.ApplyAcceptedStakeUpdatesSkeleton({{revokedRecord.stake_id, firstContext}}, 422));
+
+    uint256 nullStakeId;
+    BOOST_CHECK(!state.ApplyAcceptedStakeUpdatesSkeleton({{nullStakeId, firstContext}}, 423));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 4U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 2U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(firstRecord.T));
+    BOOST_CHECK(state.IsActiveTag(secondRecord.T));
+    BOOST_CHECK(!state.IsActiveTag(spentRecord.T));
+    BOOST_CHECK(!state.IsActiveTag(revokedRecord.T));
+    BOOST_CHECK(state.IsSpentTag(spentRecord.T));
+
+    const helsing::StakeRecord* firstStored = state.GetStakeRecord(firstRecord.stake_id);
+    const helsing::StakeRecord* secondStored = state.GetStakeRecord(secondRecord.stake_id);
+    const helsing::StakeRecord* spentStored = state.GetStakeRecord(spentRecord.stake_id);
+    const helsing::StakeRecord* revokedStored = state.GetStakeRecord(revokedRecord.stake_id);
+    BOOST_REQUIRE(firstStored != nullptr);
+    BOOST_REQUIRE(secondStored != nullptr);
+    BOOST_REQUIRE(spentStored != nullptr);
+    BOOST_REQUIRE(revokedStored != nullptr);
+    BOOST_CHECK(firstStored->m.bytes == firstRecord.m.bytes);
+    BOOST_CHECK(secondStored->m.bytes == secondRecord.m.bytes);
+    BOOST_CHECK(spentStored->m.bytes == spentRecord.m.bytes);
+    BOOST_CHECK(revokedStored->m.bytes == revokedRecord.m.bytes);
+    BOOST_CHECK_EQUAL(firstStored->nLastUpdateHeight, firstRecord.nLastUpdateHeight);
+    BOOST_CHECK_EQUAL(secondStored->nLastUpdateHeight, secondRecord.nLastUpdateHeight);
+    BOOST_CHECK_EQUAL(spentStored->nLastUpdateHeight, spentRecord.nLastUpdateHeight);
+    BOOST_CHECK_EQUAL(revokedStored->nLastUpdateHeight, revokedRecord.nLastUpdateHeight);
+    BOOST_CHECK(firstStored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK(secondStored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK(spentStored->status == helsing::StakeStatus::SPENT);
+    BOOST_CHECK(revokedStored->status == helsing::StakeStatus::REVOKED);
+    BOOST_CHECK(state.GetStakeRecord(DeterministicHash(195)) == nullptr);
+}
+
 BOOST_AUTO_TEST_CASE(state_active_stake_lifecycle)
 {
     helsing::CHelsingState state;

@@ -27,6 +27,7 @@ Current scope:
 - `CheckStakeUpdateEligibilitySkeleton` performs revised spec `StakeUpdateVerify` steps 1-3 only: stake record lookup, active status, and spent-tag checks.
 - `ApplyAcceptedStakesSkeleton` applies already accepted new stakes to in-memory `ActiveTags` and `StakeRecords`; it takes caller-supplied `stake_id` values because canonical stake-id hashing is not implemented.
 - `ApplyAcceptedStakeUpdateSkeleton` applies an already accepted update to `StakeRecords` by changing only `m` and `last_update_height`; it does not validate contexts or signatures.
+- `ApplyAcceptedStakeUpdatesSkeleton` applies already accepted stake updates as an all-or-nothing batch; duplicate updates for the same `stake_id` are rejected by the unwired skeleton because the revised spec does not define same-block duplicate-update ordering.
 - `ApplyBlockSpentTagsSkeleton` applies an already validated `BlockSpentTags` set to in-memory `SpentTags`, `ActiveTags`, and matching `StakeRecords`.
 
 Not implemented yet:
@@ -51,6 +52,7 @@ Not implemented yet:
 - canonical stake context grammar, including payout address, update key, node signing material, and rejection of empty or non-canonical contexts
 - full stake update verification, including `update_pk` extraction, canonical `m_new` validation, `enc_context(m_new)`, canonical `sig_update`, update signature verification, and update effective-height rules
 - consensus wiring for applying accepted stake updates during deterministic block application
+- consensus policy for multiple `StakeUpdate` transactions targeting the same `stake_id` in one block
 - masternode registration/update/payout transaction wiring
 - consensus activation rules
 

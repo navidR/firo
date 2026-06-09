@@ -4,6 +4,8 @@
 
 #include "helsing/state.h"
 
+#include <set>
+
 namespace helsing {
 namespace {
 
@@ -114,6 +116,30 @@ bool CHelsingState::ApplyAcceptedStakeUpdateSkeleton(const uint256& stake_id, co
 
     recordIt->second.m = m_new;
     recordIt->second.nLastUpdateHeight = nHeight;
+    return true;
+}
+
+bool CHelsingState::ApplyAcceptedStakeUpdatesSkeleton(const std::vector<std::pair<uint256, StakeContext>>& acceptedUpdates, int nHeight)
+{
+    if (nHeight < 0) {
+        return false;
+    }
+
+    std::set<uint256> seenStakeIds;
+    for (const auto& acceptedUpdate : acceptedUpdates) {
+        if (acceptedUpdate.first.IsNull() || !seenStakeIds.insert(acceptedUpdate.first).second) {
+            return false;
+        }
+    }
+
+    CHelsingState next = *this;
+    for (const auto& acceptedUpdate : acceptedUpdates) {
+        if (!next.ApplyAcceptedStakeUpdateSkeleton(acceptedUpdate.first, acceptedUpdate.second, nHeight)) {
+            return false;
+        }
+    }
+
+    *this = next;
     return true;
 }
 
