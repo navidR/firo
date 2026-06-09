@@ -239,6 +239,11 @@ bool IsValidSparkOutputRecord(const SparkOutputRecord& output)
            (output.type == SparkOutputType::MINT || output.type == SparkOutputType::SPEND);
 }
 
+bool IsHelsingEligibleOutputCandidateSkeleton(const SparkOutputRecord& output, bool allSpendPathsRevealTags)
+{
+    return IsValidSparkOutputRecord(output) && allSpendPathsRevealTags;
+}
+
 StakeValidationResult BuildBlockSpentTagsSkeleton(const std::vector<GroupElement>& spentTags, const CHelsingState* helsingState, std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags)
 {
     std::unordered_set<GroupElement, spark::CLTagHash> collected;

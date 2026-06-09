@@ -107,6 +107,10 @@ bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount ma
 bool IsValidOutputId(const OutputId& output_id);
 bool IsValidPublicPoint(const GroupElement& point);
 bool IsValidSparkOutputRecord(const SparkOutputRecord& output);
+// Revised spec section 13 eligibility gate: an output may only be considered
+// Helsing-eligible if every spend path reveals the Spark spend tag. The caller
+// supplies that path analysis; this does not inspect scripts or mark state.
+bool IsHelsingEligibleOutputCandidateSkeleton(const SparkOutputRecord& output, bool allSpendPathsRevealTags);
 
 // Models revised spec ValidateBlock step 2 after ordinary Spark spend validation.
 // The caller supplies tags revealed by valid Spark spends; this only checks

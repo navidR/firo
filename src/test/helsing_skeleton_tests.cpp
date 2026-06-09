@@ -682,6 +682,56 @@ BOOST_AUTO_TEST_CASE(stake_margin_helper_checks_integer_sum_before_scalar_conver
     BOOST_CHECK(!helsing::IsHelsingStakeValueWithMarginInRangeSkeleton(std::numeric_limits<CAmount>::min(), 0, std::numeric_limits<CAmount>::max()));
 }
 
+BOOST_AUTO_TEST_CASE(helsing_eligible_output_candidate_requires_tag_revealing_spend_paths)
+{
+    helsing::SparkOutputRecord output = EligibleOutput(Output(52, 0), 60);
+    output.helsing_eligible = false;
+
+    BOOST_CHECK(helsing::IsHelsingEligibleOutputCandidateSkeleton(output, true));
+    BOOST_CHECK(!helsing::IsHelsingEligibleOutputCandidateSkeleton(output, false));
+
+    output.helsing_eligible = true;
+    BOOST_CHECK(helsing::IsHelsingEligibleOutputCandidateSkeleton(output, true));
+    BOOST_CHECK(!helsing::IsHelsingEligibleOutputCandidateSkeleton(output, false));
+}
+
+BOOST_AUTO_TEST_CASE(helsing_eligible_output_candidate_requires_valid_output_record)
+{
+    const helsing::SparkOutputRecord output = EligibleOutput(Output(53, 0), 70);
+
+    helsing::SparkOutputRecord missingOutputId = output;
+    missingOutputId.output_id = helsing::OutputId();
+    BOOST_CHECK(!helsing::IsHelsingEligibleOutputCandidateSkeleton(missingOutputId, true));
+
+    helsing::SparkOutputRecord invalidPoint = output;
+    invalidPoint.S = GroupElement();
+    BOOST_CHECK(!helsing::IsHelsingEligibleOutputCandidateSkeleton(invalidPoint, true));
+
+    helsing::SparkOutputRecord negativeHeight = output;
+    negativeHeight.nHeight = -1;
+    BOOST_CHECK(!helsing::IsHelsingEligibleOutputCandidateSkeleton(negativeHeight, true));
+
+    helsing::SparkOutputRecord unknownType = output;
+    unknownType.type = helsing::SparkOutputType::UNKNOWN;
+    BOOST_CHECK(!helsing::IsHelsingEligibleOutputCandidateSkeleton(unknownType, true));
+}
+
+BOOST_AUTO_TEST_CASE(helsing_eligible_output_candidate_does_not_mutate_record)
+{
+    const helsing::SparkOutputRecord original = EligibleOutput(Output(54, 0), 80);
+    helsing::SparkOutputRecord output = original;
+
+    BOOST_CHECK(!helsing::IsHelsingEligibleOutputCandidateSkeleton(output, false));
+
+    BOOST_CHECK(output.output_id == original.output_id);
+    BOOST_CHECK(output.S == original.S);
+    BOOST_CHECK(output.C == original.C);
+    BOOST_CHECK(output.K == original.K);
+    BOOST_CHECK_EQUAL(output.nHeight, original.nHeight);
+    BOOST_CHECK(output.type == original.type);
+    BOOST_CHECK_EQUAL(output.helsing_eligible, original.helsing_eligible);
+}
+
 BOOST_AUTO_TEST_CASE(cover_set_output_skeleton_accepts_valid_public_power)
 {
     const std::vector<helsing::OutputId> inCoinIDs = {Output(1, 0), Output(2, 0), Output(3, 0), Output(4, 0)};
