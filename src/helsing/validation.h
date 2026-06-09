@@ -78,6 +78,9 @@ bool IsHelsingValueInRange(CAmount value, CAmount vMax);
 // Revised spec section 20 value-parameter bounds for caller-supplied public values.
 // This does not expose q or perform scalar conversion; the caller supplies V_MAX < q.
 bool AreHelsingValueParametersInRangeSkeleton(CAmount stakeValue, CAmount payoutValue, CAmount vMax, bool vMaxLessThanGroupOrder);
+// Revised spec StakeVerify step 3 value-domain subset for caller-supplied public values.
+// This does not expose q or perform scalar conversion; the caller supplies V_MAX < q.
+bool IsStakeValueParameterInRangeSkeleton(CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder);
 // Revised spec PayoutVerify step 10 subset: V_PAYOUT equals the caller-recomputed expected amount
 // and satisfies the integer-domain range. The caller must separately enforce V_MAX < q.
 bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax);

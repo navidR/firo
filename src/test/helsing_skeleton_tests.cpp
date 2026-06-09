@@ -375,6 +375,22 @@ BOOST_AUTO_TEST_CASE(value_parameter_skeleton_checks_stake_payout_and_scalar_ord
     BOOST_CHECK(!helsing::AreHelsingValueParametersInRangeSkeleton(0, std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max(), true));
 }
 
+BOOST_AUTO_TEST_CASE(stake_value_parameter_skeleton_checks_stakeverify_value_domain)
+{
+    BOOST_CHECK(helsing::IsStakeValueParameterInRangeSkeleton(0, 1, true));
+    BOOST_CHECK(helsing::IsStakeValueParameterInRangeSkeleton(1, 2, true));
+    BOOST_CHECK(helsing::IsStakeValueParameterInRangeSkeleton(MAX_MONEY - 1, MAX_MONEY, true));
+    BOOST_CHECK(helsing::IsStakeValueParameterInRangeSkeleton(std::numeric_limits<CAmount>::max() - 1, std::numeric_limits<CAmount>::max(), true));
+
+    BOOST_CHECK(!helsing::IsStakeValueParameterInRangeSkeleton(0, 1, false));
+    BOOST_CHECK(!helsing::IsStakeValueParameterInRangeSkeleton(-1, 1, true));
+    BOOST_CHECK(!helsing::IsStakeValueParameterInRangeSkeleton(1, 1, true));
+    BOOST_CHECK(!helsing::IsStakeValueParameterInRangeSkeleton(0, 0, true));
+    BOOST_CHECK(!helsing::IsStakeValueParameterInRangeSkeleton(0, -1, true));
+    BOOST_CHECK(!helsing::IsStakeValueParameterInRangeSkeleton(std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::max(), true));
+    BOOST_CHECK(!helsing::IsStakeValueParameterInRangeSkeleton(std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max(), true));
+}
+
 BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_accepts_populated_fields)
 {
     const helsing::StakeTx tx = ValidStakeTx();
