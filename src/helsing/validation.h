@@ -87,6 +87,12 @@ enum class StakeProofVerificationSkeletonResult {
     STATEMENT_HASHING_UNIMPLEMENTED,
 };
 
+enum class StakeIdConstructionSkeletonResult {
+    STAKE_VERIFY_NOT_ACCEPTED,
+    CANONICAL_TX_ENCODING_UNIMPLEMENTED,
+    STAKE_ID_HASHING_UNIMPLEMENTED,
+};
+
 struct ValidationStateView {
     std::map<OutputId, SparkOutputRecord> sparkOutputs;
     std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
@@ -175,6 +181,9 @@ StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(cons
 // canonical statement hashing and real ParVerify/RepVerify/TagVerify are required
 // before any acceptance path may exist.
 StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult);
+// Revised spec post-acceptance stake_id construction is deliberately unimplemented:
+// canonical(tx) and the consensus hash domain must be defined before deriving stake_id.
+StakeIdConstructionSkeletonResult CheckStakeIdConstructionSkeleton(bool stakeVerifyAccepted, bool canonicalStakeTxEncodingAvailable);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

@@ -419,6 +419,18 @@ StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const S
     return StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED;
 }
 
+StakeIdConstructionSkeletonResult CheckStakeIdConstructionSkeleton(bool stakeVerifyAccepted, bool canonicalStakeTxEncodingAvailable)
+{
+    if (!stakeVerifyAccepted) {
+        return StakeIdConstructionSkeletonResult::STAKE_VERIFY_NOT_ACCEPTED;
+    }
+    if (!canonicalStakeTxEncodingAvailable) {
+        return StakeIdConstructionSkeletonResult::CANONICAL_TX_ENCODING_UNIMPLEMENTED;
+    }
+
+    return StakeIdConstructionSkeletonResult::STAKE_ID_HASHING_UNIMPLEMENTED;
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {

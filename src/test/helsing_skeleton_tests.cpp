@@ -937,6 +937,22 @@ BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_does_not_fake_proof_accep
     BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED);
 }
 
+BOOST_AUTO_TEST_CASE(stake_id_construction_skeleton_blocks_before_canonical_tx_encoding)
+{
+    BOOST_CHECK(helsing::CheckStakeIdConstructionSkeleton(false, false) == helsing::StakeIdConstructionSkeletonResult::STAKE_VERIFY_NOT_ACCEPTED);
+    BOOST_CHECK(helsing::CheckStakeIdConstructionSkeleton(false, true) == helsing::StakeIdConstructionSkeletonResult::STAKE_VERIFY_NOT_ACCEPTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_id_construction_skeleton_blocks_missing_canonical_tx_encoding)
+{
+    BOOST_CHECK(helsing::CheckStakeIdConstructionSkeleton(true, false) == helsing::StakeIdConstructionSkeletonResult::CANONICAL_TX_ENCODING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_id_construction_skeleton_does_not_return_stake_id)
+{
+    BOOST_CHECK(helsing::CheckStakeIdConstructionSkeleton(true, true) == helsing::StakeIdConstructionSkeletonResult::STAKE_ID_HASHING_UNIMPLEMENTED);
+}
+
 BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_accepts_populated_fields)
 {
     const helsing::StakeTx tx = ValidStakeTx();
