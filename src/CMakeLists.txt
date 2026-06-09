@@ -266,6 +266,8 @@ add_library(firo_node STATIC EXCLUDE_FROM_ALL
   ${CMAKE_CURRENT_SOURCE_DIR}/evo/simplifiedmns.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/evo/specialtx.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/evo/spork.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/helsing/state.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/helsing/validation.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/httprpc.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/httpserver.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/init.cpp
