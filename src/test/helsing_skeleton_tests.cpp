@@ -409,6 +409,45 @@ BOOST_AUTO_TEST_CASE(stake_value_parameter_skeleton_checks_stakeverify_value_dom
     BOOST_CHECK(!helsing::IsStakeValueParameterInRangeSkeleton(std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max(), true));
 }
 
+BOOST_AUTO_TEST_CASE(stake_verification_prefix_skeleton_accepts_steps_one_through_three)
+{
+    const helsing::StakeTx tx = ValidStakeTx();
+
+    BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, 0, 1, true, true) == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, MAX_MONEY - 1, MAX_MONEY, true, true) == helsing::StakeVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, std::numeric_limits<CAmount>::max() - 1, std::numeric_limits<CAmount>::max(), true, true) == helsing::StakeVerificationPrefixSkeletonResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(stake_verification_prefix_skeleton_preserves_steps_one_through_three_precedence)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs.clear();
+    BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, -1, 0, false, false) == helsing::StakeVerificationPrefixSkeletonResult::TX_INCOMPLETE);
+
+    tx = ValidStakeTx();
+    BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, -1, 0, false, false) == helsing::StakeVerificationPrefixSkeletonResult::MALFORMED_OR_NONCANONICAL);
+
+    BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, 0, 1, false, true) == helsing::StakeVerificationPrefixSkeletonResult::INVALID_VALUE_PARAMETER);
+    BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, -1, 1, true, true) == helsing::StakeVerificationPrefixSkeletonResult::INVALID_VALUE_PARAMETER);
+    BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, 1, 1, true, true) == helsing::StakeVerificationPrefixSkeletonResult::INVALID_VALUE_PARAMETER);
+    BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, 0, 0, true, true) == helsing::StakeVerificationPrefixSkeletonResult::INVALID_VALUE_PARAMETER);
+}
+
+BOOST_AUTO_TEST_CASE(stake_verification_prefix_skeleton_does_not_define_canonical_or_proof_grammar)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {helsing::OutputId()};
+    tx.S_prime = GroupElement();
+    tx.C_prime = GroupElement();
+    tx.T = GroupElement();
+    tx.m.bytes = {0x00};
+    tx.pi_par.bytes = {0x00};
+    tx.pi_val.bytes = {0x00};
+    tx.pi_tag.bytes = {0x00};
+
+    BOOST_CHECK(helsing::CheckStakeVerificationPrefixSkeleton(tx, 0, 1, true, true) == helsing::StakeVerificationPrefixSkeletonResult::OK);
+}
+
 BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_accepts_populated_fields)
 {
     const helsing::StakeTx tx = ValidStakeTx();

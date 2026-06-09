@@ -53,6 +53,13 @@ struct PayoutVerificationSkeletonResult {
     PayoutPublicValidationResult public_result{PayoutPublicValidationResult::OK};
 };
 
+enum class StakeVerificationPrefixSkeletonResult {
+    OK,
+    TX_INCOMPLETE,
+    MALFORMED_OR_NONCANONICAL,
+    INVALID_VALUE_PARAMETER,
+};
+
 struct StakeUpdateVerificationSkeletonResult {
     bool tx_complete{false};
     StakeValidationResult stake_result{StakeValidationResult::OK};
@@ -118,6 +125,9 @@ bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx);
 // Revised spec StakeTx field-completeness only. This does not check output-id grammar,
 // group-element encodings, context grammar, value parameters, or proof validity.
 bool IsCompleteStakeTxSkeleton(const StakeTx& tx);
+// Revised spec StakeVerify steps 1-3 only. The caller supplies the result of
+// canonical-encoding validation because the consensus grammar is not implemented here.
+StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

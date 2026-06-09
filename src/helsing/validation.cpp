@@ -233,6 +233,21 @@ bool IsCompleteStakeTxSkeleton(const StakeTx& tx)
            !tx.pi_tag.empty();
 }
 
+StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid)
+{
+    if (!IsCompleteStakeTxSkeleton(tx)) {
+        return StakeVerificationPrefixSkeletonResult::TX_INCOMPLETE;
+    }
+    if (!canonicalEncodingsValid) {
+        return StakeVerificationPrefixSkeletonResult::MALFORMED_OR_NONCANONICAL;
+    }
+    if (!IsStakeValueParameterInRangeSkeleton(stakeValue, vMax, vMaxLessThanGroupOrder)) {
+        return StakeVerificationPrefixSkeletonResult::INVALID_VALUE_PARAMETER;
+    }
+
+    return StakeVerificationPrefixSkeletonResult::OK;
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {
