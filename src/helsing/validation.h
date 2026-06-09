@@ -68,6 +68,9 @@ bool DoesPayoutCoinMatchExpectedSkeleton(const PayoutTxSkeleton& tx, const Payou
 // Revised spec section 16 payout-id input completeness only. This does not define
 // canonical chain_id/enc_* grammar, chain binding, selected-stake rules, or construct j.
 bool IsCompletePayoutBlockContextSkeleton(const PayoutBlockContextSkeleton& context);
+// Revised spec StakeUpdateTx field-completeness only. This does not parse contexts,
+// extract update_pk, define enc_context(m_new), or verify sig_update.
+bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

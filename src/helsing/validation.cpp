@@ -146,6 +146,13 @@ bool IsCompletePayoutBlockContextSkeleton(const PayoutBlockContextSkeleton& cont
            !context.selected_stake_id.IsNull();
 }
 
+bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx)
+{
+    return !tx.stake_id.IsNull() &&
+           !tx.m_new.bytes.empty() &&
+           !tx.sig_update.empty();
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {

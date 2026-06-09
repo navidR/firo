@@ -355,6 +355,52 @@ BOOST_AUTO_TEST_CASE(expected_payout_amount_helper_checks_equality_and_range)
     BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::max()));
 }
 
+BOOST_AUTO_TEST_CASE(stake_update_completeness_skeleton_accepts_populated_fields)
+{
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = DeterministicHash(229);
+    tx.m_new.bytes = {0x6d, 0x5f, 0x6e, 0x65, 0x77};
+    tx.sig_update.bytes = {0x73, 0x69, 0x67};
+
+    BOOST_CHECK(helsing::IsCompleteStakeUpdateTxSkeleton(tx));
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_completeness_skeleton_rejects_missing_fields)
+{
+    helsing::StakeUpdateTx tx;
+    BOOST_CHECK(!helsing::IsCompleteStakeUpdateTxSkeleton(tx));
+
+    tx.stake_id = DeterministicHash(230);
+    tx.m_new.bytes = {0x6d};
+    tx.sig_update.bytes = {0x73};
+    BOOST_REQUIRE(helsing::IsCompleteStakeUpdateTxSkeleton(tx));
+
+    helsing::StakeUpdateTx changed = tx;
+    changed.stake_id.SetNull();
+    BOOST_CHECK(!helsing::IsCompleteStakeUpdateTxSkeleton(changed));
+
+    changed = tx;
+    changed.m_new.bytes.clear();
+    BOOST_CHECK(!helsing::IsCompleteStakeUpdateTxSkeleton(changed));
+
+    changed = tx;
+    changed.sig_update.bytes.clear();
+    BOOST_CHECK(!helsing::IsCompleteStakeUpdateTxSkeleton(changed));
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_completeness_skeleton_does_not_define_context_or_signature_grammar)
+{
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = DeterministicHash(231);
+    tx.m_new.bytes = {0x00};
+    tx.sig_update.bytes = {0x00};
+    BOOST_CHECK(helsing::IsCompleteStakeUpdateTxSkeleton(tx));
+
+    tx.m_new.bytes = {0xff, 0x00, 0x6d};
+    tx.sig_update.bytes = {0xff, 0x00, 0x73};
+    BOOST_CHECK(helsing::IsCompleteStakeUpdateTxSkeleton(tx));
+}
+
 BOOST_AUTO_TEST_CASE(payout_address_match_skeleton_compares_extracted_registered_address)
 {
     helsing::PayoutTxSkeleton tx;
