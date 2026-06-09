@@ -82,6 +82,11 @@ struct StakeVerificationOutputSkeletonResult {
     StakeValidationResult output_result{StakeValidationResult::OK};
 };
 
+enum class StakeProofVerificationSkeletonResult {
+    STAKE_PREFIX_FAILED,
+    STATEMENT_HASHING_UNIMPLEMENTED,
+};
+
 struct ValidationStateView {
     std::map<OutputId, SparkOutputRecord> sparkOutputs;
     std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
@@ -166,6 +171,10 @@ StakeValidationResult CheckStakeCoverSetOutputRulesSkeleton(const std::vector<Ou
 // Revised spec StakeVerify steps 1-7 only. This composes caller-supplied
 // context/Spark facts and stops before statement hashes and proof verification.
 StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& outputSatisfiesSparkRules);
+// Revised spec StakeVerify steps 8-11 are deliberately unimplemented here:
+// canonical statement hashing and real ParVerify/RepVerify/TagVerify are required
+// before any acceptance path may exist.
+StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

@@ -877,6 +877,66 @@ BOOST_AUTO_TEST_CASE(stake_verification_outputs_skeleton_stops_before_statement_
     BOOST_CHECK(result.output_result == helsing::StakeValidationResult::OK);
 }
 
+BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_blocks_after_valid_prefix)
+{
+    helsing::StakeVerificationOutputSkeletonResult prefix;
+    prefix.cover_set_result.context_result.prefix_result = helsing::StakeVerificationPrefixSkeletonResult::OK;
+    prefix.cover_set_result.context_result.tag_result = helsing::StakeValidationResult::OK;
+    prefix.cover_set_result.context_result.context_valid = true;
+    prefix.cover_set_result.cover_set_result = helsing::StakeValidationResult::OK;
+    prefix.output_result = helsing::StakeValidationResult::OK;
+
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_preserves_prefix_failures)
+{
+    helsing::StakeVerificationOutputSkeletonResult prefix;
+    prefix.cover_set_result.context_result.prefix_result = helsing::StakeVerificationPrefixSkeletonResult::TX_INCOMPLETE;
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+
+    prefix.cover_set_result.context_result.prefix_result = helsing::StakeVerificationPrefixSkeletonResult::OK;
+    prefix.cover_set_result.context_result.tag_result = helsing::StakeValidationResult::TAG_ALREADY_SPENT;
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+
+    prefix.cover_set_result.context_result.tag_result = helsing::StakeValidationResult::OK;
+    prefix.cover_set_result.context_result.context_valid = false;
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+
+    prefix.cover_set_result.context_result.context_valid = true;
+    prefix.cover_set_result.cover_set_result = helsing::StakeValidationResult::INVALID_COVER_SET_CARDINALITY;
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+
+    prefix.cover_set_result.cover_set_result = helsing::StakeValidationResult::OK;
+    prefix.output_result = helsing::StakeValidationResult::OUTPUT_NOT_FOUND;
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_does_not_fake_proof_acceptance)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {Output(1, 0), Output(1, 1), Output(2, 0), Output(3, 0)};
+    tx.pi_par.bytes = {0x00};
+    tx.pi_val.bytes = {0x01};
+    tx.pi_tag.bytes = {0x02};
+
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    std::map<helsing::OutputId, bool> sparkRules;
+
+    unsigned char pointTag = 114;
+    for (const helsing::OutputId& output_id : tx.inCoinIDs) {
+        view.sparkOutputs.emplace(output_id, EligibleOutput(output_id, pointTag));
+        sparkRules.emplace(output_id, true);
+        pointTag += 3;
+    }
+
+    const helsing::StakeVerificationOutputSkeletonResult prefix = helsing::CheckStakeVerificationOutputsSkeleton(tx, state, view, 0, 1, true, true, true, true, true, true, 2, 2, sparkRules);
+    BOOST_REQUIRE(prefix.output_result == helsing::StakeValidationResult::OK);
+
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED);
+}
+
 BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_accepts_populated_fields)
 {
     const helsing::StakeTx tx = ValidStakeTx();

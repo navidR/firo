@@ -406,6 +406,19 @@ StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(
     return result;
 }
 
+StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult)
+{
+    if (prefixResult.cover_set_result.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||
+        prefixResult.cover_set_result.context_result.tag_result != StakeValidationResult::OK ||
+        !prefixResult.cover_set_result.context_result.context_valid ||
+        prefixResult.cover_set_result.cover_set_result != StakeValidationResult::OK ||
+        prefixResult.output_result != StakeValidationResult::OK) {
+        return StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED;
+    }
+
+    return StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED;
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {
