@@ -123,6 +123,11 @@ bool IsHelsingValueInRange(CAmount value, CAmount vMax)
     return vMax > 0 && value >= 0 && value < vMax;
 }
 
+bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax)
+{
+    return payoutValue == expectedAmount && IsHelsingValueInRange(payoutValue, vMax);
+}
+
 bool IsValidOutputId(const OutputId& output_id)
 {
     return !output_id.txid.IsNull();

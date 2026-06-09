@@ -56,6 +56,9 @@ bool IsValidCoverSetCardinality(size_t count, size_t n, size_t m);
 bool IsStakeMatureForPayout(int activationHeight, int currentHeight, int stakeMaturity);
 // Revised spec integer-domain value bound. The caller must separately enforce V_MAX < q.
 bool IsHelsingValueInRange(CAmount value, CAmount vMax);
+// Revised spec PayoutVerify step 10 subset: V_PAYOUT equals the caller-recomputed expected amount
+// and satisfies the integer-domain range. The caller must separately enforce V_MAX < q.
+bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax);
 bool IsValidOutputId(const OutputId& output_id);
 bool IsValidPublicPoint(const GroupElement& point);
 bool IsValidSparkOutputRecord(const SparkOutputRecord& output);

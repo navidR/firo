@@ -329,6 +329,23 @@ BOOST_AUTO_TEST_CASE(value_range_helper_checks_revised_spec_integer_domain)
     BOOST_CHECK(!helsing::IsHelsingValueInRange(std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max()));
 }
 
+BOOST_AUTO_TEST_CASE(expected_payout_amount_helper_checks_equality_and_range)
+{
+    BOOST_CHECK(helsing::IsExpectedPayoutAmountInRangeSkeleton(0, 0, 1));
+    BOOST_CHECK(helsing::IsExpectedPayoutAmountInRangeSkeleton(1, 1, 2));
+    BOOST_CHECK(helsing::IsExpectedPayoutAmountInRangeSkeleton(MAX_MONEY - 1, MAX_MONEY - 1, MAX_MONEY));
+    BOOST_CHECK(helsing::IsExpectedPayoutAmountInRangeSkeleton(std::numeric_limits<CAmount>::max() - 1, std::numeric_limits<CAmount>::max() - 1, std::numeric_limits<CAmount>::max()));
+
+    BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(0, 1, 2));
+    BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(1, 0, 2));
+    BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(-1, -1, 1));
+    BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(1, 1, 1));
+    BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(0, 0, 0));
+    BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(0, 0, -1));
+    BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max()));
+    BOOST_CHECK(!helsing::IsExpectedPayoutAmountInRangeSkeleton(std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::min(), std::numeric_limits<CAmount>::max()));
+}
+
 BOOST_AUTO_TEST_CASE(cover_set_output_skeleton_accepts_valid_public_power)
 {
     const std::vector<helsing::OutputId> inCoinIDs = {Output(1, 0), Output(2, 0), Output(3, 0), Output(4, 0)};
