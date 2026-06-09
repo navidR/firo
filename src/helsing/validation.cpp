@@ -235,6 +235,22 @@ bool ExtractSparkOutputRecords(const CTransaction& tx, int nHeight, std::map<Out
     return true;
 }
 
+bool ApplyAcceptedPayoutOutputRecordsSkeleton(const std::vector<SparkOutputRecord>& acceptedOutputs, std::map<OutputId, SparkOutputRecord>& outputs)
+{
+    std::map<OutputId, SparkOutputRecord> next(outputs);
+    for (const SparkOutputRecord& output : acceptedOutputs) {
+        if (!IsValidSparkOutputRecord(output)) {
+            return false;
+        }
+        if (!next.emplace(output.output_id, output).second) {
+            return false;
+        }
+    }
+
+    outputs = std::move(next);
+    return true;
+}
+
 StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStateView& view)
 {
     if (tx.inCoinIDs.empty()) {

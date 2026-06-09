@@ -12,6 +12,7 @@ Current scope:
 - `PayoutBlockContextSkeleton` models the revised spec section 16 payout-id input fields `{chain_id, block_height, prev_block_hash, payout_index, selected_stake_id}` without defining or computing `j`.
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
 - `ExtractSparkOutputRecords` builds a consensus-inert `(txid, vout) -> SparkOutputRecord` view from valid Spark mint and spend-created output scripts.
+- `ApplyAcceptedPayoutOutputRecordsSkeleton` applies already accepted payout output records to `SparkOutputs` by `(txid, vout)` only; it does not recompute payout coins or decide Helsing eligibility.
 - `IsValidCoverSetCardinality` checks the revised spec formula `len(InCoinIDs) = N = n^m` for caller-supplied public parameters.
 - `IsStakeMatureForPayout` checks the revised spec payout maturity inequality for caller-supplied heights and `STAKE_MATURITY`.
 - `IsHelsingValueInRange` checks the revised spec integer-domain bound `0 <= value < V_MAX` for caller-supplied values.
@@ -47,6 +48,7 @@ Not implemented yet:
 - consensus block-level duplicate new stake tag integration
 - consensus wiring for applying accepted new stakes during deterministic block application
 - full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, and deterministic Spark payout coin comparison
+- payout-output extraction from accepted payout transactions after `PayoutVerify`
 - deterministic payout ordinal selection and payout identifier `j` construction
 - canonical `chain_id`, `enc_int`, `enc_hash`, and `enc_bytes` encodings for payout-id construction
 - real payout address and payout coin encodings for `PayoutTxSkeleton`

@@ -676,6 +676,117 @@ BOOST_AUTO_TEST_CASE(extractor_ignores_non_spark_transactions_and_rejects_negati
     BOOST_CHECK(outputs.count(existing) == 1);
 }
 
+BOOST_AUTO_TEST_CASE(apply_accepted_payout_output_records_skeleton_inserts_records_atomically)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId existing = Output(11, 0);
+    const helsing::OutputId firstId = Output(12, 0);
+    const helsing::OutputId secondId = Output(12, 1);
+    const helsing::SparkOutputRecord existingRecord = EligibleOutput(existing, 92);
+    helsing::SparkOutputRecord first = EligibleOutput(firstId, 93);
+    helsing::SparkOutputRecord second = EligibleOutput(secondId, 94);
+    first.helsing_eligible = false;
+    second.helsing_eligible = false;
+
+    BOOST_CHECK(outputs.emplace(existing, existingRecord).second);
+    BOOST_CHECK(helsing::ApplyAcceptedPayoutOutputRecordsSkeleton({first, second}, outputs));
+
+    BOOST_CHECK_EQUAL(outputs.size(), 3U);
+    BOOST_REQUIRE(outputs.count(existing) == 1);
+    BOOST_REQUIRE(outputs.count(firstId) == 1);
+    BOOST_REQUIRE(outputs.count(secondId) == 1);
+    CheckOutputIdEqual(outputs.at(firstId).output_id, firstId);
+    CheckOutputIdEqual(outputs.at(secondId).output_id, secondId);
+    BOOST_CHECK(outputs.at(firstId).S == first.S);
+    BOOST_CHECK(outputs.at(firstId).C == first.C);
+    BOOST_CHECK(outputs.at(firstId).K == first.K);
+    BOOST_CHECK(outputs.at(firstId).type == first.type);
+    BOOST_CHECK(!outputs.at(firstId).helsing_eligible);
+    BOOST_CHECK(outputs.at(secondId).S == second.S);
+    BOOST_CHECK(outputs.at(secondId).C == second.C);
+    BOOST_CHECK(outputs.at(secondId).K == second.K);
+    BOOST_CHECK(outputs.at(secondId).type == second.type);
+    BOOST_CHECK(!outputs.at(secondId).helsing_eligible);
+    BOOST_CHECK(outputs.at(existing).S == existingRecord.S);
+}
+
+BOOST_AUTO_TEST_CASE(apply_accepted_payout_output_records_skeleton_accepts_empty_batch)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId existing = Output(13, 0);
+    const helsing::SparkOutputRecord existingRecord = EligibleOutput(existing, 95);
+
+    BOOST_CHECK(outputs.emplace(existing, existingRecord).second);
+    BOOST_CHECK(helsing::ApplyAcceptedPayoutOutputRecordsSkeleton({}, outputs));
+
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+    BOOST_REQUIRE(outputs.count(existing) == 1);
+    BOOST_CHECK(outputs.at(existing).S == existingRecord.S);
+    BOOST_CHECK(outputs.at(existing).C == existingRecord.C);
+    BOOST_CHECK(outputs.at(existing).K == existingRecord.K);
+}
+
+BOOST_AUTO_TEST_CASE(apply_accepted_payout_output_records_skeleton_preserves_duplicate_serial_commitments)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId firstId = Output(14, 0);
+    const helsing::OutputId secondId = Output(14, 1);
+    helsing::SparkOutputRecord first = EligibleOutput(firstId, 96);
+    helsing::SparkOutputRecord second = EligibleOutput(secondId, 97);
+    second.S = first.S;
+
+    BOOST_CHECK(helsing::ApplyAcceptedPayoutOutputRecordsSkeleton({first, second}, outputs));
+
+    BOOST_CHECK_EQUAL(outputs.size(), 2U);
+    BOOST_REQUIRE(outputs.count(firstId) == 1);
+    BOOST_REQUIRE(outputs.count(secondId) == 1);
+    BOOST_CHECK(outputs.at(firstId).output_id != outputs.at(secondId).output_id);
+    BOOST_CHECK(outputs.at(firstId).S == outputs.at(secondId).S);
+}
+
+BOOST_AUTO_TEST_CASE(apply_accepted_payout_output_records_skeleton_rejects_invalid_without_mutation)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId existing = Output(15, 0);
+    const helsing::OutputId validId = Output(16, 0);
+    const helsing::SparkOutputRecord existingRecord = EligibleOutput(existing, 98);
+    helsing::SparkOutputRecord valid = EligibleOutput(validId, 99);
+    helsing::SparkOutputRecord invalid = EligibleOutput(Output(17, 0), 100);
+    invalid.S = GroupElement();
+
+    BOOST_CHECK(outputs.emplace(existing, existingRecord).second);
+    BOOST_CHECK(!helsing::ApplyAcceptedPayoutOutputRecordsSkeleton({valid, invalid}, outputs));
+
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+    BOOST_REQUIRE(outputs.count(existing) == 1);
+    BOOST_CHECK(outputs.at(existing).S == existingRecord.S);
+    BOOST_CHECK(outputs.count(validId) == 0);
+    BOOST_CHECK(outputs.count(invalid.output_id) == 0);
+}
+
+BOOST_AUTO_TEST_CASE(apply_accepted_payout_output_records_skeleton_rejects_duplicate_output_ids_without_mutation)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId existing = Output(18, 0);
+    const helsing::OutputId firstId = Output(19, 0);
+    const helsing::OutputId duplicateId = Output(20, 0);
+    const helsing::SparkOutputRecord existingRecord = EligibleOutput(existing, 101);
+    helsing::SparkOutputRecord first = EligibleOutput(firstId, 102);
+    helsing::SparkOutputRecord duplicate = EligibleOutput(duplicateId, 103);
+    helsing::SparkOutputRecord duplicateAgain = EligibleOutput(duplicateId, 104);
+
+    BOOST_CHECK(outputs.emplace(existing, existingRecord).second);
+    BOOST_CHECK(!helsing::ApplyAcceptedPayoutOutputRecordsSkeleton({first, duplicate, duplicateAgain}, outputs));
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+    BOOST_CHECK(outputs.count(existing) == 1);
+    BOOST_CHECK(outputs.count(firstId) == 0);
+    BOOST_CHECK(outputs.count(duplicateId) == 0);
+
+    BOOST_CHECK(!helsing::ApplyAcceptedPayoutOutputRecordsSkeleton({existingRecord}, outputs));
+    BOOST_CHECK_EQUAL(outputs.size(), 1U);
+    BOOST_CHECK(outputs.count(existing) == 1);
+}
+
 BOOST_AUTO_TEST_CASE(default_objects_are_structurally_invalid)
 {
     helsing::SparkOutputRecord output;

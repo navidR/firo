@@ -75,6 +75,10 @@ StakeValidationResult BuildBlockSpentTagsSkeleton(const std::vector<GroupElement
 // Leaves outputs unchanged on parse failure or duplicate output_id.
 bool ExtractSparkOutputRecords(const CTransaction& tx, int nHeight, std::map<OutputId, SparkOutputRecord>& outputs);
 
+// Applies revised spec ValidateBlock step 9 to already accepted payout output records.
+// The caller supplies records after payout-coin verification; this only inserts by output_id.
+bool ApplyAcceptedPayoutOutputRecordsSkeleton(const std::vector<SparkOutputRecord>& acceptedOutputs, std::map<OutputId, SparkOutputRecord>& outputs);
+
 // Structural skeleton for revised-spec StakeVerify. Proof verification is intentionally TODO.
 StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStateView& view);
 
