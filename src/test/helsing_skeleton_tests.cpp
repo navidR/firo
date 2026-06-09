@@ -732,6 +732,102 @@ BOOST_AUTO_TEST_CASE(helsing_eligible_output_candidate_does_not_mutate_record)
     BOOST_CHECK_EQUAL(output.helsing_eligible, original.helsing_eligible);
 }
 
+BOOST_AUTO_TEST_CASE(mark_helsing_eligible_candidates_sets_requested_outputs_atomically)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId firstId = Output(55, 0);
+    const helsing::OutputId secondId = Output(55, 1);
+    const helsing::OutputId untouchedId = Output(55, 2);
+    helsing::SparkOutputRecord first = EligibleOutput(firstId, 90);
+    helsing::SparkOutputRecord second = EligibleOutput(secondId, 91);
+    helsing::SparkOutputRecord untouched = EligibleOutput(untouchedId, 92);
+    first.helsing_eligible = false;
+    second.helsing_eligible = false;
+    untouched.helsing_eligible = false;
+
+    BOOST_CHECK(outputs.emplace(firstId, first).second);
+    BOOST_CHECK(outputs.emplace(secondId, second).second);
+    BOOST_CHECK(outputs.emplace(untouchedId, untouched).second);
+    BOOST_CHECK(helsing::MarkHelsingEligibleOutputCandidatesSkeleton({{firstId, true}, {secondId, true}}, outputs));
+
+    BOOST_CHECK(outputs.at(firstId).helsing_eligible);
+    BOOST_CHECK(outputs.at(secondId).helsing_eligible);
+    BOOST_CHECK(!outputs.at(untouchedId).helsing_eligible);
+    BOOST_CHECK(outputs.at(firstId).S == first.S);
+    BOOST_CHECK(outputs.at(secondId).C == second.C);
+    BOOST_CHECK(outputs.at(untouchedId).K == untouched.K);
+}
+
+BOOST_AUTO_TEST_CASE(mark_helsing_eligible_candidates_accepts_empty_batch)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId existingId = Output(56, 0);
+    const helsing::SparkOutputRecord existing = EligibleOutput(existingId, 93);
+
+    BOOST_CHECK(outputs.emplace(existingId, existing).second);
+    BOOST_CHECK(helsing::MarkHelsingEligibleOutputCandidatesSkeleton({}, outputs));
+
+    BOOST_REQUIRE(outputs.count(existingId) == 1);
+    BOOST_CHECK(outputs.at(existingId).S == existing.S);
+    BOOST_CHECK_EQUAL(outputs.at(existingId).helsing_eligible, existing.helsing_eligible);
+}
+
+BOOST_AUTO_TEST_CASE(mark_helsing_eligible_candidates_rejects_non_tag_revealing_paths_without_mutation)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId firstId = Output(57, 0);
+    const helsing::OutputId secondId = Output(57, 1);
+    helsing::SparkOutputRecord first = EligibleOutput(firstId, 94);
+    helsing::SparkOutputRecord second = EligibleOutput(secondId, 95);
+    first.helsing_eligible = false;
+    second.helsing_eligible = false;
+
+    BOOST_CHECK(outputs.emplace(firstId, first).second);
+    BOOST_CHECK(outputs.emplace(secondId, second).second);
+    BOOST_CHECK(!helsing::MarkHelsingEligibleOutputCandidatesSkeleton({{firstId, true}, {secondId, false}}, outputs));
+
+    BOOST_CHECK(!outputs.at(firstId).helsing_eligible);
+    BOOST_CHECK(!outputs.at(secondId).helsing_eligible);
+}
+
+BOOST_AUTO_TEST_CASE(mark_helsing_eligible_candidates_rejects_missing_or_invalid_records_without_mutation)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId validId = Output(58, 0);
+    const helsing::OutputId invalidId = Output(58, 1);
+    const helsing::OutputId missingId = Output(58, 2);
+    helsing::SparkOutputRecord valid = EligibleOutput(validId, 96);
+    helsing::SparkOutputRecord invalid = EligibleOutput(invalidId, 97);
+    valid.helsing_eligible = false;
+    invalid.helsing_eligible = false;
+    invalid.S = GroupElement();
+
+    BOOST_CHECK(outputs.emplace(validId, valid).second);
+    BOOST_CHECK(outputs.emplace(invalidId, invalid).second);
+    BOOST_CHECK(!helsing::MarkHelsingEligibleOutputCandidatesSkeleton({{validId, true}, {missingId, true}}, outputs));
+    BOOST_CHECK(!outputs.at(validId).helsing_eligible);
+    BOOST_CHECK(!outputs.at(invalidId).helsing_eligible);
+
+    BOOST_CHECK(!helsing::MarkHelsingEligibleOutputCandidatesSkeleton({{validId, true}, {invalidId, true}}, outputs));
+    BOOST_CHECK(!outputs.at(validId).helsing_eligible);
+    BOOST_CHECK(!outputs.at(invalidId).helsing_eligible);
+}
+
+BOOST_AUTO_TEST_CASE(mark_helsing_eligible_candidates_rejects_output_id_mismatch_without_mutation)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId mapId = Output(59, 0);
+    helsing::SparkOutputRecord mismatched = EligibleOutput(Output(59, 1), 98);
+    mismatched.helsing_eligible = false;
+
+    BOOST_CHECK(outputs.emplace(mapId, mismatched).second);
+    BOOST_CHECK(!helsing::MarkHelsingEligibleOutputCandidatesSkeleton({{mapId, true}}, outputs));
+
+    BOOST_REQUIRE(outputs.count(mapId) == 1);
+    BOOST_CHECK(!outputs.at(mapId).helsing_eligible);
+    BOOST_CHECK(outputs.at(mapId).output_id == mismatched.output_id);
+}
+
 BOOST_AUTO_TEST_CASE(cover_set_output_skeleton_accepts_valid_public_power)
 {
     const std::vector<helsing::OutputId> inCoinIDs = {Output(1, 0), Output(2, 0), Output(3, 0), Output(4, 0)};

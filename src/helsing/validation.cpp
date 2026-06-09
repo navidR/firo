@@ -244,6 +244,27 @@ bool IsHelsingEligibleOutputCandidateSkeleton(const SparkOutputRecord& output, b
     return IsValidSparkOutputRecord(output) && allSpendPathsRevealTags;
 }
 
+bool MarkHelsingEligibleOutputCandidatesSkeleton(const std::vector<std::pair<OutputId, bool>>& candidates, std::map<OutputId, SparkOutputRecord>& outputs)
+{
+    std::map<OutputId, SparkOutputRecord> next(outputs);
+    for (const auto& candidate : candidates) {
+        auto it = next.find(candidate.first);
+        if (it == next.end()) {
+            return false;
+        }
+        if (it->second.output_id != candidate.first) {
+            return false;
+        }
+        if (!IsHelsingEligibleOutputCandidateSkeleton(it->second, candidate.second)) {
+            return false;
+        }
+        it->second.helsing_eligible = true;
+    }
+
+    outputs = std::move(next);
+    return true;
+}
+
 StakeValidationResult BuildBlockSpentTagsSkeleton(const std::vector<GroupElement>& spentTags, const CHelsingState* helsingState, std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags)
 {
     std::unordered_set<GroupElement, spark::CLTagHash> collected;

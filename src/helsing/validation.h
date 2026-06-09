@@ -111,6 +111,10 @@ bool IsValidSparkOutputRecord(const SparkOutputRecord& output);
 // Helsing-eligible if every spend path reveals the Spark spend tag. The caller
 // supplies that path analysis; this does not inspect scripts or mark state.
 bool IsHelsingEligibleOutputCandidateSkeleton(const SparkOutputRecord& output, bool allSpendPathsRevealTags);
+// Marks caller-selected output records as Helsing-eligible after the section 13
+// candidate predicate passes. This is in-memory only and does not decide spend-path
+// policy, persist state, or provide undo data.
+bool MarkHelsingEligibleOutputCandidatesSkeleton(const std::vector<std::pair<OutputId, bool>>& candidates, std::map<OutputId, SparkOutputRecord>& outputs);
 
 // Models revised spec ValidateBlock step 2 after ordinary Spark spend validation.
 // The caller supplies tags revealed by valid Spark spends; this only checks

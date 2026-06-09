@@ -17,6 +17,7 @@ Current scope:
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
 - `ExtractSparkOutputRecords` builds a consensus-inert `(txid, vout) -> SparkOutputRecord` view from valid Spark mint and spend-created output scripts.
 - `IsHelsingEligibleOutputCandidateSkeleton` checks the revised spec section 13 rule that outputs with any non-tag-revealing spend path must not be marked `helsing_eligible`; the caller supplies spend-path analysis.
+- `MarkHelsingEligibleOutputCandidatesSkeleton` marks caller-selected in-memory `SparkOutputs` entries as `helsing_eligible` only after the section 13 candidate predicate passes.
 - `ApplyAcceptedPayoutOutputRecordsSkeleton` applies already accepted payout output records to `SparkOutputs` by `(txid, vout)` only; it does not recompute payout coins or decide Helsing eligibility.
 - `ApplyAcceptedBlockWithPayoutOutputsSkeleton` applies revised spec section 12 steps 6-9 to in-memory Helsing state and `SparkOutputs` atomically for already accepted block data.
 - `IsValidCoverSetCardinality` checks the revised spec formula `len(InCoinIDs) = N = n^m` for caller-supplied public parameters.
@@ -60,6 +61,7 @@ Not implemented yet:
 - `ParVerify`, `RepVerify`, and `TagVerify`
 - consensus block-level `BlockSpentTags` extraction/integration
 - real Spark transaction-type spend-path analysis for deciding when every spend path reveals a Spark tag
+- consensus wiring, persistence, and undo data for marking `SparkOutputs` as `helsing_eligible`
 - persistent block undo data for Helsing state mutations
 - consensus block-level duplicate new stake tag integration
 - consensus wiring for applying accepted new stakes during deterministic block application
