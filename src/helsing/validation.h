@@ -131,6 +131,9 @@ StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const
 // Revised spec StakeVerify step 4 only, against parent consensus state.
 // Same-block BlockSpentTags remain a separate block-validation pre-pass concern.
 StakeValidationResult CheckStakeTagStateSkeleton(const GroupElement& tag, const CHelsingState& helsingState);
+// Revised spec StakeVerify step 5 predicate with caller-supplied context facts.
+// This does not define enc_context(m), address grammar, update-key grammar, or node-key grammar.
+bool IsStakeContextValidSkeleton(const StakeContext& context, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

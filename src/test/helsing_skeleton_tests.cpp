@@ -508,6 +508,38 @@ BOOST_AUTO_TEST_CASE(stake_tag_state_skeleton_does_not_mutate_state)
     BOOST_CHECK(!state.IsSpentTag(freshTag));
 }
 
+BOOST_AUTO_TEST_CASE(stake_context_validation_skeleton_accepts_caller_validated_context)
+{
+    helsing::StakeContext context;
+    context.bytes = {0x6d, 0x61, 0x73, 0x74, 0x65, 0x72};
+
+    BOOST_CHECK(helsing::IsStakeContextValidSkeleton(context, true, true, true, true));
+}
+
+BOOST_AUTO_TEST_CASE(stake_context_validation_skeleton_rejects_empty_or_missing_required_facts)
+{
+    helsing::StakeContext context;
+    context.bytes = {0x6d};
+
+    helsing::StakeContext emptyContext;
+    BOOST_CHECK(!helsing::IsStakeContextValidSkeleton(emptyContext, true, true, true, true));
+    BOOST_CHECK(!helsing::IsStakeContextValidSkeleton(context, false, true, true, true));
+    BOOST_CHECK(!helsing::IsStakeContextValidSkeleton(context, true, false, true, true));
+    BOOST_CHECK(!helsing::IsStakeContextValidSkeleton(context, true, true, false, true));
+    BOOST_CHECK(!helsing::IsStakeContextValidSkeleton(context, true, true, true, false));
+    BOOST_CHECK(!helsing::IsStakeContextValidSkeleton(emptyContext, false, false, false, false));
+}
+
+BOOST_AUTO_TEST_CASE(stake_context_validation_skeleton_does_not_define_context_grammar)
+{
+    helsing::StakeContext context;
+    context.bytes = {0x00};
+    BOOST_CHECK(helsing::IsStakeContextValidSkeleton(context, true, true, true, true));
+
+    context.bytes = {0xff, 0x00, 0x6d, 0x01};
+    BOOST_CHECK(helsing::IsStakeContextValidSkeleton(context, true, true, true, true));
+}
+
 BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_accepts_populated_fields)
 {
     const helsing::StakeTx tx = ValidStakeTx();

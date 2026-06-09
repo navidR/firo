@@ -260,6 +260,15 @@ StakeValidationResult CheckStakeTagStateSkeleton(const GroupElement& tag, const 
     return StakeValidationResult::OK;
 }
 
+bool IsStakeContextValidSkeleton(const StakeContext& context, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid)
+{
+    return !context.bytes.empty() &&
+           canonicalContextValid &&
+           payoutAddressValid &&
+           updatePublicKeyValid &&
+           nodeSigningKeyMaterialValid;
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {
