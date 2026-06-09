@@ -27,6 +27,9 @@ enum class StakeValidationResult {
     DUPLICATE_SPENT_TAG_IN_BLOCK,
     TAG_ALREADY_ACTIVE,
     DUPLICATE_STAKE_TAG_IN_BLOCK,
+    STAKE_RECORD_NOT_FOUND,
+    STAKE_NOT_ACTIVE,
+    STAKE_NOT_MATURE,
     OUTPUT_NOT_FOUND,
     OUTPUT_ID_MISMATCH,
     INVALID_OUTPUT_RECORD,
@@ -68,6 +71,9 @@ StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStat
 
 // Non-mutating block-level skeleton for same-block Helsing stake checks.
 StakeValidationResult CheckStakeBlockSkeleton(const std::vector<StakeTx>& stake_txs, const ValidationStateView& view);
+
+// Structural skeleton for revised-spec PayoutVerify steps 3-7 only.
+StakeValidationResult CheckPayoutEligibilitySkeleton(const uint256& stake_id, const ValidationStateView& view, int currentHeight, int stakeMaturity);
 
 } // namespace helsing
 

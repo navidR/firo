@@ -1018,6 +1018,75 @@ BOOST_AUTO_TEST_CASE(block_skeleton_block_spent_tag_precedes_active_tag)
     BOOST_CHECK(helsing::CheckStakeBlockSkeleton({tx}, view) == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
 }
 
+BOOST_AUTO_TEST_CASE(payout_eligibility_accepts_active_mature_stake)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(142, DeterministicPoint(142));
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(helsing::CheckPayoutEligibilitySkeleton(record.stake_id, view, record.nHeight + 10, 10) == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(helsing::CheckPayoutEligibilitySkeleton(record.stake_id, view, record.nHeight, 0) == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(payout_eligibility_rejects_missing_stake_record)
+{
+    helsing::ValidationStateView view;
+    const uint256 stakeId = DeterministicHash(143);
+
+    BOOST_CHECK(helsing::CheckPayoutEligibilitySkeleton(stakeId, view, 200, 0) == helsing::StakeValidationResult::STAKE_RECORD_NOT_FOUND);
+
+    helsing::CHelsingState state;
+    view.helsingState = &state;
+    BOOST_CHECK(helsing::CheckPayoutEligibilitySkeleton(stakeId, view, 200, 0) == helsing::StakeValidationResult::STAKE_RECORD_NOT_FOUND);
+}
+
+BOOST_AUTO_TEST_CASE(payout_eligibility_rejects_inactive_stakes_before_tag_and_maturity_checks)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord spentRecord = ActiveRecord(144, DeterministicPoint(144));
+    const helsing::StakeRecord revokedRecord = ActiveRecord(145, DeterministicPoint(145));
+
+    BOOST_CHECK(state.AddActiveStake(spentRecord));
+    BOOST_CHECK(state.AddActiveStake(revokedRecord));
+    BOOST_CHECK(state.AddSpentTag(spentRecord.T, spentRecord.nHeight + 1));
+    BOOST_CHECK(state.RevokeStake(revokedRecord.stake_id));
+    view.blockSpentTags.insert(spentRecord.T);
+    view.blockSpentTags.insert(revokedRecord.T);
+
+    BOOST_CHECK(helsing::CheckPayoutEligibilitySkeleton(spentRecord.stake_id, view, spentRecord.nHeight - 1, 10) == helsing::StakeValidationResult::STAKE_NOT_ACTIVE);
+    BOOST_CHECK(helsing::CheckPayoutEligibilitySkeleton(revokedRecord.stake_id, view, revokedRecord.nHeight - 1, 10) == helsing::StakeValidationResult::STAKE_NOT_ACTIVE);
+}
+
+BOOST_AUTO_TEST_CASE(payout_eligibility_rejects_block_spent_tag_before_maturity)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(146, DeterministicPoint(146));
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    view.blockSpentTags.insert(record.T);
+
+    BOOST_CHECK(helsing::CheckPayoutEligibilitySkeleton(record.stake_id, view, record.nHeight - 1, 10) == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(payout_eligibility_rejects_immature_stake)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(147, DeterministicPoint(147));
+
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    BOOST_CHECK(helsing::CheckPayoutEligibilitySkeleton(record.stake_id, view, record.nHeight + 9, 10) == helsing::StakeValidationResult::STAKE_NOT_MATURE);
+    BOOST_CHECK(helsing::CheckPayoutEligibilitySkeleton(record.stake_id, view, record.nHeight, -1) == helsing::StakeValidationResult::STAKE_NOT_MATURE);
+}
+
 BOOST_AUTO_TEST_CASE(state_rejects_default_tag)
 {
     helsing::CHelsingState state;
@@ -1991,6 +2060,9 @@ BOOST_AUTO_TEST_CASE(validation_result_strings_cover_all_values)
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::DUPLICATE_SPENT_TAG_IN_BLOCK), "DUPLICATE_SPENT_TAG_IN_BLOCK");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::TAG_ALREADY_ACTIVE), "TAG_ALREADY_ACTIVE");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK), "DUPLICATE_STAKE_TAG_IN_BLOCK");
+    BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::STAKE_RECORD_NOT_FOUND), "STAKE_RECORD_NOT_FOUND");
+    BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::STAKE_NOT_ACTIVE), "STAKE_NOT_ACTIVE");
+    BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::STAKE_NOT_MATURE), "STAKE_NOT_MATURE");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::OUTPUT_NOT_FOUND), "OUTPUT_NOT_FOUND");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::OUTPUT_ID_MISMATCH), "OUTPUT_ID_MISMATCH");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::INVALID_OUTPUT_RECORD), "INVALID_OUTPUT_RECORD");

@@ -15,6 +15,7 @@ Current scope:
 - `BuildBlockSpentTagsSkeleton` models the revised spec block pre-pass minimum rule for duplicate Spark spend tags and tags already in `SpentTags`; it assumes ordinary Spark spend validation supplied valid revealed tags.
 - `CheckStakeSkeleton` performs structural checks only: sorted distinct `InCoinIDs`, non-infinity public group elements, non-empty proof blobs, tag conflicts, output existence, output record consistency, and `helsing_eligible`.
 - `CheckStakeBlockSkeleton` performs non-mutating block-level tag-state checks before per-stake skeleton validation, including duplicate new stake tags in the same block.
+- `CheckPayoutEligibilitySkeleton` performs revised spec `PayoutVerify` steps 3-7 only: stake record lookup, active status, spent-tag checks, and payout maturity.
 
 Not implemented yet:
 
@@ -26,7 +27,7 @@ Not implemented yet:
 - `ParVerify`, `RepVerify`, and `TagVerify`
 - consensus block-level `BlockSpentTags` extraction/integration
 - consensus block-level duplicate new stake tag integration
-- full payout verification, including registered payout address extraction, stake selection, payout amount, and deterministic Spark payout coin comparison
+- full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, and deterministic Spark payout coin comparison
 - canonical stake context grammar, including payout address, update key, node signing material, and rejection of empty or non-canonical contexts
 - masternode registration/update/payout transaction wiring
 - consensus activation rules

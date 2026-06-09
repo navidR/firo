@@ -38,6 +38,12 @@ const char* StakeValidationResultToString(StakeValidationResult result)
         return "TAG_ALREADY_ACTIVE";
     case StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK:
         return "DUPLICATE_STAKE_TAG_IN_BLOCK";
+    case StakeValidationResult::STAKE_RECORD_NOT_FOUND:
+        return "STAKE_RECORD_NOT_FOUND";
+    case StakeValidationResult::STAKE_NOT_ACTIVE:
+        return "STAKE_NOT_ACTIVE";
+    case StakeValidationResult::STAKE_NOT_MATURE:
+        return "STAKE_NOT_MATURE";
     case StakeValidationResult::OUTPUT_NOT_FOUND:
         return "OUTPUT_NOT_FOUND";
     case StakeValidationResult::OUTPUT_ID_MISMATCH:
@@ -285,6 +291,32 @@ StakeValidationResult CheckStakeBlockSkeleton(const std::vector<StakeTx>& stake_
         if (result != StakeValidationResult::OK) {
             return result;
         }
+    }
+
+    return StakeValidationResult::OK;
+}
+
+StakeValidationResult CheckPayoutEligibilitySkeleton(const uint256& stake_id, const ValidationStateView& view, int currentHeight, int stakeMaturity)
+{
+    if (view.helsingState == nullptr) {
+        return StakeValidationResult::STAKE_RECORD_NOT_FOUND;
+    }
+
+    const StakeRecord* record = view.helsingState->GetStakeRecord(stake_id);
+    if (record == nullptr) {
+        return StakeValidationResult::STAKE_RECORD_NOT_FOUND;
+    }
+    if (record->status != StakeStatus::ACTIVE) {
+        return StakeValidationResult::STAKE_NOT_ACTIVE;
+    }
+    if (view.helsingState->IsSpentTag(record->T)) {
+        return StakeValidationResult::TAG_ALREADY_SPENT;
+    }
+    if (view.HasBlockSpentTag(record->T)) {
+        return StakeValidationResult::TAG_SPENT_IN_BLOCK;
+    }
+    if (!IsStakeMatureForPayout(record->nHeight, currentHeight, stakeMaturity)) {
+        return StakeValidationResult::STAKE_NOT_MATURE;
     }
 
     return StakeValidationResult::OK;
