@@ -96,6 +96,11 @@ StakeValidationResult CheckStakeBlockSkeleton(const std::vector<StakeTx>& stake_
 // Structural skeleton for revised-spec PayoutVerify steps 3-7 only.
 StakeValidationResult CheckPayoutEligibilitySkeleton(const uint256& stake_id, const ValidationStateView& view, int currentHeight, int stakeMaturity);
 
+// Block-level skeleton for revised-spec ValidateBlock step 5 and PayoutVerify steps 3-7 only.
+// This deliberately stops before payout index policy, address extraction, deterministic selection,
+// payout amount derivation, payout identifier construction, and payout coin recomputation.
+StakeValidationResult CheckPayoutBlockEligibilitySkeleton(const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& view, int currentHeight, int stakeMaturity);
+
 // Revised-spec section 16 requires distinct payout_index values when a block
 // contains more than one masternode payout.
 bool ArePayoutIndexesDistinctSkeleton(const std::vector<PayoutTxSkeleton>& payout_txs);
