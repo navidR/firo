@@ -1410,6 +1410,114 @@ BOOST_AUTO_TEST_CASE(state_add_spent_tag_accepts_zero_height)
     BOOST_CHECK_EQUAL(stored->nSpentHeight, 0);
 }
 
+BOOST_AUTO_TEST_CASE(state_apply_block_spent_tags_skeleton_updates_spent_and_active_indexes)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord spentRecord = ActiveRecord(171, DeterministicPoint(181));
+    const helsing::StakeRecord activeRecord = ActiveRecord(172, DeterministicPoint(182));
+    const GroupElement spentOnlyTag = DeterministicPoint(183);
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    blockSpentTags.insert(spentRecord.T);
+    blockSpentTags.insert(spentOnlyTag);
+
+    BOOST_CHECK(state.AddActiveStake(spentRecord));
+    BOOST_CHECK(state.AddActiveStake(activeRecord));
+
+    BOOST_CHECK(state.ApplyBlockSpentTagsSkeleton(blockSpentTags, 400));
+
+    BOOST_CHECK(state.IsSpentTag(spentRecord.T));
+    BOOST_CHECK(state.IsSpentTag(spentOnlyTag));
+    BOOST_CHECK(!state.IsActiveTag(spentRecord.T));
+    BOOST_CHECK(state.IsActiveTag(activeRecord.T));
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 2U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 2U);
+
+    const helsing::StakeRecord* spentStored = state.GetStakeRecord(spentRecord.stake_id);
+    const helsing::StakeRecord* activeStored = state.GetStakeRecord(activeRecord.stake_id);
+    BOOST_REQUIRE(spentStored != nullptr);
+    BOOST_REQUIRE(activeStored != nullptr);
+    BOOST_CHECK(spentStored->status == helsing::StakeStatus::SPENT);
+    BOOST_CHECK_EQUAL(spentStored->nSpentHeight, 400);
+    BOOST_CHECK(activeStored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK_EQUAL(activeStored->nSpentHeight, -1);
+}
+
+BOOST_AUTO_TEST_CASE(state_apply_block_spent_tags_skeleton_accepts_empty_set)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(173, DeterministicPoint(184));
+    const GroupElement spentOnlyTag = DeterministicPoint(185);
+    const std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(state.AddSpentTag(spentOnlyTag, 401));
+
+    BOOST_CHECK(state.ApplyBlockSpentTagsSkeleton(blockSpentTags, 402));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(state.IsSpentTag(spentOnlyTag));
+}
+
+BOOST_AUTO_TEST_CASE(state_apply_block_spent_tags_skeleton_rejects_negative_height_without_mutation)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(174, DeterministicPoint(186));
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    blockSpentTags.insert(record.T);
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(!state.ApplyBlockSpentTagsSkeleton(blockSpentTags, -1));
+
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+}
+
+BOOST_AUTO_TEST_CASE(state_apply_block_spent_tags_skeleton_rejects_invalid_or_prior_spent_without_mutation)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord activeRecord = ActiveRecord(175, DeterministicPoint(187));
+    const GroupElement priorSpentTag = DeterministicPoint(188);
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    blockSpentTags.insert(activeRecord.T);
+    blockSpentTags.insert(priorSpentTag);
+
+    BOOST_CHECK(state.AddActiveStake(activeRecord));
+    BOOST_CHECK(state.AddSpentTag(priorSpentTag, 403));
+    BOOST_CHECK(!state.ApplyBlockSpentTagsSkeleton(blockSpentTags, 404));
+
+    BOOST_CHECK(!state.IsSpentTag(activeRecord.T));
+    BOOST_CHECK(state.IsActiveTag(activeRecord.T));
+    BOOST_CHECK(state.IsSpentTag(priorSpentTag));
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(activeRecord.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+
+    blockSpentTags.clear();
+    blockSpentTags.insert(activeRecord.T);
+    blockSpentTags.insert(GroupElement());
+    BOOST_CHECK(!state.ApplyBlockSpentTagsSkeleton(blockSpentTags, 405));
+
+    BOOST_CHECK(!state.IsSpentTag(activeRecord.T));
+    BOOST_CHECK(state.IsActiveTag(activeRecord.T));
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+}
+
 BOOST_AUTO_TEST_CASE(state_add_accepted_stake_populates_consensus_record)
 {
     helsing::CHelsingState state;

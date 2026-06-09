@@ -26,6 +26,7 @@ Current scope:
 - `ArePayoutIndexesDistinctSkeleton` checks the revised spec section 16 duplicate-`payout_index` rule for a caller-supplied payout set.
 - `CheckStakeUpdateEligibilitySkeleton` performs revised spec `StakeUpdateVerify` steps 1-3 only: stake record lookup, active status, and spent-tag checks.
 - `ApplyAcceptedStakeUpdateSkeleton` applies an already accepted update to `StakeRecords` by changing only `m` and `last_update_height`; it does not validate contexts or signatures.
+- `ApplyBlockSpentTagsSkeleton` applies an already validated `BlockSpentTags` set to in-memory `SpentTags`, `ActiveTags`, and matching `StakeRecords`.
 
 Not implemented yet:
 
@@ -38,6 +39,7 @@ Not implemented yet:
 - deriving the expected payout amount from consensus reward rules
 - `ParVerify`, `RepVerify`, and `TagVerify`
 - consensus block-level `BlockSpentTags` extraction/integration
+- persistent block undo data for Helsing state mutations
 - consensus block-level duplicate new stake tag integration
 - full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, and deterministic Spark payout coin comparison
 - deterministic payout ordinal selection and payout identifier `j` construction

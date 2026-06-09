@@ -100,6 +100,27 @@ bool CHelsingState::ApplyAcceptedStakeUpdateSkeleton(const uint256& stake_id, co
     return true;
 }
 
+bool CHelsingState::ApplyBlockSpentTagsSkeleton(const std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags, int nHeight)
+{
+    if (nHeight < 0) {
+        return false;
+    }
+
+    for (const GroupElement& tag : blockSpentTags) {
+        if (!IsUsableTag(tag) || IsSpentTag(tag)) {
+            return false;
+        }
+    }
+
+    for (const GroupElement& tag : blockSpentTags) {
+        if (!AddSpentTag(tag, nHeight)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool CHelsingState::AddSpentTag(const GroupElement& tag, int nHeight)
 {
     if (!IsUsableTag(tag) || nHeight < 0) {

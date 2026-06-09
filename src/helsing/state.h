@@ -25,6 +25,7 @@ public:
     bool AddActiveStake(const StakeRecord& record);
     bool AddAcceptedStake(const uint256& stake_id, const StakeTx& tx, int nHeight);
     bool ApplyAcceptedStakeUpdateSkeleton(const uint256& stake_id, const StakeContext& m_new, int nHeight);
+    bool ApplyBlockSpentTagsSkeleton(const std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags, int nHeight);
     bool AddSpentTag(const GroupElement& tag, int nHeight);
     bool RevokeStake(const uint256& stake_id);
 
