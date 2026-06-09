@@ -10,6 +10,7 @@ Current scope:
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
 - `CHelsingState` models `SpentTags`, `ActiveTags`, and `StakeRecords`.
 - `CheckStakeSkeleton` performs structural checks only: sorted distinct `InCoinIDs`, non-infinity public group elements, non-empty proof blobs, tag conflicts, output existence, output record consistency, and `helsing_eligible`.
+- `CheckStakeBlockSkeleton` performs non-mutating block-level tag-state checks before per-stake skeleton validation, including duplicate new stake tags in the same block.
 
 Not implemented yet:
 
@@ -21,7 +22,7 @@ Not implemented yet:
 - value-domain checks for `V_STAKE`, `V_MAX`, scalar conversion bounds, and fees outside the collateral proof
 - `ParVerify`, `RepVerify`, and `TagVerify`
 - block-level `BlockSpentTags` integration
-- block-level duplicate new stake tag integration
+- consensus block-level duplicate new stake tag integration
 - canonical stake context grammar, including payout address, update key, node signing material, and rejection of empty or non-canonical contexts
 - masternode registration/update/payout transaction wiring
 - consensus activation rules

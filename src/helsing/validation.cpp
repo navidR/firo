@@ -27,6 +27,8 @@ const char* StakeValidationResultToString(StakeValidationResult result)
         return "TAG_SPENT_IN_BLOCK";
     case StakeValidationResult::TAG_ALREADY_ACTIVE:
         return "TAG_ALREADY_ACTIVE";
+    case StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK:
+        return "DUPLICATE_STAKE_TAG_IN_BLOCK";
     case StakeValidationResult::OUTPUT_NOT_FOUND:
         return "OUTPUT_NOT_FOUND";
     case StakeValidationResult::OUTPUT_ID_MISMATCH:
@@ -135,6 +137,40 @@ StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStat
         }
         if (!output->helsing_eligible) {
             return StakeValidationResult::OUTPUT_NOT_ELIGIBLE;
+        }
+    }
+
+    return StakeValidationResult::OK;
+}
+
+StakeValidationResult CheckStakeBlockSkeleton(const std::vector<StakeTx>& stake_txs, const ValidationStateView& view)
+{
+    std::unordered_set<GroupElement, spark::CLTagHash> newStakeTags;
+
+    for (const StakeTx& tx : stake_txs) {
+        if (!IsValidPublicPoint(tx.T)) {
+            continue;
+        }
+        if (view.helsingState != nullptr) {
+            if (view.helsingState->IsSpentTag(tx.T)) {
+                return StakeValidationResult::TAG_ALREADY_SPENT;
+            }
+        }
+        if (view.HasBlockSpentTag(tx.T)) {
+            return StakeValidationResult::TAG_SPENT_IN_BLOCK;
+        }
+        if (view.helsingState != nullptr && view.helsingState->IsActiveTag(tx.T)) {
+            return StakeValidationResult::TAG_ALREADY_ACTIVE;
+        }
+        if (!newStakeTags.insert(tx.T).second) {
+            return StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK;
+        }
+    }
+
+    for (const StakeTx& tx : stake_txs) {
+        const StakeValidationResult result = CheckStakeSkeleton(tx, view);
+        if (result != StakeValidationResult::OK) {
+            return result;
         }
     }
 

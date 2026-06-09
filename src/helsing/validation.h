@@ -22,6 +22,7 @@ enum class StakeValidationResult {
     TAG_ALREADY_SPENT,
     TAG_SPENT_IN_BLOCK,
     TAG_ALREADY_ACTIVE,
+    DUPLICATE_STAKE_TAG_IN_BLOCK,
     OUTPUT_NOT_FOUND,
     OUTPUT_ID_MISMATCH,
     INVALID_OUTPUT_RECORD,
@@ -46,6 +47,9 @@ bool IsValidSparkOutputRecord(const SparkOutputRecord& output);
 
 // Structural skeleton for revised-spec StakeVerify. Proof verification is intentionally TODO.
 StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStateView& view);
+
+// Non-mutating block-level skeleton for same-block Helsing stake checks.
+StakeValidationResult CheckStakeBlockSkeleton(const std::vector<StakeTx>& stake_txs, const ValidationStateView& view);
 
 } // namespace helsing
 

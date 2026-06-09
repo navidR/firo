@@ -88,6 +88,14 @@ helsing::ValidationStateView ValidView(const helsing::StakeTx& tx)
     return view;
 }
 
+void AddOutputs(helsing::ValidationStateView& view, const helsing::StakeTx& tx, unsigned char pointTag)
+{
+    for (const helsing::OutputId& output_id : tx.inCoinIDs) {
+        view.sparkOutputs.emplace(output_id, EligibleOutput(output_id, pointTag));
+        pointTag += 10;
+    }
+}
+
 void CheckOutputIdEqual(const helsing::OutputId& a, const helsing::OutputId& b)
 {
     BOOST_CHECK(a == b);
@@ -565,6 +573,113 @@ BOOST_AUTO_TEST_CASE(block_spent_tags_work_without_persistent_state)
     BOOST_CHECK(view.helsingState == nullptr);
     BOOST_CHECK(view.HasBlockSpentTag(tx.T));
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(block_skeleton_accepts_empty_and_distinct_new_stake_tags)
+{
+    helsing::StakeTx txA = ValidStakeTx();
+    helsing::StakeTx txB = ValidStakeTx();
+    txB.inCoinIDs = {Output(3, 0), Output(4, 0)};
+    txB.T = DeterministicPoint(13);
+
+    helsing::ValidationStateView view;
+    AddOutputs(view, txA, 20);
+    AddOutputs(view, txB, 40);
+
+    BOOST_CHECK(helsing::CheckStakeBlockSkeleton({}, view) == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(helsing::CheckStakeBlockSkeleton({txA, txB}, view) == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(block_skeleton_rejects_duplicate_new_stake_tags)
+{
+    helsing::StakeTx txA = ValidStakeTx();
+    helsing::StakeTx txB = ValidStakeTx();
+    txB.inCoinIDs = {Output(3, 0), Output(4, 0)};
+    txB.T = txA.T;
+
+    helsing::ValidationStateView view;
+    AddOutputs(view, txA, 20);
+    AddOutputs(view, txB, 40);
+
+    BOOST_CHECK(helsing::CheckStakeBlockSkeleton({txA, txB}, view) == helsing::StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(block_skeleton_rejects_non_adjacent_duplicate_new_stake_tags)
+{
+    helsing::StakeTx txA = ValidStakeTx();
+    helsing::StakeTx txB = ValidStakeTx();
+    helsing::StakeTx txC = ValidStakeTx();
+    txB.inCoinIDs = {Output(3, 0), Output(4, 0)};
+    txB.T = DeterministicPoint(13);
+    txC.inCoinIDs = {Output(5, 0), Output(6, 0)};
+    txC.T = txA.T;
+
+    helsing::ValidationStateView view;
+    AddOutputs(view, txA, 20);
+    AddOutputs(view, txB, 40);
+    AddOutputs(view, txC, 60);
+
+    BOOST_CHECK(helsing::CheckStakeBlockSkeleton({txA, txB, txC}, view) == helsing::StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(block_skeleton_duplicate_new_stake_tags_precede_individual_failures)
+{
+    helsing::StakeTx txA = ValidStakeTx();
+    helsing::StakeTx txB = ValidStakeTx();
+    txB.inCoinIDs = {Output(3, 0), Output(4, 0)};
+    txB.T = txA.T;
+    txB.S_prime = GroupElement();
+
+    helsing::ValidationStateView view;
+    AddOutputs(view, txA, 20);
+    AddOutputs(view, txB, 40);
+
+    BOOST_CHECK(helsing::CheckStakeBlockSkeleton({txA, txB}, view) == helsing::StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(block_skeleton_invalid_tags_fall_through_to_individual_validation)
+{
+    helsing::StakeTx txA = ValidStakeTx();
+    helsing::StakeTx txB = ValidStakeTx();
+    txA.T = GroupElement();
+    txB.T = txA.T;
+    txB.inCoinIDs = {Output(3, 0), Output(4, 0)};
+
+    helsing::ValidationStateView view;
+    AddOutputs(view, txA, 20);
+    AddOutputs(view, txB, 40);
+    view.blockSpentTags.insert(txA.T);
+
+    BOOST_CHECK(helsing::CheckStakeBlockSkeleton({txA, txB}, view) == helsing::StakeValidationResult::INVALID_GROUP_ELEMENT);
+}
+
+BOOST_AUTO_TEST_CASE(block_skeleton_block_spent_tags_precede_duplicate_new_stake_tags)
+{
+    helsing::StakeTx txA = ValidStakeTx();
+    helsing::StakeTx txB = ValidStakeTx();
+    txB.inCoinIDs = {Output(3, 0), Output(4, 0)};
+    txB.T = txA.T;
+
+    helsing::ValidationStateView view;
+    AddOutputs(view, txA, 20);
+    AddOutputs(view, txB, 40);
+    view.blockSpentTags.insert(txA.T);
+
+    BOOST_CHECK(helsing::CheckStakeBlockSkeleton({txA, txB}, view) == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(block_skeleton_block_spent_tag_precedes_active_tag)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    helsing::ValidationStateView view;
+    helsing::CHelsingState state;
+    view.helsingState = &state;
+    AddOutputs(view, tx, 20);
+
+    BOOST_CHECK(state.AddActiveStake(ActiveRecord(131, tx.T)));
+    view.blockSpentTags.insert(tx.T);
+
+    BOOST_CHECK(helsing::CheckStakeBlockSkeleton({tx}, view) == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
 }
 
 BOOST_AUTO_TEST_CASE(state_rejects_default_tag)
@@ -1460,6 +1575,7 @@ BOOST_AUTO_TEST_CASE(validation_result_strings_cover_all_values)
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::TAG_ALREADY_SPENT), "TAG_ALREADY_SPENT");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK), "TAG_SPENT_IN_BLOCK");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::TAG_ALREADY_ACTIVE), "TAG_ALREADY_ACTIVE");
+    BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK), "DUPLICATE_STAKE_TAG_IN_BLOCK");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::OUTPUT_NOT_FOUND), "OUTPUT_NOT_FOUND");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::OUTPUT_ID_MISMATCH), "OUTPUT_ID_MISMATCH");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::INVALID_OUTPUT_RECORD), "INVALID_OUTPUT_RECORD");
