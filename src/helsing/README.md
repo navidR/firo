@@ -18,6 +18,8 @@ Current scope:
 - `IsStakeMatureForPayout` checks the revised spec payout maturity inequality for caller-supplied heights and `STAKE_MATURITY`.
 - `IsHelsingValueInRange` checks the revised spec integer-domain bound `0 <= value < V_MAX` for caller-supplied values.
 - `IsExpectedPayoutAmountInRangeSkeleton` checks the revised spec `PayoutVerify` step 10 equality and integer range for caller-supplied values.
+- `DoesPayoutAddressMatchRegisteredSkeleton` checks revised spec `PayoutVerify` step 8 byte equality against a caller-supplied, already extracted registered payout address.
+- `DoesPayoutCoinMatchExpectedSkeleton` checks revised spec `PayoutVerify` step 13 byte equality against a caller-supplied, already recomputed payout coin.
 - `IsHelsingStakeValueWithMarginInRangeSkeleton` checks the revised spec optional collateral-margin integer sum rule for caller-supplied `V_STAKE`, `margin`, and `V_MAX`.
 - `CHelsingState` models `SpentTags`, `ActiveTags`, and `StakeRecords`.
 - `BuildBlockSpentTagsSkeleton` models the revised spec block pre-pass minimum rule for duplicate Spark spend tags and tags already in `SpentTags`; it assumes ordinary Spark spend validation supplied valid revealed tags.

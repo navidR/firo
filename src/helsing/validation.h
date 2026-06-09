@@ -59,6 +59,12 @@ bool IsHelsingValueInRange(CAmount value, CAmount vMax);
 // Revised spec PayoutVerify step 10 subset: V_PAYOUT equals the caller-recomputed expected amount
 // and satisfies the integer-domain range. The caller must separately enforce V_MAX < q.
 bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax);
+// Revised spec PayoutVerify step 8 subset: compare the transaction address with the
+// caller-supplied, already extracted registered address. This does not parse context m.
+bool DoesPayoutAddressMatchRegisteredSkeleton(const PayoutTxSkeleton& tx, const PayoutAddressBlob& registeredAddress);
+// Revised spec PayoutVerify step 13 subset: compare the transaction coin with the
+// caller-supplied, already recomputed payout coin. This does not construct j or run Payout.
+bool DoesPayoutCoinMatchExpectedSkeleton(const PayoutTxSkeleton& tx, const PayoutCoinBlob& expectedCoin);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);
