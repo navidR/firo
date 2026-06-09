@@ -64,10 +64,24 @@ bool CHelsingState::AddActiveStake(const StakeRecord& record)
     StakeRecord activeRecord = record;
     activeRecord.status = StakeStatus::ACTIVE;
     activeRecord.nSpentHeight = -1;
+    if (activeRecord.nLastUpdateHeight < 0) {
+        activeRecord.nLastUpdateHeight = activeRecord.nHeight;
+    }
 
     activeTags.emplace(activeRecord.T, activeRecord.stake_id);
     stakeRecords.emplace(activeRecord.stake_id, activeRecord);
     return true;
+}
+
+bool CHelsingState::AddAcceptedStake(const uint256& stake_id, const StakeTx& tx, int nHeight)
+{
+    StakeRecord record;
+    record.stake_id = stake_id;
+    record.T = tx.T;
+    record.m = tx.m;
+    record.nHeight = nHeight;
+    record.nLastUpdateHeight = nHeight;
+    return AddActiveStake(record);
 }
 
 bool CHelsingState::AddSpentTag(const GroupElement& tag, int nHeight)

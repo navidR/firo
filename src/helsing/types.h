@@ -129,6 +129,7 @@ struct StakeRecord {
     StakeContext m;
     int nHeight{-1};
     int nSpentHeight{-1};
+    int nLastUpdateHeight{-1};
     StakeStatus status{StakeStatus::ACTIVE};
 };
 

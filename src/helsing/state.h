@@ -23,6 +23,7 @@ public:
     const StakeRecord* GetStakeRecord(const uint256& stake_id) const;
 
     bool AddActiveStake(const StakeRecord& record);
+    bool AddAcceptedStake(const uint256& stake_id, const StakeTx& tx, int nHeight);
     bool AddSpentTag(const GroupElement& tag, int nHeight);
     bool RevokeStake(const uint256& stake_id);
 

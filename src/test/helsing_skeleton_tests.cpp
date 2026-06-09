@@ -3,8 +3,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "helsing/validation.h"
+#include "hash.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"
+#include "utilstrencodings.h"
 #include "version.h"
 
 #include <boost/test/unit_test.hpp>
@@ -63,6 +65,7 @@ helsing::StakeRecord ActiveRecord(unsigned char stakeTag, const GroupElement& ta
     record.T = tag;
     record.m.bytes = {0x6d, stakeTag};
     record.nHeight = 100 + stakeTag;
+    record.nLastUpdateHeight = record.nHeight;
     return record;
 }
 
@@ -117,6 +120,20 @@ void CheckStakeTxEqual(const helsing::StakeTx& a, const helsing::StakeTx& b)
     BOOST_CHECK(a.pi_par.bytes == b.pi_par.bytes);
     BOOST_CHECK(a.pi_val.bytes == b.pi_val.bytes);
     BOOST_CHECK(a.pi_tag.bytes == b.pi_tag.bytes);
+}
+
+template <typename T>
+std::string WireHex(const T& obj)
+{
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << obj;
+    return HexStr(stream);
+}
+
+template <typename T>
+uint256 WireHash(const T& obj)
+{
+    return SerializeHash(obj, SER_NETWORK, PROTOCOL_VERSION);
 }
 
 } // namespace
@@ -803,6 +820,78 @@ BOOST_AUTO_TEST_CASE(state_add_spent_tag_accepts_zero_height)
     BOOST_CHECK_EQUAL(stored->nSpentHeight, 0);
 }
 
+BOOST_AUTO_TEST_CASE(state_add_accepted_stake_populates_consensus_record)
+{
+    helsing::CHelsingState state;
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.m.bytes = {0x01, 0x02, 0x03};
+    const uint256 stakeId = DeterministicHash(131);
+
+    BOOST_CHECK(state.AddAcceptedStake(stakeId, tx, 250));
+
+    uint256 activeStakeId;
+    BOOST_CHECK(state.GetActiveStakeId(tx.T, activeStakeId));
+    BOOST_CHECK(activeStakeId == stakeId);
+    BOOST_CHECK(state.IsActiveTag(tx.T));
+    BOOST_CHECK(!state.IsSpentTag(tx.T));
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(stakeId);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->stake_id == stakeId);
+    BOOST_CHECK(stored->T == tx.T);
+    BOOST_CHECK(stored->m.bytes == tx.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nHeight, 250);
+    BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, 250);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
+BOOST_AUTO_TEST_CASE(state_add_accepted_stake_rejects_invalid_inputs_without_mutation)
+{
+    helsing::CHelsingState state;
+    helsing::StakeTx tx = ValidStakeTx();
+    const GroupElement validTag = tx.T;
+    const helsing::StakeRecord activeRecord = ActiveRecord(132, DeterministicPoint(84));
+    const GroupElement spentOnlyTag = DeterministicPoint(85);
+
+    BOOST_CHECK(state.AddActiveStake(activeRecord));
+    BOOST_CHECK(state.AddSpentTag(spentOnlyTag, 260));
+
+    uint256 nullStakeId;
+    BOOST_CHECK(!state.AddAcceptedStake(nullStakeId, tx, 251));
+
+    BOOST_CHECK(!state.AddAcceptedStake(DeterministicHash(133), tx, -1));
+
+    tx.T = GroupElement();
+    BOOST_CHECK(!state.AddAcceptedStake(DeterministicHash(134), tx, 252));
+
+    tx = ValidStakeTx();
+    tx.T = activeRecord.T;
+    BOOST_CHECK(!state.AddAcceptedStake(DeterministicHash(135), tx, 253));
+
+    tx = ValidStakeTx();
+    tx.T = spentOnlyTag;
+    BOOST_CHECK(!state.AddAcceptedStake(DeterministicHash(136), tx, 254));
+
+    tx = ValidStakeTx();
+    BOOST_CHECK(!state.AddAcceptedStake(activeRecord.stake_id, tx, 255));
+
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 1U);
+    BOOST_CHECK(state.IsActiveTag(activeRecord.T));
+    BOOST_CHECK(state.IsSpentTag(spentOnlyTag));
+    BOOST_CHECK(!state.IsActiveTag(validTag));
+    BOOST_CHECK(state.GetStakeRecord(activeRecord.stake_id) != nullptr);
+    BOOST_CHECK(state.GetStakeRecord(DeterministicHash(133)) == nullptr);
+    BOOST_CHECK(state.GetStakeRecord(DeterministicHash(134)) == nullptr);
+    BOOST_CHECK(state.GetStakeRecord(DeterministicHash(135)) == nullptr);
+    BOOST_CHECK(state.GetStakeRecord(DeterministicHash(136)) == nullptr);
+}
+
 BOOST_AUTO_TEST_CASE(state_active_stake_lifecycle)
 {
     helsing::CHelsingState state;
@@ -827,6 +916,7 @@ BOOST_AUTO_TEST_CASE(state_active_stake_lifecycle)
     BOOST_CHECK(stored->m.bytes == record.m.bytes);
     BOOST_CHECK_EQUAL(stored->nHeight, record.nHeight);
     BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nHeight);
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
@@ -837,6 +927,7 @@ BOOST_AUTO_TEST_CASE(state_add_active_normalizes_record_fields)
     helsing::StakeRecord record = ActiveRecord(98, tag);
     record.status = helsing::StakeStatus::SPENT;
     record.nSpentHeight = 123;
+    record.nLastUpdateHeight = -1;
 
     BOOST_CHECK(state.AddActiveStake(record));
 
@@ -848,6 +939,7 @@ BOOST_AUTO_TEST_CASE(state_add_active_normalizes_record_fields)
     BOOST_REQUIRE(stored != nullptr);
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
     BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nHeight);
 
     helsing::StakeRecord revokedRecord = ActiveRecord(102, DeterministicPoint(64));
     revokedRecord.status = helsing::StakeStatus::REVOKED;
@@ -858,6 +950,7 @@ BOOST_AUTO_TEST_CASE(state_add_active_normalizes_record_fields)
     BOOST_REQUIRE(stored != nullptr);
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
     BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, revokedRecord.nLastUpdateHeight);
 
     helsing::StakeRecord invalidStatusRecord = ActiveRecord(103, DeterministicPoint(65));
     invalidStatusRecord.status = static_cast<helsing::StakeStatus>(255);
@@ -868,6 +961,7 @@ BOOST_AUTO_TEST_CASE(state_add_active_normalizes_record_fields)
     BOOST_REQUIRE(stored != nullptr);
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
     BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, invalidStatusRecord.nLastUpdateHeight);
 
     helsing::StakeRecord boundaryRecord = ActiveRecord(124, DeterministicPoint(73));
     boundaryRecord.nHeight = 0;
@@ -880,6 +974,7 @@ BOOST_AUTO_TEST_CASE(state_add_active_normalizes_record_fields)
     BOOST_CHECK_EQUAL(stored->nHeight, 0);
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
     BOOST_CHECK_EQUAL(stored->nSpentHeight, -1);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, boundaryRecord.nLastUpdateHeight);
 }
 
 BOOST_AUTO_TEST_CASE(state_rejects_duplicate_active_stakes_and_spent_tags)
@@ -1600,6 +1695,117 @@ BOOST_AUTO_TEST_CASE(stake_tx_serialization_roundtrip)
     stream >> decoded;
 
     CheckStakeTxEqual(decoded, tx);
+}
+
+BOOST_AUTO_TEST_CASE(stake_tx_wire_regression_vectors)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs.push_back(Output(3, 7));
+    tx.m.bytes = {0x01, 0x02, 0x03, 0x04};
+    tx.pi_par.bytes = {0x10, 0x11};
+    tx.pi_val.bytes = {0x20, 0x21, 0x22};
+    tx.pi_tag.bytes = {0x30, 0x31, 0x32, 0x33};
+
+    const std::string output1 = WireHex(Output(1, 0));
+    const std::string output2 = WireHex(Output(2, 0));
+    const std::string output3 = WireHex(Output(3, 7));
+    const std::string sPrime = WireHex(tx.S_prime);
+    const std::string cPrime = WireHex(tx.C_prime);
+    const std::string tag = WireHex(tx.T);
+    const std::string context = WireHex(tx.m);
+    const std::string parProof = WireHex(tx.pi_par);
+    const std::string valProof = WireHex(tx.pi_val);
+    const std::string tagProof = WireHex(tx.pi_tag);
+
+    BOOST_CHECK_EQUAL(output1, "010000000000000000000000000000000000000000000000000000000000000000000000");
+    BOOST_CHECK_EQUAL(output2, "020000000000000000000000000000000000000000000000000000000000000000000000");
+    BOOST_CHECK_EQUAL(output3, "030000000000000000000000000000000000000000000000000000000000000007000000");
+    BOOST_CHECK_EQUAL(WireHex(helsing::StakeContext()), "00");
+    BOOST_CHECK_EQUAL(context, "0401020304");
+    BOOST_CHECK_EQUAL(parProof, "021011");
+    BOOST_CHECK_EQUAL(valProof, "03202122");
+    BOOST_CHECK_EQUAL(tagProof, "0430313233");
+    BOOST_CHECK_EQUAL(sPrime, "f142f9527f87078bb7ab339db4642cb9a27d402ffcaa7619951e938555cf3dbe0000");
+    BOOST_CHECK_EQUAL(cPrime, "7fd78938d3d576859f86f568ad342cd05357543aede3a6a48cedda6ff2c9b2350100");
+    BOOST_CHECK_EQUAL(tag, "06c3ae6d399a9cf1a3445af93452102d0eceae6918c731e20294c324bf4419a20000");
+    BOOST_CHECK_EQUAL(WireHex(tx), std::string("03") + output1 + output2 + output3 + sPrime + cPrime + tag + context + parProof + valProof + tagProof);
+    BOOST_CHECK_EQUAL(WireHash(tx).ToString(), "1a3000cbdb67ca49f60d467cb72e9332566a5e97ddf17f52890dcec89ab6ead5");
+}
+
+BOOST_AUTO_TEST_CASE(stake_tx_wire_hash_is_field_sensitive)
+{
+    const helsing::StakeTx tx = ValidStakeTx();
+    const uint256 baseHash = WireHash(tx);
+
+    helsing::StakeTx changed = tx;
+    changed.inCoinIDs[0] = Output(9, 0);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = tx;
+    changed.S_prime = DeterministicPoint(21);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = tx;
+    changed.C_prime = DeterministicPoint(22);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = tx;
+    changed.T = DeterministicPoint(23);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = tx;
+    changed.m.bytes.push_back(0x04);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = tx;
+    changed.pi_par.bytes.push_back(0x10);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = tx;
+    changed.pi_val.bytes.push_back(0x20);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+
+    changed = tx;
+    changed.pi_tag.bytes.push_back(0x30);
+    BOOST_CHECK(WireHash(changed) != baseHash);
+}
+
+BOOST_AUTO_TEST_CASE(stake_wire_deserialization_rejects_truncated_or_noncanonical_streams)
+{
+    std::vector<unsigned char> serializedOutput = ParseHex(WireHex(Output(1, 0)));
+    BOOST_REQUIRE(!serializedOutput.empty());
+    serializedOutput.pop_back();
+
+    CDataStream truncatedOutput(serializedOutput, SER_NETWORK, PROTOCOL_VERSION);
+    helsing::OutputId decodedOutput;
+    BOOST_CHECK_THROW(truncatedOutput >> decodedOutput, std::ios_base::failure);
+
+    const std::vector<unsigned char> serializedTx = ParseHex(WireHex(ValidStakeTx()));
+    BOOST_REQUIRE(!serializedTx.empty());
+    for (size_t prefixSize = 0; prefixSize < serializedTx.size(); ++prefixSize) {
+        BOOST_TEST_CONTEXT("prefixSize=" << prefixSize)
+        {
+            std::vector<unsigned char> prefix(serializedTx.begin(), serializedTx.begin() + prefixSize);
+            CDataStream truncated(prefix, SER_NETWORK, PROTOCOL_VERSION);
+            helsing::StakeTx decodedTx;
+            BOOST_CHECK_THROW(truncated >> decodedTx, std::ios_base::failure);
+        }
+    }
+
+    CDataStream nonCanonicalInCoinIDs(SER_NETWORK, PROTOCOL_VERSION);
+    nonCanonicalInCoinIDs.write("\xfd\x00\x00", 3);
+    helsing::StakeTx decodedTx;
+    BOOST_CHECK_THROW(nonCanonicalInCoinIDs >> decodedTx, std::ios_base::failure);
+
+    CDataStream nonCanonicalContext(SER_NETWORK, PROTOCOL_VERSION);
+    nonCanonicalContext.write("\xfd\x00\x00", 3);
+    helsing::StakeContext decodedContext;
+    BOOST_CHECK_THROW(nonCanonicalContext >> decodedContext, std::ios_base::failure);
+
+    CDataStream nonCanonicalProof(SER_NETWORK, PROTOCOL_VERSION);
+    nonCanonicalProof.write("\xfd\xfc\x00", 3);
+    helsing::ProofBlob decodedProof;
+    BOOST_CHECK_THROW(nonCanonicalProof >> decodedProof, std::ios_base::failure);
 }
 
 BOOST_AUTO_TEST_CASE(default_stake_tx_serialization_roundtrip)
