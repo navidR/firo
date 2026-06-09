@@ -7,6 +7,7 @@
 
 #include "helsing/state.h"
 
+#include <cstddef>
 #include <map>
 #include <unordered_set>
 
@@ -43,6 +44,8 @@ struct ValidationStateView {
 };
 
 bool IsStrictlySortedAndDistinct(const std::vector<OutputId>& output_ids);
+// Revised spec cover-set cardinality: len(InCoinIDs) = N = n^m, with n,m > 1.
+bool IsValidCoverSetCardinality(size_t count, size_t n, size_t m);
 bool IsValidOutputId(const OutputId& output_id);
 bool IsValidPublicPoint(const GroupElement& point);
 bool IsValidSparkOutputRecord(const SparkOutputRecord& output);

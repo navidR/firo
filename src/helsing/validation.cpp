@@ -8,6 +8,7 @@
 #include "spark/state.h"
 
 #include <exception>
+#include <limits>
 #include <utility>
 
 namespace helsing {
@@ -76,6 +77,23 @@ bool IsStrictlySortedAndDistinct(const std::vector<OutputId>& output_ids)
     }
 
     return true;
+}
+
+bool IsValidCoverSetCardinality(size_t count, size_t n, size_t m)
+{
+    if (count == 0 || n <= 1 || m <= 1) {
+        return false;
+    }
+
+    size_t expected = 1;
+    for (size_t i = 0; i < m; ++i) {
+        if (expected > std::numeric_limits<size_t>::max() / n) {
+            return false;
+        }
+        expected *= n;
+    }
+
+    return count == expected;
 }
 
 bool IsValidOutputId(const OutputId& output_id)

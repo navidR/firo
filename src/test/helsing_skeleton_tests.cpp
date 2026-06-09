@@ -263,6 +263,23 @@ BOOST_AUTO_TEST_CASE(sorted_distinct_helper_covers_boundaries)
     BOOST_CHECK(!helsing::IsStrictlySortedAndDistinct({Output(2, 0), Output(1, 1)}));
 }
 
+BOOST_AUTO_TEST_CASE(cover_set_cardinality_requires_exact_public_power)
+{
+    BOOST_CHECK(helsing::IsValidCoverSetCardinality(8, 2, 3));
+    BOOST_CHECK(helsing::IsValidCoverSetCardinality(9, 3, 2));
+    BOOST_CHECK(helsing::IsValidCoverSetCardinality(16, 4, 2));
+
+    BOOST_CHECK(!helsing::IsValidCoverSetCardinality(0, 2, 3));
+    BOOST_CHECK(!helsing::IsValidCoverSetCardinality(7, 2, 3));
+    BOOST_CHECK(!helsing::IsValidCoverSetCardinality(9, 2, 3));
+    BOOST_CHECK(!helsing::IsValidCoverSetCardinality(8, 0, 3));
+    BOOST_CHECK(!helsing::IsValidCoverSetCardinality(8, 1, 3));
+    BOOST_CHECK(!helsing::IsValidCoverSetCardinality(8, 2, 0));
+    BOOST_CHECK(!helsing::IsValidCoverSetCardinality(8, 2, 1));
+    BOOST_CHECK(!helsing::IsValidCoverSetCardinality(1, 2, 0));
+    BOOST_CHECK(!helsing::IsValidCoverSetCardinality(std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max(), 2));
+}
+
 BOOST_AUTO_TEST_CASE(output_id_helper_rejects_null_txid)
 {
     BOOST_CHECK(!helsing::IsValidOutputId(helsing::OutputId()));
