@@ -303,6 +303,15 @@ enum class StakeStatementProtocolBindingSkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class StakeStatementPublicInputBindingSkeletonResult {
+    STAKE_PREFIX_FAILED,
+    INCOINS_ROOT_BINDING_UNIMPLEMENTED,
+    PUBLIC_OFFSET_BINDING_UNIMPLEMENTED,
+    PUBLIC_TAG_BINDING_UNIMPLEMENTED,
+    CONTEXT_HASH_BINDING_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 struct StakeVerificationBlockedSkeletonResult {
     StakeVerificationOutputSkeletonResult output_result;
     StakeCoverSetSparkRulesBlockedSkeletonResult spark_rules_result;
@@ -518,6 +527,10 @@ StakeStatementConstructionSkeletonResult CheckStakeStatementConstructionSkeleton
 // consensus-valid. This blocker has no accepting result and does not construct
 // stake_stmt.
 StakeStatementProtocolBindingSkeletonResult CheckStakeStatementProtocolBindingSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool chainIdBindingAvailable, bool protocolVersionBindingAvailable, bool publicParametersHashBindingAvailable, bool collateralValueBindingAvailable);
+// Revised spec section 5.2 requires stake_stmt to bind the cover-set root,
+// public offsets S_prime/C_prime, public tag T, and context_hash. This blocker
+// has no accepting result and does not construct stake_stmt.
+StakeStatementPublicInputBindingSkeletonResult CheckStakeStatementPublicInputBindingSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool incoinsRootBindingAvailable, bool publicOffsetBindingAvailable, bool publicTagBindingAvailable, bool contextHashBindingAvailable);
 // Revised spec StakeVerify steps 9-11 are deliberately unimplemented here:
 // real ParVerify/RepVerify/TagVerify bound to stake_stmt are required before any
 // acceptance path may exist. The caller-supplied booleans are implementation

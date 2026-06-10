@@ -745,6 +745,31 @@ StakeStatementProtocolBindingSkeletonResult CheckStakeStatementProtocolBindingSk
     return StakeStatementProtocolBindingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+StakeStatementPublicInputBindingSkeletonResult CheckStakeStatementPublicInputBindingSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool incoinsRootBindingAvailable, bool publicOffsetBindingAvailable, bool publicTagBindingAvailable, bool contextHashBindingAvailable)
+{
+    if (prefixResult.cover_set_result.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||
+        prefixResult.cover_set_result.context_result.tag_result != StakeValidationResult::OK ||
+        !prefixResult.cover_set_result.context_result.context_valid ||
+        prefixResult.cover_set_result.cover_set_result != StakeValidationResult::OK ||
+        prefixResult.output_result != StakeValidationResult::OK) {
+        return StakeStatementPublicInputBindingSkeletonResult::STAKE_PREFIX_FAILED;
+    }
+    if (!incoinsRootBindingAvailable) {
+        return StakeStatementPublicInputBindingSkeletonResult::INCOINS_ROOT_BINDING_UNIMPLEMENTED;
+    }
+    if (!publicOffsetBindingAvailable) {
+        return StakeStatementPublicInputBindingSkeletonResult::PUBLIC_OFFSET_BINDING_UNIMPLEMENTED;
+    }
+    if (!publicTagBindingAvailable) {
+        return StakeStatementPublicInputBindingSkeletonResult::PUBLIC_TAG_BINDING_UNIMPLEMENTED;
+    }
+    if (!contextHashBindingAvailable) {
+        return StakeStatementPublicInputBindingSkeletonResult::CONTEXT_HASH_BINDING_UNIMPLEMENTED;
+    }
+
+    return StakeStatementPublicInputBindingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool stakeStatementAvailable, bool parVerifierAvailable, bool repVerifierAvailable)
 {
     if (prefixResult.cover_set_result.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||
