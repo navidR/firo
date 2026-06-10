@@ -12,6 +12,7 @@ Current scope:
 - `CheckHelsingTransactionWiringSkeleton` is an explicit blocker for wiring the section 9, 14, and 15 payloads into real Firo consensus transactions and section 12 block extraction. It has no accepting result and does not parse `CTransaction`.
 - `CheckHelsingConsensusActivationSkeleton` is an explicit blocker for real Firo deployment activation. Section 30 lists Spark compatibility questions, but the revised spec does not define activation parameters, chainparams/versionbits wiring, historical-state bootstrap, or enforcement points; this helper has no accepting result.
 - `CheckHelsingMasternodeLifecycleSkeleton` is an explicit blocker for integrating accepted Helsing stakes, updates, and payouts with Firo deterministic masternode lifecycle state. The revised spec defines public staking context and selected-stake checks, but not Firo masternode-list registration, update propagation, or payment wiring; this helper has no accepting result.
+- `CheckStakeStatusLifecycleSkeleton` is an explicit blocker for revised spec section 6 stake status lifecycle support. It blocks canonical status encoding, expiration rules, deactivation rules, `ActiveTags` consistency, and consensus wiring; it has no accepting result and does not change the current in-memory enum.
 - `CheckHelsingCanonicalTranscriptSkeleton` is an explicit blocker for the revised spec section 5/5.1 canonical transcript setup. It blocks before canonical encoding grammar, consensus hash-to-field method, domain-separation strings, proof transcript labels, and consensus wiring; it has no accepting result and does not hash transcripts.
 - `PayoutBlockContextSkeleton` models the revised spec section 16 payout-id input fields `{chain_id, block_height, prev_block_hash, payout_index, selected_stake_id}` without defining or computing `j`.
 - `IsCompletePayoutBlockContextSkeleton` checks that caller-supplied section 16 payout-id input fields are populated before any future `j` construction; it does not define canonical `chain_id` or `enc_*` grammar.
@@ -160,6 +161,7 @@ Not implemented yet:
 - consensus policy for multiple `StakeUpdate` transactions targeting the same `stake_id` in one block
 - consensus context-diff extraction, immutable `stake_id`/tag checks, and allowed mutable-field policy for accepted stake updates
 - masternode lifecycle integration for registration, update propagation, deterministic selection, and payment wiring
+- canonical stake status lifecycle support for active, spent, expired, and deactivated records, including expiration/deactivation rules and `ActiveTags` consistency
 - real consensus activation height/versionbits/chainparams wiring, Spark-compatibility gates, historical-state bootstrap, and activation enforcement
 
 The important implementation decision left open by the revised spec is how to migrate Spark output identity from the current serialized `spark::Coin` state key toward `(txid, vout)` without changing existing Spark behavior accidentally.

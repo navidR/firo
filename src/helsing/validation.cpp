@@ -571,6 +571,27 @@ HelsingMasternodeLifecycleSkeletonResult CheckHelsingMasternodeLifecycleSkeleton
     return HelsingMasternodeLifecycleSkeletonResult::MASTERNODE_PAYMENT_INTEGRATION_UNIMPLEMENTED;
 }
 
+StakeStatusLifecycleSkeletonResult CheckStakeStatusLifecycleSkeleton(bool stakeRecordStateAvailable, bool canonicalStatusEncodingAvailable, bool expirationRuleAvailable, bool deactivationRuleAvailable, bool activeTagConsistencyAvailable)
+{
+    if (!stakeRecordStateAvailable) {
+        return StakeStatusLifecycleSkeletonResult::STAKE_RECORD_STATE_UNAVAILABLE;
+    }
+    if (!canonicalStatusEncodingAvailable) {
+        return StakeStatusLifecycleSkeletonResult::CANONICAL_STATUS_ENCODING_UNIMPLEMENTED;
+    }
+    if (!expirationRuleAvailable) {
+        return StakeStatusLifecycleSkeletonResult::EXPIRATION_RULE_UNIMPLEMENTED;
+    }
+    if (!deactivationRuleAvailable) {
+        return StakeStatusLifecycleSkeletonResult::DEACTIVATION_RULE_UNIMPLEMENTED;
+    }
+    if (!activeTagConsistencyAvailable) {
+        return StakeStatusLifecycleSkeletonResult::ACTIVE_TAG_CONSISTENCY_UNIMPLEMENTED;
+    }
+
+    return StakeStatusLifecycleSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 HelsingCanonicalTranscriptSkeletonResult CheckHelsingCanonicalTranscriptSkeleton(bool canonicalEncodingGrammarAvailable, bool hashToFieldMethodAvailable, bool domainSeparationStringsAvailable, bool proofTranscriptLabelsAvailable)
 {
     if (!canonicalEncodingGrammarAvailable) {

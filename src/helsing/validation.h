@@ -163,6 +163,15 @@ enum class HelsingMasternodeLifecycleSkeletonResult {
     MASTERNODE_PAYMENT_INTEGRATION_UNIMPLEMENTED,
 };
 
+enum class StakeStatusLifecycleSkeletonResult {
+    STAKE_RECORD_STATE_UNAVAILABLE,
+    CANONICAL_STATUS_ENCODING_UNIMPLEMENTED,
+    EXPIRATION_RULE_UNIMPLEMENTED,
+    DEACTIVATION_RULE_UNIMPLEMENTED,
+    ACTIVE_TAG_CONSISTENCY_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class HelsingCanonicalTranscriptSkeletonResult {
     CANONICAL_ENCODING_GRAMMAR_UNIMPLEMENTED,
     HASH_TO_FIELD_METHOD_UNIMPLEMENTED,
@@ -600,6 +609,10 @@ HelsingConsensusActivationSkeletonResult CheckHelsingConsensusActivationSkeleton
 // but do not define how these map into Firo deterministic masternode lifecycle
 // state. This blocker has no accepting result and does not touch evo state.
 HelsingMasternodeLifecycleSkeletonResult CheckHelsingMasternodeLifecycleSkeleton(bool acceptedStakeAvailable, bool masternodeContextExtractionAvailable, bool masternodeRegistrationIntegrationAvailable, bool stakeUpdateLifecycleIntegrationAvailable, bool payoutSelectionIntegrationAvailable);
+// Revised spec section 6 says StakeRecord status includes active, spent,
+// expired, and deactivated, and ActiveTags contains exactly active backing tags.
+// This blocker has no accepting result and does not define status transitions.
+StakeStatusLifecycleSkeletonResult CheckStakeStatusLifecycleSkeleton(bool stakeRecordStateAvailable, bool canonicalStatusEncodingAvailable, bool expirationRuleAvailable, bool deactivationRuleAvailable, bool activeTagConsistencyAvailable);
 // Revised spec section 5 and 5.1 require canonical encodings, a consensus
 // hash-to-field method, domain-separated hashes, and independent proof transcript
 // labels before proof paths can be consensus-valid. This blocker has no accepting
