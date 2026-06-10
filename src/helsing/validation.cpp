@@ -805,6 +805,18 @@ StakeValidationResult CheckPayoutBlockEligibilitySkeleton(const std::vector<Payo
     return StakeValidationResult::OK;
 }
 
+PayoutVerificationEligibilitySkeletonResult CheckPayoutVerificationEligibilitySkeleton(const PayoutTxSkeleton& tx, const ValidationStateView& view, int currentHeight, int stakeMaturity, bool canonicalEncodingsValid)
+{
+    PayoutVerificationEligibilitySkeletonResult result;
+    result.prefix_result = CheckPayoutVerificationPrefixSkeleton(tx, canonicalEncodingsValid);
+    if (result.prefix_result != PayoutVerificationPrefixSkeletonResult::OK) {
+        return result;
+    }
+
+    result.stake_result = CheckPayoutEligibilitySkeleton(tx.selected_stake_id, view, currentHeight, stakeMaturity);
+    return result;
+}
+
 PayoutVerificationSkeletonResult CheckPayoutVerificationSkeleton(
     const PayoutTxSkeleton& tx,
     const ValidationStateView& view,

@@ -75,6 +75,11 @@ struct PayoutVerificationSkeletonResult {
     PayoutPublicValidationResult public_result{PayoutPublicValidationResult::OK};
 };
 
+struct PayoutVerificationEligibilitySkeletonResult {
+    PayoutVerificationPrefixSkeletonResult prefix_result{PayoutVerificationPrefixSkeletonResult::OK};
+    StakeValidationResult stake_result{StakeValidationResult::OK};
+};
+
 enum class StakeVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -272,6 +277,9 @@ StakeValidationResult CheckPayoutEligibilitySkeleton(const uint256& stake_id, co
 // This deliberately stops before payout index policy, address extraction, deterministic selection,
 // payout amount derivation, payout identifier construction, and payout coin recomputation.
 StakeValidationResult CheckPayoutBlockEligibilitySkeleton(const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& view, int currentHeight, int stakeMaturity);
+// Revised-spec PayoutVerify steps 1-7 only. This composes field/canonical prefix
+// checks with stake lookup, active status, spent-tag checks, and maturity.
+PayoutVerificationEligibilitySkeletonResult CheckPayoutVerificationEligibilitySkeleton(const PayoutTxSkeleton& tx, const ValidationStateView& view, int currentHeight, int stakeMaturity, bool canonicalEncodingsValid);
 // Structural skeleton for revised-spec PayoutVerify steps 3-13 using caller-supplied
 // expected public values for steps that are not implemented yet. This does not parse
 // contexts, select masternodes, compute j, run Payout, or verify payout coins.
