@@ -5304,6 +5304,61 @@ BOOST_AUTO_TEST_CASE(payout_id_input_skeleton_ignores_fields_outside_identifier)
     BOOST_CHECK(helsing::ArePayoutIdInputsCompleteSkeleton(changed, context));
 }
 
+BOOST_AUTO_TEST_CASE(payout_id_construction_skeleton_blocks_incomplete_inputs_before_encoding)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(251);
+    tx.payout_index = 19;
+
+    helsing::PayoutBlockContextSkeleton context;
+    context.chain_id = {0x66};
+    context.block_height = 504;
+    context.prev_block_hash = DeterministicHash(252);
+    context.payout_index = tx.payout_index;
+    context.selected_stake_id = tx.selected_stake_id;
+    BOOST_REQUIRE(helsing::ArePayoutIdInputsCompleteSkeleton(tx, context));
+
+    helsing::PayoutBlockContextSkeleton incompleteContext = context;
+    incompleteContext.chain_id.clear();
+    BOOST_CHECK(helsing::CheckPayoutIdConstructionSkeleton(tx, incompleteContext, true) == helsing::PayoutIdConstructionSkeletonResult::PAYOUT_ID_INPUTS_INCOMPLETE);
+
+    helsing::PayoutBlockContextSkeleton mismatchedContext = context;
+    ++mismatchedContext.payout_index;
+    BOOST_CHECK(helsing::CheckPayoutIdConstructionSkeleton(tx, mismatchedContext, false) == helsing::PayoutIdConstructionSkeletonResult::PAYOUT_ID_INPUTS_INCOMPLETE);
+}
+
+BOOST_AUTO_TEST_CASE(payout_id_construction_skeleton_blocks_missing_canonical_encoding)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(253);
+    tx.payout_index = 20;
+
+    helsing::PayoutBlockContextSkeleton context;
+    context.chain_id = {0x66};
+    context.block_height = 505;
+    context.prev_block_hash = DeterministicHash(254);
+    context.payout_index = tx.payout_index;
+    context.selected_stake_id = tx.selected_stake_id;
+
+    BOOST_CHECK(helsing::CheckPayoutIdConstructionSkeleton(tx, context, false) == helsing::PayoutIdConstructionSkeletonResult::CANONICAL_PAYOUT_ID_ENCODING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_id_construction_skeleton_does_not_construct_identifier)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(255);
+    tx.payout_index = 21;
+
+    helsing::PayoutBlockContextSkeleton context;
+    context.chain_id = {0x66};
+    context.block_height = 506;
+    context.prev_block_hash = DeterministicHash(250);
+    context.payout_index = tx.payout_index;
+    context.selected_stake_id = tx.selected_stake_id;
+
+    BOOST_CHECK(helsing::CheckPayoutIdConstructionSkeleton(tx, context, true) == helsing::PayoutIdConstructionSkeletonResult::PAYOUT_ID_HASHING_UNIMPLEMENTED);
+}
+
 BOOST_AUTO_TEST_CASE(payout_index_skeleton_accepts_empty_single_and_distinct_indexes)
 {
     BOOST_CHECK(helsing::ArePayoutIndexesDistinctSkeleton({}));

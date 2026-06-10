@@ -191,6 +191,18 @@ bool ArePayoutIdInputsCompleteSkeleton(const PayoutTxSkeleton& tx, const PayoutB
            DoesPayoutContextMatchTxSkeleton(tx, context);
 }
 
+PayoutIdConstructionSkeletonResult CheckPayoutIdConstructionSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context, bool canonicalPayoutIdEncodingAvailable)
+{
+    if (!ArePayoutIdInputsCompleteSkeleton(tx, context)) {
+        return PayoutIdConstructionSkeletonResult::PAYOUT_ID_INPUTS_INCOMPLETE;
+    }
+    if (!canonicalPayoutIdEncodingAvailable) {
+        return PayoutIdConstructionSkeletonResult::CANONICAL_PAYOUT_ID_ENCODING_UNIMPLEMENTED;
+    }
+
+    return PayoutIdConstructionSkeletonResult::PAYOUT_ID_HASHING_UNIMPLEMENTED;
+}
+
 PayoutPublicValidationResult CheckPayoutPublicFieldsSkeleton(
     const PayoutTxSkeleton& tx,
     const PayoutBlockContextSkeleton& context,

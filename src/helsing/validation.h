@@ -49,6 +49,12 @@ enum class PayoutPublicValidationResult {
     PAYOUT_COIN_MISMATCH,
 };
 
+enum class PayoutIdConstructionSkeletonResult {
+    PAYOUT_ID_INPUTS_INCOMPLETE,
+    CANONICAL_PAYOUT_ID_ENCODING_UNIMPLEMENTED,
+    PAYOUT_ID_HASHING_UNIMPLEMENTED,
+};
+
 struct PayoutVerificationSkeletonResult {
     StakeValidationResult stake_result{StakeValidationResult::OK};
     PayoutPublicValidationResult public_result{PayoutPublicValidationResult::OK};
@@ -143,6 +149,9 @@ bool DoesPayoutContextMatchTxSkeleton(const PayoutTxSkeleton& tx, const PayoutBl
 // Revised spec section 16 payout-id input availability across tx and block context.
 // This does not define canonical encodings, selected-masternode rules, or construct j.
 bool ArePayoutIdInputsCompleteSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context);
+// Revised spec section 16 payout-id construction is deliberately unimplemented:
+// canonical chain_id/enc_* grammar and hash construction are required before deriving j.
+PayoutIdConstructionSkeletonResult CheckPayoutIdConstructionSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context, bool canonicalPayoutIdEncodingAvailable);
 // Revised spec PayoutVerify public-field suffix, using only caller-supplied expected values.
 // This checks steps 8, 9, 10, 11 input availability, and 13 equality in order; it
 // does not parse contexts, select masternodes, compute j, run Payout, or verify proofs.
