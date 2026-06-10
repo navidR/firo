@@ -9,6 +9,7 @@
 
 #include <exception>
 #include <limits>
+#include <set>
 #include <utility>
 
 namespace helsing {
@@ -1073,6 +1074,22 @@ StakeUpdateEffectiveHeightSkeletonResult CheckStakeUpdateEffectiveHeightSkeleton
     }
 
     return StakeUpdateEffectiveHeightSkeletonResult::EFFECTIVE_HEIGHT_STATE_TRANSITION_UNIMPLEMENTED;
+}
+
+StakeUpdateSameBlockPolicySkeletonResult CheckStakeUpdateSameBlockPolicySkeleton(const std::vector<uint256>& acceptedStakeUpdateIds, bool stakeUpdatesAccepted)
+{
+    if (!stakeUpdatesAccepted) {
+        return StakeUpdateSameBlockPolicySkeletonResult::ACCEPTED_STAKE_UPDATES_UNAVAILABLE;
+    }
+
+    std::set<uint256> seenStakeIds;
+    for (const uint256& stake_id : acceptedStakeUpdateIds) {
+        if (!seenStakeIds.insert(stake_id).second) {
+            return StakeUpdateSameBlockPolicySkeletonResult::DUPLICATE_STAKE_UPDATE_POLICY_UNIMPLEMENTED;
+        }
+    }
+
+    return StakeUpdateSameBlockPolicySkeletonResult::STAKE_UPDATE_APPLICATION_ORDER_UNIMPLEMENTED;
 }
 
 StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view)

@@ -3778,6 +3778,51 @@ BOOST_AUTO_TEST_CASE(stake_update_effective_height_skeleton_does_not_apply_updat
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(stake_update_same_block_policy_skeleton_requires_accepted_updates_first)
+{
+    const uint256 firstStakeId = DeterministicHash(236);
+    const uint256 secondStakeId = DeterministicHash(237);
+
+    BOOST_CHECK(helsing::CheckStakeUpdateSameBlockPolicySkeleton({}, false) == helsing::StakeUpdateSameBlockPolicySkeletonResult::ACCEPTED_STAKE_UPDATES_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckStakeUpdateSameBlockPolicySkeleton({firstStakeId, firstStakeId}, false) == helsing::StakeUpdateSameBlockPolicySkeletonResult::ACCEPTED_STAKE_UPDATES_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckStakeUpdateSameBlockPolicySkeleton({firstStakeId, secondStakeId, firstStakeId}, false) == helsing::StakeUpdateSameBlockPolicySkeletonResult::ACCEPTED_STAKE_UPDATES_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_same_block_policy_skeleton_blocks_duplicate_targets)
+{
+    const uint256 firstStakeId = DeterministicHash(238);
+    const uint256 secondStakeId = DeterministicHash(239);
+
+    BOOST_CHECK(helsing::CheckStakeUpdateSameBlockPolicySkeleton({firstStakeId, firstStakeId}, true) == helsing::StakeUpdateSameBlockPolicySkeletonResult::DUPLICATE_STAKE_UPDATE_POLICY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateSameBlockPolicySkeleton({firstStakeId, secondStakeId, firstStakeId}, true) == helsing::StakeUpdateSameBlockPolicySkeletonResult::DUPLICATE_STAKE_UPDATE_POLICY_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_same_block_policy_skeleton_has_no_accepting_path)
+{
+    const uint256 firstStakeId = DeterministicHash(240);
+    const uint256 secondStakeId = DeterministicHash(241);
+
+    BOOST_CHECK(helsing::CheckStakeUpdateSameBlockPolicySkeleton({}, true) == helsing::StakeUpdateSameBlockPolicySkeletonResult::STAKE_UPDATE_APPLICATION_ORDER_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateSameBlockPolicySkeleton({firstStakeId}, true) == helsing::StakeUpdateSameBlockPolicySkeletonResult::STAKE_UPDATE_APPLICATION_ORDER_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateSameBlockPolicySkeleton({firstStakeId, secondStakeId}, true) == helsing::StakeUpdateSameBlockPolicySkeletonResult::STAKE_UPDATE_APPLICATION_ORDER_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_same_block_policy_skeleton_does_not_apply_updates)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(242, DeterministicPoint(243));
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(helsing::CheckStakeUpdateSameBlockPolicySkeleton({record.stake_id}, true) == helsing::StakeUpdateSameBlockPolicySkeletonResult::STAKE_UPDATE_APPLICATION_ORDER_UNIMPLEMENTED);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nLastUpdateHeight);
+    BOOST_CHECK(stored->T == record.T);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(stake_update_eligibility_accepts_active_stake)
 {
     helsing::CHelsingState state;
