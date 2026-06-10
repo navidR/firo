@@ -1474,6 +1474,30 @@ StakeUpdateSignatureMessageSkeletonResult CheckStakeUpdateSignatureMessageSkelet
     return StakeUpdateSignatureMessageSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+StakeUpdateSignatureVerificationSkeletonResult CheckStakeUpdateSignatureVerificationSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updateMessageConstructionAvailable, bool canonicalSignatureEncodingAvailable, bool updatePublicKeyValidationAvailable, bool signatureSchemeBindingAvailable, bool updateSignatureVerificationAvailable)
+{
+    if (!prefixResult.tx_complete || prefixResult.stake_result != StakeValidationResult::OK) {
+        return StakeUpdateSignatureVerificationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED;
+    }
+    if (!updateMessageConstructionAvailable) {
+        return StakeUpdateSignatureVerificationSkeletonResult::UPDATE_MESSAGE_CONSTRUCTION_UNIMPLEMENTED;
+    }
+    if (!canonicalSignatureEncodingAvailable) {
+        return StakeUpdateSignatureVerificationSkeletonResult::CANONICAL_UPDATE_SIGNATURE_ENCODING_UNIMPLEMENTED;
+    }
+    if (!updatePublicKeyValidationAvailable) {
+        return StakeUpdateSignatureVerificationSkeletonResult::UPDATE_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED;
+    }
+    if (!signatureSchemeBindingAvailable) {
+        return StakeUpdateSignatureVerificationSkeletonResult::SIGNATURE_SCHEME_BINDING_UNIMPLEMENTED;
+    }
+    if (!updateSignatureVerificationAvailable) {
+        return StakeUpdateSignatureVerificationSkeletonResult::UPDATE_SIGNATURE_VERIFICATION_UNIMPLEMENTED;
+    }
+
+    return StakeUpdateSignatureVerificationSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeUpdateAuthorizationSkeletonResult CheckStakeUpdateAuthorizationSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool updateSignatureHashingAvailable)
 {
     if (!prefixResult.tx_complete || prefixResult.stake_result != StakeValidationResult::OK) {

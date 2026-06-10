@@ -283,6 +283,16 @@ enum class StakeUpdateSignatureMessageSkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class StakeUpdateSignatureVerificationSkeletonResult {
+    STAKE_UPDATE_PREFIX_FAILED,
+    UPDATE_MESSAGE_CONSTRUCTION_UNIMPLEMENTED,
+    CANONICAL_UPDATE_SIGNATURE_ENCODING_UNIMPLEMENTED,
+    UPDATE_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED,
+    SIGNATURE_SCHEME_BINDING_UNIMPLEMENTED,
+    UPDATE_SIGNATURE_VERIFICATION_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 struct StakeUpdateVerificationBlockedSkeletonResult {
     StakeUpdateVerificationSkeletonResult prefix_result;
     StakeUpdateAuthorizationSkeletonResult authorization_result{StakeUpdateAuthorizationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED};
@@ -721,6 +731,11 @@ StakeUpdateVerificationSkeletonResult CheckStakeUpdateVerificationSkeleton(const
 // H("Helsing/update/v1" || stake_id || H(enc_context(m_new))). This blocker
 // has no accepting result and does not hash messages or verify sig_update.
 StakeUpdateSignatureMessageSkeletonResult CheckStakeUpdateSignatureMessageSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool encContextHashingAvailable, bool stakeIdBindingAvailable, bool updateMessageHashingAvailable);
+
+// Revised-spec StakeUpdateVerify step 6 requires real signature verification:
+// Verify(update_pk, update_message, sig_update). This blocker has no accepting
+// result and does not parse sig_update, validate update_pk, or verify signatures.
+StakeUpdateSignatureVerificationSkeletonResult CheckStakeUpdateSignatureVerificationSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updateMessageConstructionAvailable, bool canonicalSignatureEncodingAvailable, bool updatePublicKeyValidationAvailable, bool signatureSchemeBindingAvailable, bool updateSignatureVerificationAvailable);
 
 // Revised-spec StakeUpdateVerify steps 4-6 are deliberately blocked here. The
 // caller supplies implementation-availability flags, not consensus validation

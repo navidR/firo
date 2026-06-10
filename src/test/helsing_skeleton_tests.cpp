@@ -4307,6 +4307,57 @@ BOOST_AUTO_TEST_CASE(stake_update_signature_message_skeleton_has_no_accepting_or
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(stake_update_signature_verification_skeleton_checks_prefix_first)
+{
+    const helsing::StakeUpdateVerificationSkeletonResult incompletePrefix{false, helsing::StakeValidationResult::OK};
+    const helsing::StakeUpdateVerificationSkeletonResult blockedPrefix{true, helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK};
+
+    BOOST_CHECK(helsing::CheckStakeUpdateSignatureVerificationSkeleton(incompletePrefix, false, false, false, false, false) == helsing::StakeUpdateSignatureVerificationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED);
+    BOOST_CHECK(helsing::CheckStakeUpdateSignatureVerificationSkeleton(blockedPrefix, false, false, false, false, false) == helsing::StakeUpdateSignatureVerificationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_signature_verification_skeleton_orders_verification_blockers)
+{
+    const helsing::StakeUpdateVerificationSkeletonResult prefix{true, helsing::StakeValidationResult::OK};
+
+    BOOST_CHECK(helsing::CheckStakeUpdateSignatureVerificationSkeleton(prefix, false, false, false, false, false) == helsing::StakeUpdateSignatureVerificationSkeletonResult::UPDATE_MESSAGE_CONSTRUCTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateSignatureVerificationSkeleton(prefix, true, false, false, false, false) == helsing::StakeUpdateSignatureVerificationSkeletonResult::CANONICAL_UPDATE_SIGNATURE_ENCODING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateSignatureVerificationSkeleton(prefix, true, true, false, false, false) == helsing::StakeUpdateSignatureVerificationSkeletonResult::UPDATE_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateSignatureVerificationSkeleton(prefix, true, true, true, false, false) == helsing::StakeUpdateSignatureVerificationSkeletonResult::SIGNATURE_SCHEME_BINDING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateSignatureVerificationSkeleton(prefix, true, true, true, true, false) == helsing::StakeUpdateSignatureVerificationSkeletonResult::UPDATE_SIGNATURE_VERIFICATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateSignatureVerificationSkeleton(prefix, true, true, true, true, true) == helsing::StakeUpdateSignatureVerificationSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_signature_verification_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(60, DeterministicPoint(60));
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = record.stake_id;
+    tx.m_new.bytes = {0x6d, 0x3b};
+    tx.sig_update.bytes = {0x73, 0x3b};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::StakeUpdateVerificationSkeletonResult prefix = helsing::CheckStakeUpdateVerificationSkeleton(tx, view);
+    const helsing::StakeUpdateSignatureVerificationSkeletonResult result = helsing::CheckStakeUpdateSignatureVerificationSkeleton(prefix, true, true, true, true, true);
+
+    BOOST_CHECK(prefix.tx_complete);
+    BOOST_CHECK(prefix.stake_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result == helsing::StakeUpdateSignatureVerificationSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nLastUpdateHeight);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(stake_update_verification_blocked_skeleton_reports_authorization_after_prefix)
 {
     helsing::CHelsingState state;
