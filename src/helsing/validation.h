@@ -772,6 +772,10 @@ bool IsHelsingEligibleOutputCandidateSkeleton(const SparkOutputRecord& output, b
 // deployed consensus must analyze Spark spend paths, persist the marking, and
 // provide undo data before any output may be marked Helsing-eligible.
 HelsingEligibleOutputMarkingSkeletonResult CheckHelsingEligibleOutputMarkingSkeleton(const SparkOutputRecord& output, bool sparkSpendPathAnalysisAvailable, bool eligibilityPersistenceAvailable, bool eligibilityUndoAvailable);
+// Revised spec section 6 invariant only: ActiveTags contains exactly the tags
+// backing currently active records, with at most one active stake per tag. This
+// checks caller-supplied snapshots and does not read or mutate persistent state.
+bool IsActiveTagIndexConsistentSkeleton(const std::vector<StakeRecord>& records, const std::vector<std::pair<GroupElement, uint256>>& activeTags);
 // Marks caller-selected output records as Helsing-eligible after the section 13
 // candidate predicate passes. This is in-memory only and does not decide spend-path
 // policy, persist state, or provide undo data.

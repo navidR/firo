@@ -1163,6 +1163,52 @@ HelsingEligibleOutputMarkingSkeletonResult CheckHelsingEligibleOutputMarkingSkel
     return HelsingEligibleOutputMarkingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+bool IsActiveTagIndexConsistentSkeleton(const std::vector<StakeRecord>& records, const std::vector<std::pair<GroupElement, uint256>>& activeTags)
+{
+    std::map<uint256, StakeRecord> recordsByStakeId;
+    for (const StakeRecord& record : records) {
+        if (record.stake_id.IsNull() || !IsValidPublicPoint(record.T)) {
+            return false;
+        }
+        if (!recordsByStakeId.emplace(record.stake_id, record).second) {
+            return false;
+        }
+    }
+
+    std::unordered_map<GroupElement, uint256, spark::CLTagHash> activeStakeByTag;
+    for (const auto& activeTag : activeTags) {
+        const GroupElement& tag = activeTag.first;
+        const uint256& stake_id = activeTag.second;
+        if (!IsValidPublicPoint(tag) || stake_id.IsNull()) {
+            return false;
+        }
+        if (!activeStakeByTag.emplace(tag, stake_id).second) {
+            return false;
+        }
+        const auto recordIt = recordsByStakeId.find(stake_id);
+        if (recordIt == recordsByStakeId.end()) {
+            return false;
+        }
+        if (recordIt->second.status != StakeStatus::ACTIVE || recordIt->second.T != tag) {
+            return false;
+        }
+    }
+
+    for (const auto& recordEntry : recordsByStakeId) {
+        const StakeRecord& record = recordEntry.second;
+        const auto activeIt = activeStakeByTag.find(record.T);
+        if (record.status == StakeStatus::ACTIVE) {
+            if (activeIt == activeStakeByTag.end() || activeIt->second != record.stake_id) {
+                return false;
+            }
+        } else if (activeIt != activeStakeByTag.end()) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool MarkHelsingEligibleOutputCandidatesSkeleton(const std::vector<std::pair<OutputId, bool>>& candidates, std::map<OutputId, SparkOutputRecord>& outputs)
 {
     std::map<OutputId, SparkOutputRecord> next(outputs);

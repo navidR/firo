@@ -6350,6 +6350,47 @@ BOOST_AUTO_TEST_CASE(state_active_stake_lifecycle)
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(active_tag_index_consistency_skeleton_accepts_matching_snapshot)
+{
+    BOOST_CHECK(helsing::IsActiveTagIndexConsistentSkeleton({}, {}));
+
+    helsing::StakeRecord activeRecord = ActiveRecord(147, DeterministicPoint(94));
+    helsing::StakeRecord spentRecord = ActiveRecord(148, DeterministicPoint(95));
+    helsing::StakeRecord revokedRecord = ActiveRecord(149, DeterministicPoint(96));
+    spentRecord.status = helsing::StakeStatus::SPENT;
+    spentRecord.nSpentHeight = spentRecord.nHeight + 1;
+    revokedRecord.status = helsing::StakeStatus::REVOKED;
+
+    const std::vector<helsing::StakeRecord> records = {activeRecord, spentRecord, revokedRecord};
+    const std::vector<std::pair<GroupElement, uint256>> activeTags = {{activeRecord.T, activeRecord.stake_id}};
+
+    BOOST_CHECK(helsing::IsActiveTagIndexConsistentSkeleton(records, activeTags));
+}
+
+BOOST_AUTO_TEST_CASE(active_tag_index_consistency_skeleton_rejects_broken_indexes)
+{
+    helsing::StakeRecord activeRecord = ActiveRecord(150, DeterministicPoint(97));
+    helsing::StakeRecord secondActiveRecord = ActiveRecord(151, DeterministicPoint(98));
+    helsing::StakeRecord inactiveRecord = ActiveRecord(152, DeterministicPoint(99));
+    inactiveRecord.status = helsing::StakeStatus::SPENT;
+    inactiveRecord.nSpentHeight = inactiveRecord.nHeight + 1;
+
+    BOOST_CHECK(!helsing::IsActiveTagIndexConsistentSkeleton({activeRecord}, {{activeRecord.T, activeRecord.stake_id}, {activeRecord.T, activeRecord.stake_id}}));
+    BOOST_CHECK(!helsing::IsActiveTagIndexConsistentSkeleton({}, {{activeRecord.T, activeRecord.stake_id}}));
+    BOOST_CHECK(!helsing::IsActiveTagIndexConsistentSkeleton({inactiveRecord}, {{inactiveRecord.T, inactiveRecord.stake_id}}));
+    BOOST_CHECK(!helsing::IsActiveTagIndexConsistentSkeleton({activeRecord}, {}));
+    BOOST_CHECK(!helsing::IsActiveTagIndexConsistentSkeleton({activeRecord, secondActiveRecord}, {{activeRecord.T, secondActiveRecord.stake_id}, {secondActiveRecord.T, secondActiveRecord.stake_id}}));
+
+    helsing::StakeRecord duplicateTagRecord = ActiveRecord(153, activeRecord.T);
+    BOOST_CHECK(!helsing::IsActiveTagIndexConsistentSkeleton({activeRecord, duplicateTagRecord}, {{activeRecord.T, activeRecord.stake_id}}));
+
+    helsing::StakeRecord nullStakeIdRecord = ActiveRecord(154, DeterministicPoint(100));
+    nullStakeIdRecord.stake_id.SetNull();
+    BOOST_CHECK(!helsing::IsActiveTagIndexConsistentSkeleton({nullStakeIdRecord}, {}));
+
+    BOOST_CHECK(!helsing::IsActiveTagIndexConsistentSkeleton({activeRecord}, {{GroupElement(), activeRecord.stake_id}}));
+}
+
 BOOST_AUTO_TEST_CASE(state_add_active_normalizes_record_fields)
 {
     helsing::CHelsingState state;

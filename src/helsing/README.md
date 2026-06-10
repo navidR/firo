@@ -81,6 +81,7 @@ Current scope:
 - `CheckPayoutPublicFieldsSkeleton` composes caller-supplied payout public-field checks in revised spec `PayoutVerify` step 8, 9, 10, 11, and 13 order; it does not compute deterministic selection, `j`, or payout coins.
 - `IsHelsingStakeValueWithMarginInRangeSkeleton` checks the revised spec optional collateral-margin integer sum rule for caller-supplied `V_STAKE`, `margin`, and `V_MAX`.
 - `CHelsingState` models `SpentTags`, `ActiveTags`, and `StakeRecords`.
+- `IsActiveTagIndexConsistentSkeleton` checks the revised spec section 6 invariant that `ActiveTags` contains exactly the tags backing active `StakeRecords`, with at most one active stake per tag, over caller-supplied snapshots only.
 - `BuildBlockSpentTagsSkeleton` models the revised spec block pre-pass minimum rule for duplicate Spark spend tags and tags already in `SpentTags`; it assumes ordinary Spark spend validation supplied valid revealed tags.
 - `CheckCoverSetOutputsSkeleton` performs revised spec cover-set output checks for caller-supplied public parameters: `N = n^m`, sorted distinct output identifiers, output lookup, output record consistency, and `helsing_eligible`.
 - `CheckStakeSkeleton` performs structural checks only: sorted distinct `InCoinIDs`, non-infinity public group elements, non-empty proof blobs, tag conflicts, output existence, output record consistency, and `helsing_eligible`.
