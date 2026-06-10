@@ -4937,6 +4937,45 @@ BOOST_AUTO_TEST_CASE(stake_update_context_mutation_policy_skeleton_does_not_appl
     BOOST_CHECK(!state.IsSpentTag(record.T));
 }
 
+BOOST_AUTO_TEST_CASE(stake_update_identity_skeleton_accepts_same_stake_and_tag_snapshots)
+{
+    const helsing::StakeRecord before = ActiveRecord(245, DeterministicPoint(245));
+    helsing::StakeRecord after = before;
+    after.m.bytes = {0x6d, 0x5f, 0x6e, 0x65, 0x77};
+    after.nLastUpdateHeight = before.nLastUpdateHeight + 1;
+
+    BOOST_CHECK(helsing::DoesStakeUpdatePreserveStakeIdentitySkeleton(before, after));
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_identity_skeleton_rejects_changed_or_malformed_identity)
+{
+    const helsing::StakeRecord before = ActiveRecord(246, DeterministicPoint(246));
+
+    helsing::StakeRecord changedStakeId = before;
+    changedStakeId.stake_id = DeterministicHash(247);
+    BOOST_CHECK(!helsing::DoesStakeUpdatePreserveStakeIdentitySkeleton(before, changedStakeId));
+
+    helsing::StakeRecord changedTag = before;
+    changedTag.T = DeterministicPoint(248);
+    BOOST_CHECK(!helsing::DoesStakeUpdatePreserveStakeIdentitySkeleton(before, changedTag));
+
+    helsing::StakeRecord nullBeforeStakeId = before;
+    nullBeforeStakeId.stake_id.SetNull();
+    BOOST_CHECK(!helsing::DoesStakeUpdatePreserveStakeIdentitySkeleton(nullBeforeStakeId, before));
+
+    helsing::StakeRecord nullAfterStakeId = before;
+    nullAfterStakeId.stake_id.SetNull();
+    BOOST_CHECK(!helsing::DoesStakeUpdatePreserveStakeIdentitySkeleton(before, nullAfterStakeId));
+
+    helsing::StakeRecord invalidBeforeTag = before;
+    invalidBeforeTag.T = GroupElement();
+    BOOST_CHECK(!helsing::DoesStakeUpdatePreserveStakeIdentitySkeleton(invalidBeforeTag, before));
+
+    helsing::StakeRecord invalidAfterTag = before;
+    invalidAfterTag.T = NonMemberPoint();
+    BOOST_CHECK(!helsing::DoesStakeUpdatePreserveStakeIdentitySkeleton(before, invalidAfterTag));
+}
+
 BOOST_AUTO_TEST_CASE(stake_update_eligibility_accepts_active_stake)
 {
     helsing::CHelsingState state;

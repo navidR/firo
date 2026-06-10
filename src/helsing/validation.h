@@ -893,6 +893,10 @@ StakeUpdateSameBlockPolicySkeletonResult CheckStakeUpdateSameBlockPolicySkeleton
 // to implementation policy. This blocker has no accepting result and does not
 // parse contexts or apply updates.
 StakeUpdateContextMutationPolicySkeletonResult CheckStakeUpdateContextMutationPolicySkeleton(bool stakeUpdateVerifyAccepted, bool contextDiffExtractionAvailable, bool stakeIdTagInvariantAvailable, bool allowedContextFieldPolicyAvailable);
+// Revised-spec section 14 invariant only: an accepted StakeUpdate MUST NOT
+// change stake_id or tag T. This checks caller-supplied record snapshots and
+// does not decide effective height, allowed context fields, or status lifecycle.
+bool DoesStakeUpdatePreserveStakeIdentitySkeleton(const StakeRecord& before, const StakeRecord& after);
 
 // Block-level skeleton for revised-spec ValidateBlock step 4 and StakeUpdateVerify steps 1-3 only.
 // This deliberately stops before context parsing, signature verification, effective-height rules,

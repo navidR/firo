@@ -1813,6 +1813,16 @@ StakeUpdateContextMutationPolicySkeletonResult CheckStakeUpdateContextMutationPo
     return StakeUpdateContextMutationPolicySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+bool DoesStakeUpdatePreserveStakeIdentitySkeleton(const StakeRecord& before, const StakeRecord& after)
+{
+    return !before.stake_id.IsNull() &&
+           !after.stake_id.IsNull() &&
+           IsValidPublicPoint(before.T) &&
+           IsValidPublicPoint(after.T) &&
+           before.stake_id == after.stake_id &&
+           before.T == after.T;
+}
+
 StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view)
 {
     for (const StakeUpdateTx& tx : update_txs) {
