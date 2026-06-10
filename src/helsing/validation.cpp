@@ -1008,4 +1008,24 @@ BlockValidationPrefixWithSpentTagsSkeletonResult CheckBlockValidationPrefixWithS
     return result;
 }
 
+BlockValidationBlockedSkeletonResult CheckBlockValidationBlockedSkeleton(
+    const std::vector<GroupElement>& sparkSpendTags,
+    const std::vector<StakeTx>& stake_txs,
+    const std::vector<StakeUpdateTx>& update_txs,
+    const std::vector<PayoutTxSkeleton>& payout_txs,
+    const ValidationStateView& parentView,
+    int currentHeight,
+    int stakeMaturity)
+{
+    BlockValidationBlockedSkeletonResult result;
+    result.prefix_result = CheckBlockValidationPrefixWithSpentTagsSkeleton(sparkSpendTags, stake_txs, update_txs, payout_txs, parentView, currentHeight, stakeMaturity);
+    if (result.prefix_result.block_spent_result != StakeValidationResult::OK ||
+        result.prefix_result.validation_result != StakeValidationResult::OK) {
+        return result;
+    }
+
+    result.suffix_result = BlockValidationSuffixSkeletonResult::FULL_TRANSACTION_VERIFICATION_UNIMPLEMENTED;
+    return result;
+}
+
 } // namespace helsing

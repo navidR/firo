@@ -67,6 +67,7 @@ Current scope:
 - `CheckStakeUpdateBlockSkeleton` performs revised spec `ValidateBlock` step 4 and `StakeUpdateVerify` steps 1-3 only for a caller-supplied update set; it deliberately stops before context parsing, signature verification, effective-height rules, and same-block duplicate-update policy.
 - `CheckBlockValidationPrefixSkeleton` composes the existing stake, stake-update, and payout skeleton prefix checks in revised spec `ValidateBlock` steps 3-5 order; the caller must supply already collected `BlockSpentTags`.
 - `CheckBlockValidationPrefixWithSpentTagsSkeleton` composes revised spec `ValidateBlock` steps 2-5 without mutation: it builds `BlockSpentTags` from caller-supplied valid Spark-spend tags, copies them into a validation view, then runs the existing stake/update/payout prefix checks.
+- `CheckBlockValidationBlockedSkeleton` composes the revised spec `ValidateBlock` section 12 prefix and then stops with an explicit full-transaction-verification blocker; it has no block-acceptance result and does not apply state.
 - `ApplyAcceptedStakesSkeleton` applies already accepted new stakes to in-memory `ActiveTags` and `StakeRecords`; it takes caller-supplied `stake_id` values because canonical stake-id hashing is not implemented.
 - `ApplyAcceptedStakeUpdateSkeleton` applies an already accepted update to `StakeRecords` by changing only `m` and `last_update_height`; it does not validate contexts or signatures.
 - `ApplyAcceptedStakeUpdatesSkeleton` applies already accepted stake updates as an all-or-nothing batch; duplicate updates for the same `stake_id` are rejected by the unwired skeleton because the revised spec does not define same-block duplicate-update ordering.
@@ -90,6 +91,7 @@ Not implemented yet:
 - persistent block undo data for Helsing state mutations
 - consensus block-level duplicate new stake tag integration
 - consensus wiring for applying accepted new stakes during deterministic block application
+- any full block-acceptance path before real `StakeVerify`, `StakeUpdateVerify`, and `PayoutVerify` exist
 - full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, payout address parsing, deterministic Spark payout coin construction, and payout coin comparison
 - payout-output extraction from accepted payout transactions after `PayoutVerify`
 - deterministic payout ordinal selection and payout identifier `j` construction

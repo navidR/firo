@@ -151,6 +151,16 @@ struct BlockValidationPrefixWithSpentTagsSkeletonResult {
     StakeValidationResult validation_result{StakeValidationResult::OK};
 };
 
+enum class BlockValidationSuffixSkeletonResult {
+    BLOCK_VALIDATION_PREFIX_FAILED,
+    FULL_TRANSACTION_VERIFICATION_UNIMPLEMENTED,
+};
+
+struct BlockValidationBlockedSkeletonResult {
+    BlockValidationPrefixWithSpentTagsSkeletonResult prefix_result;
+    BlockValidationSuffixSkeletonResult suffix_result{BlockValidationSuffixSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED};
+};
+
 enum class StakeIdConstructionSkeletonResult {
     STAKE_VERIFY_NOT_ACCEPTED,
     CANONICAL_TX_ENCODING_UNIMPLEMENTED,
@@ -359,6 +369,9 @@ StakeValidationResult CheckBlockValidationPrefixSkeleton(const std::vector<Stake
 // tags revealed by already valid Spark spends; this builds BlockSpentTags in a copied
 // view, then runs the existing non-mutating stake/update/payout prefix checks.
 BlockValidationPrefixWithSpentTagsSkeletonResult CheckBlockValidationPrefixWithSpentTagsSkeleton(const std::vector<GroupElement>& sparkSpendTags, const std::vector<StakeTx>& stake_txs, const std::vector<StakeUpdateTx>& update_txs, const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& parentView, int currentHeight, int stakeMaturity);
+// Full block validation remains deliberately blocked after the section 12 prefix:
+// real StakeVerify, StakeUpdateVerify, PayoutVerify, persistence, and undo data are required.
+BlockValidationBlockedSkeletonResult CheckBlockValidationBlockedSkeleton(const std::vector<GroupElement>& sparkSpendTags, const std::vector<StakeTx>& stake_txs, const std::vector<StakeUpdateTx>& update_txs, const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& parentView, int currentHeight, int stakeMaturity);
 
 } // namespace helsing
 
