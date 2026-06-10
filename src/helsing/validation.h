@@ -17,6 +17,7 @@ namespace helsing {
 
 enum class StakeValidationResult {
     OK,
+    TX_INCOMPLETE,
     EMPTY_INCOINIDS,
     INVALID_COVER_SET_CARDINALITY,
     INCOINIDS_NOT_SORTED_DISTINCT,

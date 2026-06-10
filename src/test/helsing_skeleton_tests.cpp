@@ -5303,6 +5303,32 @@ BOOST_AUTO_TEST_CASE(stake_update_block_skeleton_rejects_missing_state_or_record
     BOOST_CHECK(helsing::CheckStakeUpdateBlockSkeleton({update}, view) == helsing::StakeValidationResult::STAKE_RECORD_NOT_FOUND);
 }
 
+BOOST_AUTO_TEST_CASE(stake_update_block_skeleton_rejects_incomplete_updates_before_eligibility)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(159, DeterministicPoint(159));
+    BOOST_CHECK(state.AddActiveStake(record));
+    view.blockSpentTags.insert(record.T);
+
+    helsing::StakeUpdateTx missingStakeId;
+    missingStakeId.m_new.bytes = {0x6d};
+    missingStakeId.sig_update.bytes = {0x73};
+
+    helsing::StakeUpdateTx missingContext;
+    missingContext.stake_id = record.stake_id;
+    missingContext.sig_update.bytes = {0x73};
+
+    helsing::StakeUpdateTx missingSignature;
+    missingSignature.stake_id = record.stake_id;
+    missingSignature.m_new.bytes = {0x6d};
+
+    BOOST_CHECK(helsing::CheckStakeUpdateBlockSkeleton({missingStakeId}, view) == helsing::StakeValidationResult::TX_INCOMPLETE);
+    BOOST_CHECK(helsing::CheckStakeUpdateBlockSkeleton({missingContext}, view) == helsing::StakeValidationResult::TX_INCOMPLETE);
+    BOOST_CHECK(helsing::CheckStakeUpdateBlockSkeleton({missingSignature}, view) == helsing::StakeValidationResult::TX_INCOMPLETE);
+}
+
 BOOST_AUTO_TEST_CASE(stake_update_block_skeleton_checks_spec_prefix_before_unimplemented_fields)
 {
     helsing::CHelsingState state;
@@ -5311,6 +5337,8 @@ BOOST_AUTO_TEST_CASE(stake_update_block_skeleton_checks_spec_prefix_before_unimp
     const helsing::StakeRecord record = ActiveRecord(156, DeterministicPoint(156));
     helsing::StakeUpdateTx update;
     update.stake_id = record.stake_id;
+    update.m_new.bytes = {0x6d};
+    update.sig_update.bytes = {0x73};
 
     BOOST_CHECK(state.AddActiveStake(record));
     view.blockSpentTags.insert(record.T);
@@ -5331,6 +5359,8 @@ BOOST_AUTO_TEST_CASE(stake_update_block_skeleton_preserves_single_update_precede
     const helsing::StakeRecord record = ActiveRecord(157, DeterministicPoint(157));
     helsing::StakeUpdateTx update;
     update.stake_id = record.stake_id;
+    update.m_new.bytes = {0x6d};
+    update.sig_update.bytes = {0x73};
 
     BOOST_CHECK(state.AddActiveStake(record));
     BOOST_CHECK(state.AddSpentTag(record.T, record.nHeight + 1));
@@ -5396,6 +5426,8 @@ BOOST_AUTO_TEST_CASE(block_validation_prefix_skeleton_checks_updates_before_payo
     helsing::StakeUpdateTx update;
     helsing::PayoutTxSkeleton payout;
     update.stake_id = updateRecord.stake_id;
+    update.m_new.bytes = {0x75, 0x70, 0x64};
+    update.sig_update.bytes = {0x73, 0x69, 0x67};
     payout.selected_stake_id = DeterministicHash(176);
 
     BOOST_CHECK(state.AddActiveStake(updateRecord));
@@ -5413,6 +5445,8 @@ BOOST_AUTO_TEST_CASE(block_validation_prefix_skeleton_reports_payout_after_prior
     helsing::StakeUpdateTx update;
     helsing::PayoutTxSkeleton payout;
     update.stake_id = updateRecord.stake_id;
+    update.m_new.bytes = {0x75, 0x70, 0x64};
+    update.sig_update.bytes = {0x73, 0x69, 0x67};
     payout.selected_stake_id = DeterministicHash(178);
 
     BOOST_CHECK(state.AddActiveStake(updateRecord));
@@ -7487,6 +7521,7 @@ BOOST_AUTO_TEST_CASE(validation_state_view_lookup_helpers)
 BOOST_AUTO_TEST_CASE(validation_result_strings_cover_all_values)
 {
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::OK), "OK");
+    BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::TX_INCOMPLETE), "TX_INCOMPLETE");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::EMPTY_INCOINIDS), "EMPTY_INCOINIDS");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::INVALID_COVER_SET_CARDINALITY), "INVALID_COVER_SET_CARDINALITY");
     BOOST_CHECK_EQUAL(helsing::StakeValidationResultToString(helsing::StakeValidationResult::INCOINIDS_NOT_SORTED_DISTINCT), "INCOINIDS_NOT_SORTED_DISTINCT");

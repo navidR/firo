@@ -19,6 +19,8 @@ const char* StakeValidationResultToString(StakeValidationResult result)
     switch (result) {
     case StakeValidationResult::OK:
         return "OK";
+    case StakeValidationResult::TX_INCOMPLETE:
+        return "TX_INCOMPLETE";
     case StakeValidationResult::EMPTY_INCOINIDS:
         return "EMPTY_INCOINIDS";
     case StakeValidationResult::INVALID_COVER_SET_CARDINALITY:
@@ -1889,6 +1891,10 @@ bool DoesStakeUpdatePreserveStakeIdentitySkeleton(const StakeRecord& before, con
 StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view)
 {
     for (const StakeUpdateTx& tx : update_txs) {
+        if (!IsCompleteStakeUpdateTxSkeleton(tx)) {
+            return StakeValidationResult::TX_INCOMPLETE;
+        }
+
         const StakeValidationResult result = CheckStakeUpdateEligibilitySkeleton(tx.stake_id, view);
         if (result != StakeValidationResult::OK) {
             return result;
