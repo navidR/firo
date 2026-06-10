@@ -37,10 +37,11 @@ Current scope:
 - `CheckStakeCoverSetIdentifiersSkeleton` checks revised spec `StakeVerify` step 6 only: `len(InCoinIDs) = N = n^m` and strictly sorted distinct output identifiers. It deliberately stops before output lookup, output eligibility, Spark maturity, statement hashes, and proof verification.
 - `CheckStakeVerificationCoverSetSkeleton` composes revised spec `StakeVerify` steps 1-6 only using caller-supplied canonical/context facts and public cover-set parameters. It deliberately stops before output lookup, output eligibility, Spark maturity, statement hashes, and proof verification.
 - `CheckStakeCoverSetOutputRulesSkeleton` checks revised spec `StakeVerify` step 7 explicit predicates only: each `output_id` exists in `SparkOutputs`, `helsing_eligible` is true, and caller-supplied Spark maturity/cover-set rules pass. It assumes `SparkOutputs` records already came from ordinary Spark consensus validation and does not define those Spark rules.
+- `CheckStakeCoverSetSparkRulesBlockedSkeleton` is an explicit blocker for revised spec `StakeVerify` step 7 real Spark maturity and cover-set rules. It preserves per-output lookup and `helsing_eligible` precedence, then stops before accepting caller-supplied Spark-rule facts as consensus.
 - `CheckStakeVerificationOutputsSkeleton` composes revised spec `StakeVerify` steps 1-7 only using caller-supplied canonical/context/Spark facts. It deliberately stops before `incoins_root`, `context_hash`, `stake_stmt`, `ParVerify`, `RepVerify`, and `TagVerify`.
 - `CheckStakeStatementConstructionSkeleton` is an explicit blocker for revised spec section 5.2 and `StakeVerify` step 8 statement construction. It preserves step-1-through-7 prefix failures, then blocks `incoins_root`, `context_hash`, and `stake_stmt` construction in spec order.
 - `CheckStakeProofVerificationSkeleton` is an explicit blocker for revised spec `StakeVerify` steps 9-11. It preserves earlier prefix failures, requires a caller-supplied available `stake_stmt`, then blocks `ParVerify`, `RepVerify`, and `TagVerify` in spec order; it has no acceptance result.
-- `CheckStakeVerificationBlockedSkeleton` composes revised spec `StakeVerify` steps 1-11 without an accepting path: it runs the step-1-through-7 output checks, then the statement-construction and proof-verification blockers.
+- `CheckStakeVerificationBlockedSkeleton` composes revised spec `StakeVerify` without an accepting path: it runs the step-1-through-6 prefix and stops at the real step-7 Spark maturity/cover-set blocker before statement construction or proof verification.
 - `CheckStakeIdConstructionSkeleton` is an explicit blocker for post-acceptance `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction. It does not hash caller-supplied bytes or return a stake ID.
 - `IsExpectedPayoutAmountInRangeSkeleton` checks the revised spec `PayoutVerify` step 10 equality and integer range for caller-supplied values.
 - `IsPayoutValueParameterInRangeSkeleton` checks revised spec `PayoutVerify` step 10 for caller-supplied `V_PAYOUT`, expected amount, `V_MAX`, and `V_MAX < q`; it does not expose the scalar order, perform scalar conversion, or recompute payout amounts.
@@ -85,7 +86,7 @@ Not implemented yet:
 - canonical `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction
 - final `StakeVerify` steps 8-12 after statement hashes and proof verification are implemented
 - replacing caller-supplied Spark maturity/cover-set facts with concrete Spark consensus checks without changing the step-1-through-7 helper into a full verifier
-- Spark maturity and cover-set eligibility rules using current height and consensus maturity parameters
+- Spark maturity and cover-set eligibility rules using current height, Spark ledger state, and consensus maturity/eligibility parameters
 - wiring value-domain checks for `V_STAKE`, `V_PAYOUT`, `V_MAX < q`, scalar conversion bounds, and ordinary fees outside the collateral proof
 - any decision to reintroduce an optional collateral margin as a consensus policy
 - deriving the expected payout amount from consensus reward rules

@@ -799,6 +799,43 @@ BOOST_AUTO_TEST_CASE(stake_cover_set_output_rules_skeleton_preserves_step_seven_
     BOOST_CHECK(helsing::CheckStakeCoverSetOutputRulesSkeleton(inCoinIDs, view, sparkRules) == helsing::StakeValidationResult::OUTPUT_SPARK_RULES_FAILED);
 }
 
+BOOST_AUTO_TEST_CASE(stake_cover_set_spark_rules_blocker_preserves_current_output_precedence)
+{
+    const std::vector<helsing::OutputId> inCoinIDs = {Output(1, 0), Output(1, 1), Output(2, 0), Output(3, 0)};
+    helsing::ValidationStateView view;
+
+    helsing::StakeCoverSetSparkRulesBlockedSkeletonResult result = helsing::CheckStakeCoverSetSparkRulesBlockedSkeleton(inCoinIDs, view);
+    BOOST_CHECK(result.output_result == helsing::StakeValidationResult::OUTPUT_NOT_FOUND);
+    BOOST_CHECK(result.spark_rules_result == helsing::StakeCoverSetSparkRulesSkeletonResult::STAKE_OUTPUT_PREFIX_FAILED);
+
+    view.sparkOutputs.emplace(inCoinIDs[0], EligibleOutput(inCoinIDs[0], 95));
+    view.sparkOutputs[inCoinIDs[0]].helsing_eligible = false;
+    result = helsing::CheckStakeCoverSetSparkRulesBlockedSkeleton(inCoinIDs, view);
+    BOOST_CHECK(result.output_result == helsing::StakeValidationResult::OUTPUT_NOT_ELIGIBLE);
+    BOOST_CHECK(result.spark_rules_result == helsing::StakeCoverSetSparkRulesSkeletonResult::STAKE_OUTPUT_PREFIX_FAILED);
+
+    view.sparkOutputs[inCoinIDs[0]].helsing_eligible = true;
+    result = helsing::CheckStakeCoverSetSparkRulesBlockedSkeleton(inCoinIDs, view);
+    BOOST_CHECK(result.output_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.spark_rules_result == helsing::StakeCoverSetSparkRulesSkeletonResult::SPARK_MATURITY_OR_COVER_SET_RULES_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_cover_set_spark_rules_blocker_has_no_accepting_path)
+{
+    const std::vector<helsing::OutputId> inCoinIDs = {Output(1, 0), Output(1, 1), Output(2, 0), Output(3, 0)};
+    helsing::ValidationStateView view;
+
+    unsigned char pointTag = 96;
+    for (const helsing::OutputId& output_id : inCoinIDs) {
+        view.sparkOutputs.emplace(output_id, EligibleOutput(output_id, pointTag));
+        pointTag += 3;
+    }
+
+    const helsing::StakeCoverSetSparkRulesBlockedSkeletonResult result = helsing::CheckStakeCoverSetSparkRulesBlockedSkeleton(inCoinIDs, view);
+    BOOST_CHECK(result.output_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.spark_rules_result == helsing::StakeCoverSetSparkRulesSkeletonResult::SPARK_MATURITY_OR_COVER_SET_RULES_UNIMPLEMENTED);
+}
+
 BOOST_AUTO_TEST_CASE(stake_verification_outputs_skeleton_accepts_steps_one_through_seven)
 {
     helsing::StakeTx tx = ValidStakeTx();
@@ -808,7 +845,7 @@ BOOST_AUTO_TEST_CASE(stake_verification_outputs_skeleton_accepts_steps_one_throu
     helsing::ValidationStateView view;
     std::map<helsing::OutputId, bool> sparkRules;
 
-    unsigned char pointTag = 96;
+    unsigned char pointTag = 97;
     for (const helsing::OutputId& output_id : tx.inCoinIDs) {
         view.sparkOutputs.emplace(output_id, EligibleOutput(output_id, pointTag));
         sparkRules.emplace(output_id, true);
@@ -1055,7 +1092,7 @@ BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_does_not_fake_proof_accep
     BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, true) == helsing::StakeProofVerificationSkeletonResult::TAG_VERIFY_UNIMPLEMENTED);
 }
 
-BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_reports_statement_blocker_after_outputs)
+BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_reports_spark_rule_blocker_after_cover_set_prefix)
 {
     helsing::StakeTx tx = ValidStakeTx();
     tx.inCoinIDs = {Output(1, 0), Output(1, 1), Output(2, 0), Output(3, 0)};
@@ -1078,8 +1115,36 @@ BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_reports_statement_block
     BOOST_CHECK(result.output_result.cover_set_result.context_result.context_valid);
     BOOST_CHECK(result.output_result.cover_set_result.cover_set_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.output_result.output_result == helsing::StakeValidationResult::OK);
-    BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::INCOINS_ROOT_HASHING_UNIMPLEMENTED);
-    BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_STATEMENT_UNAVAILABLE);
+    BOOST_CHECK(result.spark_rules_result.output_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.spark_rules_result.spark_rules_result == helsing::StakeCoverSetSparkRulesSkeletonResult::SPARK_MATURITY_OR_COVER_SET_RULES_UNIMPLEMENTED);
+    BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::STAKE_PREFIX_FAILED);
+    BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_does_not_trust_caller_spark_rule_facts)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {Output(1, 0), Output(1, 1), Output(2, 0), Output(3, 0)};
+
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    std::map<helsing::OutputId, bool> sparkRules;
+
+    unsigned char pointTag = 118;
+    for (const helsing::OutputId& output_id : tx.inCoinIDs) {
+        view.sparkOutputs.emplace(output_id, EligibleOutput(output_id, pointTag));
+        sparkRules.emplace(output_id, false);
+        pointTag += 3;
+    }
+
+    const helsing::StakeVerificationBlockedSkeletonResult result = helsing::CheckStakeVerificationBlockedSkeleton(tx, state, view, 0, 1, true, true, true, true, true, true, 2, 2, sparkRules);
+
+    BOOST_CHECK(result.output_result.cover_set_result.cover_set_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.output_result.output_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.spark_rules_result.output_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.spark_rules_result.spark_rules_result == helsing::StakeCoverSetSparkRulesSkeletonResult::SPARK_MATURITY_OR_COVER_SET_RULES_UNIMPLEMENTED);
+    BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::STAKE_PREFIX_FAILED);
+    BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
 }
 
 BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_checks_prefix_before_proofs)
@@ -1096,6 +1161,7 @@ BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_checks_prefix_before_pr
     BOOST_CHECK(result.output_result.cover_set_result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::TX_INCOMPLETE);
     BOOST_CHECK(result.output_result.cover_set_result.context_result.tag_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.output_result.output_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.spark_rules_result.spark_rules_result == helsing::StakeCoverSetSparkRulesSkeletonResult::STAKE_OUTPUT_PREFIX_FAILED);
     BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::STAKE_PREFIX_FAILED);
     BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
 }
@@ -1115,13 +1181,15 @@ BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_checks_output_rules_bef
         sparkRules.emplace(output_id, true);
         pointTag += 3;
     }
-    view.sparkOutputs.erase(tx.inCoinIDs[2]);
+    view.sparkOutputs.erase(tx.inCoinIDs[0]);
 
     const helsing::StakeVerificationBlockedSkeletonResult result = helsing::CheckStakeVerificationBlockedSkeleton(tx, state, view, 0, 1, true, true, true, true, true, true, 2, 2, sparkRules);
 
     BOOST_CHECK(result.output_result.cover_set_result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
     BOOST_CHECK(result.output_result.cover_set_result.cover_set_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.output_result.output_result == helsing::StakeValidationResult::OUTPUT_NOT_FOUND);
+    BOOST_CHECK(result.spark_rules_result.output_result == helsing::StakeValidationResult::OUTPUT_NOT_FOUND);
+    BOOST_CHECK(result.spark_rules_result.spark_rules_result == helsing::StakeCoverSetSparkRulesSkeletonResult::STAKE_OUTPUT_PREFIX_FAILED);
     BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::STAKE_PREFIX_FAILED);
     BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
 }
@@ -1144,8 +1212,10 @@ BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_does_not_mutate_state)
 
     const helsing::StakeVerificationBlockedSkeletonResult result = helsing::CheckStakeVerificationBlockedSkeleton(tx, state, view, 0, 1, true, true, true, true, true, true, 2, 2, sparkRules);
 
-    BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::INCOINS_ROOT_HASHING_UNIMPLEMENTED);
-    BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_STATEMENT_UNAVAILABLE);
+    BOOST_CHECK(result.spark_rules_result.output_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.spark_rules_result.spark_rules_result == helsing::StakeCoverSetSparkRulesSkeletonResult::SPARK_MATURITY_OR_COVER_SET_RULES_UNIMPLEMENTED);
+    BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::STAKE_PREFIX_FAILED);
+    BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
     BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 0U);
     BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 0U);
     BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);

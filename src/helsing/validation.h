@@ -152,6 +152,16 @@ struct StakeVerificationOutputSkeletonResult {
     StakeValidationResult output_result{StakeValidationResult::OK};
 };
 
+enum class StakeCoverSetSparkRulesSkeletonResult {
+    STAKE_OUTPUT_PREFIX_FAILED,
+    SPARK_MATURITY_OR_COVER_SET_RULES_UNIMPLEMENTED,
+};
+
+struct StakeCoverSetSparkRulesBlockedSkeletonResult {
+    StakeValidationResult output_result{StakeValidationResult::OK};
+    StakeCoverSetSparkRulesSkeletonResult spark_rules_result{StakeCoverSetSparkRulesSkeletonResult::STAKE_OUTPUT_PREFIX_FAILED};
+};
+
 enum class StakeProofVerificationSkeletonResult {
     STAKE_PREFIX_FAILED,
     STAKE_STATEMENT_UNAVAILABLE,
@@ -169,6 +179,7 @@ enum class StakeStatementConstructionSkeletonResult {
 
 struct StakeVerificationBlockedSkeletonResult {
     StakeVerificationOutputSkeletonResult output_result;
+    StakeCoverSetSparkRulesBlockedSkeletonResult spark_rules_result;
     StakeStatementConstructionSkeletonResult statement_result{StakeStatementConstructionSkeletonResult::STAKE_PREFIX_FAILED};
     StakeProofVerificationSkeletonResult proof_result{StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED};
 };
@@ -303,6 +314,10 @@ StakeVerificationCoverSetSkeletonResult CheckStakeVerificationCoverSetSkeleton(c
 // Revised spec StakeVerify step 7 explicit predicates only: output lookup,
 // helsing_eligible, and caller-supplied Spark maturity/cover-set rule status.
 StakeValidationResult CheckStakeCoverSetOutputRulesSkeleton(const std::vector<OutputId>& inCoinIDs, const ValidationStateView& view, const std::map<OutputId, bool>& outputSatisfiesSparkRules);
+// Revised spec StakeVerify step 7 real Spark maturity/cover-set rules are
+// deliberately blocked here. This preserves output lookup and helsing_eligible
+// precedence, but it does not accept caller-supplied Spark-rule facts.
+StakeCoverSetSparkRulesBlockedSkeletonResult CheckStakeCoverSetSparkRulesBlockedSkeleton(const std::vector<OutputId>& inCoinIDs, const ValidationStateView& view);
 // Revised spec StakeVerify steps 1-7 only. This composes caller-supplied
 // context/Spark facts and stops before statement hashes and proof verification.
 StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& outputSatisfiesSparkRules);
@@ -316,7 +331,7 @@ StakeStatementConstructionSkeletonResult CheckStakeStatementConstructionSkeleton
 // availability flags, not proof-verification results.
 StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool stakeStatementAvailable, bool parVerifierAvailable, bool repVerifierAvailable);
 // Revised spec StakeVerify steps 1-11 composition with no accepting result. This
-// runs the step-1-through-7 output checks, then the statement and proof blockers.
+// runs the step-1-through-6 prefix and stops at the real step-7 Spark-rule blocker.
 StakeVerificationBlockedSkeletonResult CheckStakeVerificationBlockedSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& outputSatisfiesSparkRules);
 // Revised spec post-acceptance stake_id construction is deliberately unimplemented:
 // canonical(tx) and the consensus hash domain must be defined before deriving stake_id.
