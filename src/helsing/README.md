@@ -52,6 +52,7 @@ Current scope:
 - `CheckStakeVerificationOutputsSkeleton` composes revised spec `StakeVerify` steps 1-7 only using caller-supplied canonical/context/Spark facts. It deliberately stops before `incoins_root`, `context_hash`, `stake_stmt`, `ParVerify`, `RepVerify`, and `TagVerify`.
 - `CheckStakeStatementConstructionSkeleton` is an explicit blocker for revised spec section 5.2 and `StakeVerify` step 8 statement construction. It preserves step-1-through-7 prefix failures, then blocks `incoins_root`, `context_hash`, and `stake_stmt` construction in spec order.
 - `CheckStakeProofVerificationSkeleton` is an explicit blocker for revised spec `StakeVerify` steps 9-11. It preserves earlier prefix failures, requires a caller-supplied available `stake_stmt`, then blocks `ParVerify`, `RepVerify`, and `TagVerify` in spec order; it has no acceptance result.
+- `CheckStakeProofTranscriptBindingSkeleton` is an explicit blocker for revised spec section 5.2 proof transcript binding. It requires an available `stake_stmt`, then blocks before proving that `ParVerify`, `RepVerify`, and `TagVerify` each bind the full staking statement; it has no accepting result and does not build transcripts.
 - `CheckStakeVerificationBlockedSkeleton` composes revised spec `StakeVerify` without an accepting path: it runs the step-1-through-6 prefix and stops at the real step-7 Spark maturity/cover-set blocker before statement construction or proof verification.
 - `CheckStakeIdConstructionSkeleton` is an explicit blocker for post-acceptance `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction. It does not hash caller-supplied bytes or return a stake ID.
 - `IsExpectedPayoutAmountInRangeSkeleton` checks the revised spec `PayoutVerify` step 10 equality and integer range for caller-supplied values.
@@ -99,6 +100,7 @@ Not implemented yet:
 
 - canonical `stake_stmt`, `incoins_root`, context hashing, and any accepting `StakeVerify` proof path
 - global canonical encoding grammar, hash-to-field method, domain strings, proof transcript labels, and transcript consensus wiring
+- proof transcripts that bind the full `stake_stmt` for `ParVerify`, `RepVerify`, and `TagVerify`
 - canonical `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction
 - final `StakeVerify` steps 8-12 after statement hashes and proof verification are implemented
 - replacing caller-supplied Spark maturity/cover-set facts with concrete Spark consensus checks without changing the step-1-through-7 helper into a full verifier

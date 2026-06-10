@@ -279,6 +279,14 @@ enum class StakeProofVerificationSkeletonResult {
     TAG_VERIFY_UNIMPLEMENTED,
 };
 
+enum class StakeProofTranscriptBindingSkeletonResult {
+    STAKE_STATEMENT_UNAVAILABLE,
+    PAR_TRANSCRIPT_STAKE_STATEMENT_BINDING_UNIMPLEMENTED,
+    REP_TRANSCRIPT_STAKE_STATEMENT_BINDING_UNIMPLEMENTED,
+    TAG_TRANSCRIPT_STAKE_STATEMENT_BINDING_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class StakeStatementConstructionSkeletonResult {
     STAKE_PREFIX_FAILED,
     INCOINS_ROOT_HASHING_UNIMPLEMENTED,
@@ -501,6 +509,11 @@ StakeStatementConstructionSkeletonResult CheckStakeStatementConstructionSkeleton
 // acceptance path may exist. The caller-supplied booleans are implementation
 // availability flags, not proof-verification results.
 StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool stakeStatementAvailable, bool parVerifierAvailable, bool repVerifierAvailable);
+// Revised spec section 5.2 requires ParVerify, RepVerify, and TagVerify to bind
+// the full stake_stmt in their Fiat-Shamir transcripts; TagVerify must not bind
+// only a loose context string. This blocker has no accepting result and does not
+// verify proofs or build transcripts.
+StakeProofTranscriptBindingSkeletonResult CheckStakeProofTranscriptBindingSkeleton(bool stakeStatementAvailable, bool parTranscriptStakeStatementBindingAvailable, bool repTranscriptStakeStatementBindingAvailable, bool tagTranscriptStakeStatementBindingAvailable);
 // Revised spec StakeVerify steps 1-11 composition with no accepting result. This
 // runs the step-1-through-6 prefix and stops at the real step-7 Spark-rule blocker.
 StakeVerificationBlockedSkeletonResult CheckStakeVerificationBlockedSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& outputSatisfiesSparkRules);

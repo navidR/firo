@@ -742,6 +742,24 @@ StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const S
     return StakeProofVerificationSkeletonResult::TAG_VERIFY_UNIMPLEMENTED;
 }
 
+StakeProofTranscriptBindingSkeletonResult CheckStakeProofTranscriptBindingSkeleton(bool stakeStatementAvailable, bool parTranscriptStakeStatementBindingAvailable, bool repTranscriptStakeStatementBindingAvailable, bool tagTranscriptStakeStatementBindingAvailable)
+{
+    if (!stakeStatementAvailable) {
+        return StakeProofTranscriptBindingSkeletonResult::STAKE_STATEMENT_UNAVAILABLE;
+    }
+    if (!parTranscriptStakeStatementBindingAvailable) {
+        return StakeProofTranscriptBindingSkeletonResult::PAR_TRANSCRIPT_STAKE_STATEMENT_BINDING_UNIMPLEMENTED;
+    }
+    if (!repTranscriptStakeStatementBindingAvailable) {
+        return StakeProofTranscriptBindingSkeletonResult::REP_TRANSCRIPT_STAKE_STATEMENT_BINDING_UNIMPLEMENTED;
+    }
+    if (!tagTranscriptStakeStatementBindingAvailable) {
+        return StakeProofTranscriptBindingSkeletonResult::TAG_TRANSCRIPT_STAKE_STATEMENT_BINDING_UNIMPLEMENTED;
+    }
+
+    return StakeProofTranscriptBindingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeVerificationBlockedSkeletonResult CheckStakeVerificationBlockedSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& /*outputSatisfiesSparkRules*/)
 {
     StakeVerificationBlockedSkeletonResult result;

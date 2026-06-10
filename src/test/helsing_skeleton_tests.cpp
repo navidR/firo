@@ -1252,6 +1252,36 @@ BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_does_not_fake_proof_accep
     BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, true) == helsing::StakeProofVerificationSkeletonResult::TAG_VERIFY_UNIMPLEMENTED);
 }
 
+BOOST_AUTO_TEST_CASE(stake_proof_transcript_binding_skeleton_requires_stake_statement_first)
+{
+    BOOST_CHECK(helsing::CheckStakeProofTranscriptBindingSkeleton(false, false, false, false) == helsing::StakeProofTranscriptBindingSkeletonResult::STAKE_STATEMENT_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckStakeProofTranscriptBindingSkeleton(false, true, true, true) == helsing::StakeProofTranscriptBindingSkeletonResult::STAKE_STATEMENT_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(stake_proof_transcript_binding_skeleton_orders_proof_binding_blockers)
+{
+    BOOST_CHECK(helsing::CheckStakeProofTranscriptBindingSkeleton(true, false, true, true) == helsing::StakeProofTranscriptBindingSkeletonResult::PAR_TRANSCRIPT_STAKE_STATEMENT_BINDING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeProofTranscriptBindingSkeleton(true, false, false, false) == helsing::StakeProofTranscriptBindingSkeletonResult::PAR_TRANSCRIPT_STAKE_STATEMENT_BINDING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeProofTranscriptBindingSkeleton(true, true, false, true) == helsing::StakeProofTranscriptBindingSkeletonResult::REP_TRANSCRIPT_STAKE_STATEMENT_BINDING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeProofTranscriptBindingSkeleton(true, true, true, false) == helsing::StakeProofTranscriptBindingSkeletonResult::TAG_TRANSCRIPT_STAKE_STATEMENT_BINDING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_proof_transcript_binding_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(204, DeterministicPoint(204));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::StakeProofTranscriptBindingSkeletonResult result = helsing::CheckStakeProofTranscriptBindingSkeleton(true, true, true, true);
+
+    BOOST_CHECK(result == helsing::StakeProofTranscriptBindingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_reports_spark_rule_blocker_after_cover_set_prefix)
 {
     helsing::StakeTx tx = ValidStakeTx();
