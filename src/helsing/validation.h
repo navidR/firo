@@ -128,6 +128,14 @@ enum class HelsingValueScalarConversionSkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class HelsingStakeFeeHandlingSkeletonResult {
+    STAKE_VALUE_PROOF_NOT_ACCEPTED,
+    ORDINARY_FEE_MECHANISM_UNIMPLEMENTED,
+    FEE_COLLATERAL_SEPARATION_UNIMPLEMENTED,
+    CONSENSUS_FEE_POLICY_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class PayoutVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -320,6 +328,11 @@ bool AreHelsingValueParametersInRangeSkeleton(CAmount stakeValue, CAmount payout
 // V_MAX < q, and an injective integer-to-scalar conversion with no modular
 // wraparound. This blocker has no accepting result and does not construct scalars.
 HelsingValueScalarConversionSkeletonResult CheckHelsingValueScalarConversionSkeleton(CAmount stakeValue, CAmount payoutValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool valueToScalarEncodingAvailable, bool injectiveScalarConversionAvailable);
+// Revised spec section 3 removes the cryptographic fee term from the collateral
+// proof: staking proves exactly V_STAKE, and any transaction fee must be handled
+// through the ordinary fee mechanism outside that proof. This blocker has no
+// accepting result and does not inspect real transactions or fees.
+HelsingStakeFeeHandlingSkeletonResult CheckHelsingStakeFeeHandlingSkeleton(bool stakeValueProofAccepted, bool ordinaryFeeMechanismAvailable, bool feeCollateralSeparationAvailable, bool consensusFeePolicyAvailable);
 // Revised spec StakeVerify step 3 value-domain subset for caller-supplied public values.
 // This does not expose q or perform scalar conversion; the caller supplies V_MAX < q.
 bool IsStakeValueParameterInRangeSkeleton(CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder);

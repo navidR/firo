@@ -152,6 +152,24 @@ HelsingValueScalarConversionSkeletonResult CheckHelsingValueScalarConversionSkel
     return HelsingValueScalarConversionSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+HelsingStakeFeeHandlingSkeletonResult CheckHelsingStakeFeeHandlingSkeleton(bool stakeValueProofAccepted, bool ordinaryFeeMechanismAvailable, bool feeCollateralSeparationAvailable, bool consensusFeePolicyAvailable)
+{
+    if (!stakeValueProofAccepted) {
+        return HelsingStakeFeeHandlingSkeletonResult::STAKE_VALUE_PROOF_NOT_ACCEPTED;
+    }
+    if (!ordinaryFeeMechanismAvailable) {
+        return HelsingStakeFeeHandlingSkeletonResult::ORDINARY_FEE_MECHANISM_UNIMPLEMENTED;
+    }
+    if (!feeCollateralSeparationAvailable) {
+        return HelsingStakeFeeHandlingSkeletonResult::FEE_COLLATERAL_SEPARATION_UNIMPLEMENTED;
+    }
+    if (!consensusFeePolicyAvailable) {
+        return HelsingStakeFeeHandlingSkeletonResult::CONSENSUS_FEE_POLICY_UNIMPLEMENTED;
+    }
+
+    return HelsingStakeFeeHandlingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 bool IsStakeValueParameterInRangeSkeleton(CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder)
 {
     return vMaxLessThanGroupOrder && IsHelsingValueInRange(stakeValue, vMax);
