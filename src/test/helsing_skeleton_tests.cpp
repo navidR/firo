@@ -2790,6 +2790,61 @@ BOOST_AUTO_TEST_CASE(extractor_preserves_duplicate_serial_commitments_under_dist
     BOOST_CHECK(outputs.at(firstId).output_id != outputs.at(secondId).output_id);
 }
 
+BOOST_AUTO_TEST_CASE(serial_commitment_index_skeleton_accepts_complete_duplicate_serial_index)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId firstId = Output(30, 0);
+    const helsing::OutputId secondId = Output(30, 1);
+    const helsing::OutputId thirdId = Output(31, 0);
+    helsing::SparkOutputRecord first = EligibleOutput(firstId, 107);
+    helsing::SparkOutputRecord second = EligibleOutput(secondId, 108);
+    helsing::SparkOutputRecord third = EligibleOutput(thirdId, 109);
+    second.S = first.S;
+
+    BOOST_CHECK(outputs.emplace(firstId, first).second);
+    BOOST_CHECK(outputs.emplace(secondId, second).second);
+    BOOST_CHECK(outputs.emplace(thirdId, third).second);
+
+    const std::vector<std::pair<GroupElement, std::vector<helsing::OutputId>>> serialIndex = {
+        {first.S, {secondId, firstId}},
+        {third.S, {thirdId}},
+    };
+
+    BOOST_CHECK(helsing::IsSparkSerialCommitmentIndexCompleteSkeleton(outputs, serialIndex));
+}
+
+BOOST_AUTO_TEST_CASE(serial_commitment_index_skeleton_rejects_incomplete_or_unique_assuming_indexes)
+{
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
+    const helsing::OutputId firstId = Output(32, 0);
+    const helsing::OutputId secondId = Output(32, 1);
+    const helsing::OutputId thirdId = Output(33, 0);
+    helsing::SparkOutputRecord first = EligibleOutput(firstId, 110);
+    helsing::SparkOutputRecord second = EligibleOutput(secondId, 111);
+    helsing::SparkOutputRecord third = EligibleOutput(thirdId, 112);
+    second.S = first.S;
+
+    BOOST_CHECK(outputs.emplace(firstId, first).second);
+    BOOST_CHECK(outputs.emplace(secondId, second).second);
+    BOOST_CHECK(outputs.emplace(thirdId, third).second);
+
+    BOOST_CHECK(!helsing::IsSparkSerialCommitmentIndexCompleteSkeleton(outputs, {{first.S, {firstId}}, {third.S, {thirdId}}}));
+    BOOST_CHECK(!helsing::IsSparkSerialCommitmentIndexCompleteSkeleton(outputs, {{first.S, {firstId, secondId, secondId}}, {third.S, {thirdId}}}));
+    BOOST_CHECK(!helsing::IsSparkSerialCommitmentIndexCompleteSkeleton(outputs, {{first.S, {firstId, thirdId}}, {third.S, {thirdId}}}));
+    BOOST_CHECK(!helsing::IsSparkSerialCommitmentIndexCompleteSkeleton(outputs, {{first.S, {firstId, secondId}}, {first.S, {firstId, secondId}}, {third.S, {thirdId}}}));
+    BOOST_CHECK(!helsing::IsSparkSerialCommitmentIndexCompleteSkeleton(outputs, {{first.S, {firstId, secondId}}, {third.S, {thirdId}}, {DeterministicPoint(113), {}}}));
+    BOOST_CHECK(!helsing::IsSparkSerialCommitmentIndexCompleteSkeleton(outputs, {{GroupElement(), {firstId, secondId}}, {third.S, {thirdId}}}));
+    BOOST_CHECK(!helsing::IsSparkSerialCommitmentIndexCompleteSkeleton(outputs, {{first.S, {firstId, secondId}}, {third.S, {Output(34, 0)}}}));
+
+    std::map<helsing::OutputId, helsing::SparkOutputRecord> malformedOutputs = outputs;
+    malformedOutputs.at(secondId).output_id = Output(35, 0);
+    BOOST_CHECK(!helsing::IsSparkSerialCommitmentIndexCompleteSkeleton(malformedOutputs, {{first.S, {firstId, secondId}}, {third.S, {thirdId}}}));
+
+    malformedOutputs = outputs;
+    malformedOutputs.at(secondId).C = NonMemberPoint();
+    BOOST_CHECK(!helsing::IsSparkSerialCommitmentIndexCompleteSkeleton(malformedOutputs, {{first.S, {firstId, secondId}}, {third.S, {thirdId}}}));
+}
+
 BOOST_AUTO_TEST_CASE(duplicate_serial_compatibility_skeleton_requires_spark_review_first)
 {
     BOOST_CHECK(helsing::CheckHelsingDuplicateSerialCompatibilitySkeleton(false, false, false, false) == helsing::HelsingDuplicateSerialCompatibilitySkeletonResult::SPARK_SERIAL_UNIQUENESS_REVIEW_UNIMPLEMENTED);

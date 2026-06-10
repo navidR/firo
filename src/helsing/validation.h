@@ -764,6 +764,10 @@ bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount ma
 bool IsValidOutputId(const OutputId& output_id);
 bool IsValidPublicPoint(const GroupElement& point);
 bool IsValidSparkOutputRecord(const SparkOutputRecord& output);
+// Revised spec section 19 permits serial-commitment indexes only if they return
+// all matching output_id values and do not assume uniqueness. This checks a
+// caller-supplied in-memory index snapshot and does not alter Spark consensus.
+bool IsSparkSerialCommitmentIndexCompleteSkeleton(const std::map<OutputId, SparkOutputRecord>& outputs, const std::vector<std::pair<GroupElement, std::vector<OutputId>>>& serialIndex);
 // Revised spec section 13 eligibility gate: an output may only be considered
 // Helsing-eligible if every spend path reveals the Spark spend tag. The caller
 // supplies that path analysis; this does not inspect scripts or mark state.

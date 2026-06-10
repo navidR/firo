@@ -1140,6 +1140,51 @@ bool IsValidSparkOutputRecord(const SparkOutputRecord& output)
             output.type == SparkOutputType::PAYOUT);
 }
 
+bool IsSparkSerialCommitmentIndexCompleteSkeleton(const std::map<OutputId, SparkOutputRecord>& outputs, const std::vector<std::pair<GroupElement, std::vector<OutputId>>>& serialIndex)
+{
+    std::unordered_map<GroupElement, std::set<OutputId>, spark::CLTagHash> expected;
+    for (const auto& outputEntry : outputs) {
+        const OutputId& output_id = outputEntry.first;
+        const SparkOutputRecord& output = outputEntry.second;
+        if (output.output_id != output_id || !IsValidSparkOutputRecord(output)) {
+            return false;
+        }
+        expected[output.S].insert(output_id);
+    }
+
+    std::unordered_map<GroupElement, std::set<OutputId>, spark::CLTagHash> actual;
+    for (const auto& indexEntry : serialIndex) {
+        const GroupElement& serial = indexEntry.first;
+        if (!IsValidPublicPoint(serial) || actual.count(serial) != 0) {
+            return false;
+        }
+
+        std::set<OutputId> outputIds;
+        for (const OutputId& output_id : indexEntry.second) {
+            if (!IsValidOutputId(output_id) || !outputIds.insert(output_id).second) {
+                return false;
+            }
+            const auto outputIt = outputs.find(output_id);
+            if (outputIt == outputs.end() || outputIt->second.S != serial) {
+                return false;
+            }
+        }
+        actual.emplace(serial, std::move(outputIds));
+    }
+
+    if (actual.size() != expected.size()) {
+        return false;
+    }
+    for (const auto& expectedEntry : expected) {
+        const auto actualIt = actual.find(expectedEntry.first);
+        if (actualIt == actual.end() || actualIt->second != expectedEntry.second) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool IsHelsingEligibleOutputCandidateSkeleton(const SparkOutputRecord& output, bool allSpendPathsRevealTags)
 {
     return IsValidSparkOutputRecord(output) && allSpendPathsRevealTags;
