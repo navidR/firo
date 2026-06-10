@@ -5109,6 +5109,49 @@ BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_does_not_mutate_state_or_
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(block_validation_transaction_verification_skeleton_checks_prefix_first)
+{
+    helsing::BlockValidationPrefixWithSpentTagsSkeletonResult duplicateSpendPrefix;
+    duplicateSpendPrefix.block_spent_result = helsing::StakeValidationResult::DUPLICATE_SPENT_TAG_IN_BLOCK;
+    duplicateSpendPrefix.validation_result = helsing::StakeValidationResult::OK;
+    helsing::BlockValidationPrefixWithSpentTagsSkeletonResult stakePrefixFailure;
+    stakePrefixFailure.block_spent_result = helsing::StakeValidationResult::OK;
+    stakePrefixFailure.validation_result = helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK;
+
+    BOOST_CHECK(helsing::CheckBlockValidationTransactionVerificationSkeleton(duplicateSpendPrefix, false, false, false) == helsing::BlockValidationTransactionVerificationSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED);
+    BOOST_CHECK(helsing::CheckBlockValidationTransactionVerificationSkeleton(stakePrefixFailure, false, false, false) == helsing::BlockValidationTransactionVerificationSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED);
+}
+
+BOOST_AUTO_TEST_CASE(block_validation_transaction_verification_skeleton_orders_verify_blockers)
+{
+    const helsing::BlockValidationPrefixWithSpentTagsSkeletonResult prefix;
+
+    BOOST_CHECK(helsing::CheckBlockValidationTransactionVerificationSkeleton(prefix, false, false, false) == helsing::BlockValidationTransactionVerificationSkeletonResult::STAKE_VERIFY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckBlockValidationTransactionVerificationSkeleton(prefix, true, false, false) == helsing::BlockValidationTransactionVerificationSkeletonResult::STAKE_UPDATE_VERIFY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckBlockValidationTransactionVerificationSkeleton(prefix, true, true, false) == helsing::BlockValidationTransactionVerificationSkeletonResult::PAYOUT_VERIFY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckBlockValidationTransactionVerificationSkeleton(prefix, true, true, true) == helsing::BlockValidationTransactionVerificationSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(block_validation_transaction_verification_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(192, DeterministicPoint(192));
+    const helsing::BlockValidationPrefixWithSpentTagsSkeletonResult prefix;
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::BlockValidationTransactionVerificationSkeletonResult result = helsing::CheckBlockValidationTransactionVerificationSkeleton(prefix, true, true, true);
+
+    BOOST_CHECK(result == helsing::BlockValidationTransactionVerificationSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(persistent_block_application_skeleton_requires_accepted_block_data_first)
 {
     BOOST_CHECK(helsing::CheckPersistentBlockApplicationSkeleton(false, false, false, false) == helsing::PersistentBlockApplicationSkeletonResult::ACCEPTED_BLOCK_DATA_UNAVAILABLE);

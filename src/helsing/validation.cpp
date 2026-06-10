@@ -1701,6 +1701,25 @@ BlockValidationBlockedSkeletonResult CheckBlockValidationBlockedSkeleton(
     return result;
 }
 
+BlockValidationTransactionVerificationSkeletonResult CheckBlockValidationTransactionVerificationSkeleton(const BlockValidationPrefixWithSpentTagsSkeletonResult& prefixResult, bool stakeVerifyAvailable, bool stakeUpdateVerifyAvailable, bool payoutVerifyAvailable)
+{
+    if (prefixResult.block_spent_result != StakeValidationResult::OK ||
+        prefixResult.validation_result != StakeValidationResult::OK) {
+        return BlockValidationTransactionVerificationSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED;
+    }
+    if (!stakeVerifyAvailable) {
+        return BlockValidationTransactionVerificationSkeletonResult::STAKE_VERIFY_UNIMPLEMENTED;
+    }
+    if (!stakeUpdateVerifyAvailable) {
+        return BlockValidationTransactionVerificationSkeletonResult::STAKE_UPDATE_VERIFY_UNIMPLEMENTED;
+    }
+    if (!payoutVerifyAvailable) {
+        return BlockValidationTransactionVerificationSkeletonResult::PAYOUT_VERIFY_UNIMPLEMENTED;
+    }
+
+    return BlockValidationTransactionVerificationSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 PersistentBlockApplicationSkeletonResult CheckPersistentBlockApplicationSkeleton(bool acceptedBlockDataAvailable, bool helsingStateStorageAvailable, bool sparkOutputStorageAvailable, bool undoDataSerializationAvailable)
 {
     if (!acceptedBlockDataAvailable) {

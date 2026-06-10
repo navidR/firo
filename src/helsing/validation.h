@@ -426,6 +426,14 @@ enum class BlockValidationSuffixSkeletonResult {
     FULL_TRANSACTION_VERIFICATION_UNIMPLEMENTED,
 };
 
+enum class BlockValidationTransactionVerificationSkeletonResult {
+    BLOCK_VALIDATION_PREFIX_FAILED,
+    STAKE_VERIFY_UNIMPLEMENTED,
+    STAKE_UPDATE_VERIFY_UNIMPLEMENTED,
+    PAYOUT_VERIFY_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 struct BlockValidationBlockedSkeletonResult {
     BlockValidationSparkPrepassSkeletonResult spark_prepass_result{BlockValidationSparkPrepassSkeletonResult::ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED};
     BlockValidationPrefixWithSpentTagsSkeletonResult prefix_result;
@@ -811,6 +819,10 @@ BlockValidationSparkPrepassSkeletonResult CheckBlockValidationSparkPrepassSkelet
 // real Spark spend validation/tag extraction, StakeVerify, StakeUpdateVerify,
 // PayoutVerify, persistence, and undo data are required.
 BlockValidationBlockedSkeletonResult CheckBlockValidationBlockedSkeleton(const std::vector<GroupElement>& sparkSpendTags, const std::vector<StakeTx>& stake_txs, const std::vector<StakeUpdateTx>& update_txs, const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& parentView, int currentHeight, int stakeMaturity);
+// Revised spec ValidateBlock steps 3-5 require full per-transaction
+// StakeVerify, StakeUpdateVerify, and PayoutVerify after same-block prefix
+// checks pass. This blocker has no accepting result and does not validate txs.
+BlockValidationTransactionVerificationSkeletonResult CheckBlockValidationTransactionVerificationSkeleton(const BlockValidationPrefixWithSpentTagsSkeletonResult& prefixResult, bool stakeVerifyAvailable, bool stakeUpdateVerifyAvailable, bool payoutVerifyAvailable);
 
 // Persistent integration for revised spec section 6 state and section 12
 // mutation is deliberately blocked until accepted block data, storage, undo
