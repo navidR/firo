@@ -170,6 +170,30 @@ HelsingStakeFeeHandlingSkeletonResult CheckHelsingStakeFeeHandlingSkeleton(bool 
     return HelsingStakeFeeHandlingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+StakeAlgorithmSkeletonResult CheckStakeAlgorithmSkeleton(bool stakeWitnessAvailable, bool sparkCoinEquationValidationAvailable, bool offsetHashingAvailable, bool offsetCommitmentConstructionAvailable, bool stakeStatementBindingAvailable, bool proofGenerationAvailable)
+{
+    if (!stakeWitnessAvailable) {
+        return StakeAlgorithmSkeletonResult::STAKE_WITNESS_UNAVAILABLE;
+    }
+    if (!sparkCoinEquationValidationAvailable) {
+        return StakeAlgorithmSkeletonResult::SPARK_COIN_EQUATION_VALIDATION_UNIMPLEMENTED;
+    }
+    if (!offsetHashingAvailable) {
+        return StakeAlgorithmSkeletonResult::OFFSET_HASHING_UNIMPLEMENTED;
+    }
+    if (!offsetCommitmentConstructionAvailable) {
+        return StakeAlgorithmSkeletonResult::OFFSET_COMMITMENT_CONSTRUCTION_UNIMPLEMENTED;
+    }
+    if (!stakeStatementBindingAvailable) {
+        return StakeAlgorithmSkeletonResult::STAKE_STATEMENT_BINDING_UNIMPLEMENTED;
+    }
+    if (!proofGenerationAvailable) {
+        return StakeAlgorithmSkeletonResult::STAKE_PROOF_GENERATION_UNIMPLEMENTED;
+    }
+
+    return StakeAlgorithmSkeletonResult::STAKE_TX_CONSTRUCTION_UNIMPLEMENTED;
+}
+
 bool IsStakeValueParameterInRangeSkeleton(CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder)
 {
     return vMaxLessThanGroupOrder && IsHelsingValueInRange(stakeValue, vMax);

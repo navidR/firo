@@ -35,6 +35,7 @@ Current scope:
 - `AreHelsingValueParametersInRangeSkeleton` checks revised spec section 20 integer-domain bounds for caller-supplied `V_STAKE`, `V_PAYOUT`, and `V_MAX`, plus a caller-supplied `V_MAX < q` result; it does not expose the scalar order or perform scalar conversion.
 - `CheckHelsingValueScalarConversionSkeleton` is an explicit blocker for revised spec section 20 scalar conversion. It preserves integer-domain and caller-supplied `V_MAX < q` precedence, then blocks before defining the integer-to-scalar encoding, proving injectivity/no-wraparound over `[0,V_MAX)`, or wiring conversion into commitments and proof verification.
 - `CheckHelsingStakeFeeHandlingSkeleton` is an explicit blocker for the revised spec section 3 fee/proof boundary. It requires exact `V_STAKE` proof acceptance first, then blocks before ordinary fee-mechanism handling, fee/collateral-proof separation, consensus fee policy, and transaction wiring.
+- `CheckStakeAlgorithmSkeleton` is an explicit blocker for revised spec section 10 wallet/prover staking transaction construction. It blocks before Spark witness extraction, inherited Spark coin-equation validation, `H_SER2`/`H_VAL2` offset hashing, offset commitment construction, `stake_stmt` binding, proof generation, and final transaction emission.
 - `IsStakeValueParameterInRangeSkeleton` checks revised spec `StakeVerify` step 3 for caller-supplied `V_STAKE`, `V_MAX`, and `V_MAX < q`; it does not expose the scalar order, perform scalar conversion, or verify the collateral proof.
 - `CheckStakeVerificationPrefixSkeleton` checks revised spec `StakeVerify` steps 1-3 only: field presence, a caller-supplied canonical-encoding result, and caller-supplied `V_STAKE` value parameters. It deliberately stops before tag-state, context, cover-set, statement-hash, and proof verification.
 - `CheckStakeTagStateSkeleton` checks revised spec `StakeVerify` step 4 against parent state only: reject if `T` is already spent, then reject if `T` is already active. It does not inspect same-block `BlockSpentTags`.
@@ -102,6 +103,7 @@ Not implemented yet:
 - real scalar-order access, integer-to-scalar encoding, injectivity/no-wraparound proof, and value-conversion wiring into commitments and proof verification
 - wiring value-domain checks for `V_STAKE`, `V_PAYOUT`, and `V_MAX < q`
 - ordinary transaction-fee handling outside the collateral proof
+- real wallet/prover staking algorithm support for Spark witness extraction, offset hashing, offset commitment construction, statement-bound proof generation, and staking transaction emission
 - any decision to reintroduce an optional collateral margin as a consensus policy
 - real expected payout amount derivation from consensus reward rules
 - `ParVerify`, `RepVerify`, and `TagVerify`

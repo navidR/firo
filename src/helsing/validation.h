@@ -136,6 +136,16 @@ enum class HelsingStakeFeeHandlingSkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class StakeAlgorithmSkeletonResult {
+    STAKE_WITNESS_UNAVAILABLE,
+    SPARK_COIN_EQUATION_VALIDATION_UNIMPLEMENTED,
+    OFFSET_HASHING_UNIMPLEMENTED,
+    OFFSET_COMMITMENT_CONSTRUCTION_UNIMPLEMENTED,
+    STAKE_STATEMENT_BINDING_UNIMPLEMENTED,
+    STAKE_PROOF_GENERATION_UNIMPLEMENTED,
+    STAKE_TX_CONSTRUCTION_UNIMPLEMENTED,
+};
+
 enum class PayoutVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -333,6 +343,11 @@ HelsingValueScalarConversionSkeletonResult CheckHelsingValueScalarConversionSkel
 // through the ordinary fee mechanism outside that proof. This blocker has no
 // accepting result and does not inspect real transactions or fees.
 HelsingStakeFeeHandlingSkeletonResult CheckHelsingStakeFeeHandlingSkeleton(bool stakeValueProofAccepted, bool ordinaryFeeMechanismAvailable, bool feeCollateralSeparationAvailable, bool consensusFeePolicyAvailable);
+// Revised spec section 10 staking algorithm is deliberately blocked here. Real
+// wallet/prover code must extract the Spark witness, validate inherited Spark
+// coin equations, compute H_SER2/H_VAL2, construct offsets, bind stake_stmt, and
+// generate real proofs before emitting a staking transaction.
+StakeAlgorithmSkeletonResult CheckStakeAlgorithmSkeleton(bool stakeWitnessAvailable, bool sparkCoinEquationValidationAvailable, bool offsetHashingAvailable, bool offsetCommitmentConstructionAvailable, bool stakeStatementBindingAvailable, bool proofGenerationAvailable);
 // Revised spec StakeVerify step 3 value-domain subset for caller-supplied public values.
 // This does not expose q or perform scalar conversion; the caller supplies V_MAX < q.
 bool IsStakeValueParameterInRangeSkeleton(CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder);

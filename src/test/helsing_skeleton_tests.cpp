@@ -491,6 +491,38 @@ BOOST_AUTO_TEST_CASE(stake_fee_handling_skeleton_has_no_accepting_or_mutating_pa
     BOOST_CHECK(!state.IsSpentTag(record.T));
 }
 
+BOOST_AUTO_TEST_CASE(stake_algorithm_skeleton_requires_spark_witness_first)
+{
+    BOOST_CHECK(helsing::CheckStakeAlgorithmSkeleton(false, false, false, false, false, false) == helsing::StakeAlgorithmSkeletonResult::STAKE_WITNESS_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckStakeAlgorithmSkeleton(false, true, true, true, true, true) == helsing::StakeAlgorithmSkeletonResult::STAKE_WITNESS_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(stake_algorithm_skeleton_preserves_section_ten_order)
+{
+    BOOST_CHECK(helsing::CheckStakeAlgorithmSkeleton(true, false, true, true, true, true) == helsing::StakeAlgorithmSkeletonResult::SPARK_COIN_EQUATION_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeAlgorithmSkeleton(true, false, false, false, false, false) == helsing::StakeAlgorithmSkeletonResult::SPARK_COIN_EQUATION_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeAlgorithmSkeleton(true, true, false, true, true, true) == helsing::StakeAlgorithmSkeletonResult::OFFSET_HASHING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeAlgorithmSkeleton(true, true, true, false, true, true) == helsing::StakeAlgorithmSkeletonResult::OFFSET_COMMITMENT_CONSTRUCTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeAlgorithmSkeleton(true, true, true, true, false, true) == helsing::StakeAlgorithmSkeletonResult::STAKE_STATEMENT_BINDING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeAlgorithmSkeleton(true, true, true, true, true, false) == helsing::StakeAlgorithmSkeletonResult::STAKE_PROOF_GENERATION_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_algorithm_skeleton_does_not_construct_tx_or_mutate_state)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(200, DeterministicPoint(200));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::StakeAlgorithmSkeletonResult result = helsing::CheckStakeAlgorithmSkeleton(true, true, true, true, true, true);
+
+    BOOST_CHECK(result == helsing::StakeAlgorithmSkeletonResult::STAKE_TX_CONSTRUCTION_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(stake_value_parameter_skeleton_checks_stakeverify_value_domain)
 {
     BOOST_CHECK(helsing::IsStakeValueParameterInRangeSkeleton(0, 1, true));
