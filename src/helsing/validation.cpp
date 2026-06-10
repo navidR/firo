@@ -1512,6 +1512,8 @@ StakeValidationResult CheckStakeBlockSkeleton(const std::vector<StakeTx>& stake_
 {
     std::unordered_set<GroupElement, spark::CLTagHash> newStakeTags;
 
+    // Block-wide tag conflicts are checked before per-transaction validation so
+    // same-block stake/tag conflicts have one deterministic precedence point.
     for (const StakeTx& tx : stake_txs) {
         if (!IsValidPublicPoint(tx.T)) {
             continue;

@@ -3867,6 +3867,24 @@ BOOST_AUTO_TEST_CASE(block_skeleton_duplicate_new_stake_tags_precede_individual_
     BOOST_CHECK(helsing::CheckStakeBlockSkeleton({txA, txB}, view) == helsing::StakeValidationResult::DUPLICATE_STAKE_TAG_IN_BLOCK);
 }
 
+BOOST_AUTO_TEST_CASE(block_skeleton_tag_prepass_precedes_per_transaction_validation)
+{
+    helsing::StakeTx txA = ValidStakeTx();
+    helsing::StakeTx txB = ValidStakeTx();
+    txA.inCoinIDs.clear();
+    txB.inCoinIDs = {Output(3, 0), Output(4, 0)};
+    txB.T = DeterministicPoint(131);
+
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    AddOutputs(view, txB, 40);
+
+    BOOST_CHECK(state.AddActiveStake(ActiveRecord(131, txB.T)));
+    BOOST_CHECK(helsing::CheckStakeSkeleton(txA, view) == helsing::StakeValidationResult::EMPTY_INCOINIDS);
+    BOOST_CHECK(helsing::CheckStakeBlockSkeleton({txA, txB}, view) == helsing::StakeValidationResult::TAG_ALREADY_ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(block_skeleton_invalid_tags_fall_through_to_individual_validation)
 {
     helsing::StakeTx txA = ValidStakeTx();
