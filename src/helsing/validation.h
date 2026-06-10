@@ -231,6 +231,14 @@ enum class StakeIdConstructionSkeletonResult {
     STAKE_ID_HASHING_UNIMPLEMENTED,
 };
 
+enum class HelsingEligibleOutputMarkingSkeletonResult {
+    OUTPUT_RECORD_INVALID,
+    SPARK_SPEND_PATH_ANALYSIS_UNIMPLEMENTED,
+    ELIGIBILITY_PERSISTENCE_UNIMPLEMENTED,
+    ELIGIBILITY_UNDO_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 struct ValidationStateView {
     std::map<OutputId, SparkOutputRecord> sparkOutputs;
     std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
@@ -358,6 +366,10 @@ bool IsValidSparkOutputRecord(const SparkOutputRecord& output);
 // Helsing-eligible if every spend path reveals the Spark spend tag. The caller
 // supplies that path analysis; this does not inspect scripts or mark state.
 bool IsHelsingEligibleOutputCandidateSkeleton(const SparkOutputRecord& output, bool allSpendPathsRevealTags);
+// Revised spec section 13 real eligibility marking is deliberately blocked:
+// deployed consensus must analyze Spark spend paths, persist the marking, and
+// provide undo data before any output may be marked Helsing-eligible.
+HelsingEligibleOutputMarkingSkeletonResult CheckHelsingEligibleOutputMarkingSkeleton(const SparkOutputRecord& output, bool sparkSpendPathAnalysisAvailable, bool eligibilityPersistenceAvailable, bool eligibilityUndoAvailable);
 // Marks caller-selected output records as Helsing-eligible after the section 13
 // candidate predicate passes. This is in-memory only and does not decide spend-path
 // policy, persist state, or provide undo data.

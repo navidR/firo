@@ -617,6 +617,24 @@ bool IsHelsingEligibleOutputCandidateSkeleton(const SparkOutputRecord& output, b
     return IsValidSparkOutputRecord(output) && allSpendPathsRevealTags;
 }
 
+HelsingEligibleOutputMarkingSkeletonResult CheckHelsingEligibleOutputMarkingSkeleton(const SparkOutputRecord& output, bool sparkSpendPathAnalysisAvailable, bool eligibilityPersistenceAvailable, bool eligibilityUndoAvailable)
+{
+    if (!IsValidSparkOutputRecord(output)) {
+        return HelsingEligibleOutputMarkingSkeletonResult::OUTPUT_RECORD_INVALID;
+    }
+    if (!sparkSpendPathAnalysisAvailable) {
+        return HelsingEligibleOutputMarkingSkeletonResult::SPARK_SPEND_PATH_ANALYSIS_UNIMPLEMENTED;
+    }
+    if (!eligibilityPersistenceAvailable) {
+        return HelsingEligibleOutputMarkingSkeletonResult::ELIGIBILITY_PERSISTENCE_UNIMPLEMENTED;
+    }
+    if (!eligibilityUndoAvailable) {
+        return HelsingEligibleOutputMarkingSkeletonResult::ELIGIBILITY_UNDO_UNIMPLEMENTED;
+    }
+
+    return HelsingEligibleOutputMarkingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 bool MarkHelsingEligibleOutputCandidatesSkeleton(const std::vector<std::pair<OutputId, bool>>& candidates, std::map<OutputId, SparkOutputRecord>& outputs)
 {
     std::map<OutputId, SparkOutputRecord> next(outputs);

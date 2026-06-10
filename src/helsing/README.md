@@ -20,6 +20,7 @@ Current scope:
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
 - `ExtractSparkOutputRecords` builds a consensus-inert `(txid, vout) -> SparkOutputRecord` view from valid Spark mint and spend-created output scripts.
 - `IsHelsingEligibleOutputCandidateSkeleton` checks the revised spec section 13 rule that outputs with any non-tag-revealing spend path must not be marked `helsing_eligible`; the caller supplies spend-path analysis.
+- `CheckHelsingEligibleOutputMarkingSkeleton` is an explicit blocker for real section 13 eligibility marking. It requires a valid Spark output record, then blocks before Spark spend-path analysis, persistent eligibility marking, undo data, and consensus wiring; it has no accepting result and does not mark outputs.
 - `MarkHelsingEligibleOutputCandidatesSkeleton` marks caller-selected in-memory `SparkOutputs` entries as `helsing_eligible` only after the section 13 candidate predicate passes.
 - `CheckPayoutOutputRecordConstructionSkeleton` is an explicit blocker for constructing revised spec step 9 `SparkOutputs` records from accepted payout transactions. It requires a real `(txid, vout)` output identifier and blocks before parsing payout coin blobs into Spark fields.
 - `ApplyAcceptedPayoutOutputRecordsSkeleton` applies already accepted payout output records to `SparkOutputs` by `(txid, vout)` only; it does not recompute payout coins or decide Helsing eligibility.

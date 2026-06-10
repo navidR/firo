@@ -1719,6 +1719,49 @@ BOOST_AUTO_TEST_CASE(helsing_eligible_output_candidate_does_not_mutate_record)
     BOOST_CHECK_EQUAL(output.helsing_eligible, original.helsing_eligible);
 }
 
+BOOST_AUTO_TEST_CASE(helsing_eligible_output_marking_skeleton_rejects_invalid_record_first)
+{
+    helsing::SparkOutputRecord output = EligibleOutput(Output(55, 0), 90);
+    output.output_id = helsing::OutputId();
+
+    BOOST_CHECK(helsing::CheckHelsingEligibleOutputMarkingSkeleton(output, false, false, false) == helsing::HelsingEligibleOutputMarkingSkeletonResult::OUTPUT_RECORD_INVALID);
+    BOOST_CHECK(helsing::CheckHelsingEligibleOutputMarkingSkeleton(output, true, true, true) == helsing::HelsingEligibleOutputMarkingSkeletonResult::OUTPUT_RECORD_INVALID);
+}
+
+BOOST_AUTO_TEST_CASE(helsing_eligible_output_marking_skeleton_blocks_real_spend_path_analysis)
+{
+    const helsing::SparkOutputRecord output = EligibleOutput(Output(55, 1), 91);
+
+    BOOST_CHECK(helsing::CheckHelsingEligibleOutputMarkingSkeleton(output, false, true, true) == helsing::HelsingEligibleOutputMarkingSkeletonResult::SPARK_SPEND_PATH_ANALYSIS_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingEligibleOutputMarkingSkeleton(output, false, false, false) == helsing::HelsingEligibleOutputMarkingSkeletonResult::SPARK_SPEND_PATH_ANALYSIS_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(helsing_eligible_output_marking_skeleton_orders_persistence_blockers)
+{
+    const helsing::SparkOutputRecord output = EligibleOutput(Output(55, 2), 92);
+
+    BOOST_CHECK(helsing::CheckHelsingEligibleOutputMarkingSkeleton(output, true, false, false) == helsing::HelsingEligibleOutputMarkingSkeletonResult::ELIGIBILITY_PERSISTENCE_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingEligibleOutputMarkingSkeleton(output, true, true, false) == helsing::HelsingEligibleOutputMarkingSkeletonResult::ELIGIBILITY_UNDO_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingEligibleOutputMarkingSkeleton(output, true, true, true) == helsing::HelsingEligibleOutputMarkingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(helsing_eligible_output_marking_skeleton_does_not_mark_output)
+{
+    const helsing::SparkOutputRecord original = EligibleOutput(Output(55, 3), 93);
+    helsing::SparkOutputRecord output = original;
+    output.helsing_eligible = false;
+
+    BOOST_CHECK(helsing::CheckHelsingEligibleOutputMarkingSkeleton(output, true, true, true) == helsing::HelsingEligibleOutputMarkingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+
+    BOOST_CHECK(!output.helsing_eligible);
+    BOOST_CHECK(output.output_id == original.output_id);
+    BOOST_CHECK(output.S == original.S);
+    BOOST_CHECK(output.C == original.C);
+    BOOST_CHECK(output.K == original.K);
+    BOOST_CHECK_EQUAL(output.nHeight, original.nHeight);
+    BOOST_CHECK(output.type == original.type);
+}
+
 BOOST_AUTO_TEST_CASE(mark_helsing_eligible_candidates_sets_requested_outputs_atomically)
 {
     std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
