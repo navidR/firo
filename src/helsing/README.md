@@ -33,6 +33,7 @@ Current scope:
 - `IsStakeMatureForPayout` checks the revised spec payout maturity inequality for caller-supplied heights and `STAKE_MATURITY`.
 - `IsHelsingValueInRange` checks the revised spec integer-domain bound `0 <= value < V_MAX` for caller-supplied values.
 - `AreHelsingValueParametersInRangeSkeleton` checks revised spec section 20 integer-domain bounds for caller-supplied `V_STAKE`, `V_PAYOUT`, and `V_MAX`, plus a caller-supplied `V_MAX < q` result; it does not expose the scalar order or perform scalar conversion.
+- `CheckHelsingValueScalarConversionSkeleton` is an explicit blocker for revised spec section 20 scalar conversion. It preserves integer-domain and caller-supplied `V_MAX < q` precedence, then blocks before defining the integer-to-scalar encoding, proving injectivity/no-wraparound over `[0,V_MAX)`, or wiring conversion into commitments and proof verification.
 - `IsStakeValueParameterInRangeSkeleton` checks revised spec `StakeVerify` step 3 for caller-supplied `V_STAKE`, `V_MAX`, and `V_MAX < q`; it does not expose the scalar order, perform scalar conversion, or verify the collateral proof.
 - `CheckStakeVerificationPrefixSkeleton` checks revised spec `StakeVerify` steps 1-3 only: field presence, a caller-supplied canonical-encoding result, and caller-supplied `V_STAKE` value parameters. It deliberately stops before tag-state, context, cover-set, statement-hash, and proof verification.
 - `CheckStakeTagStateSkeleton` checks revised spec `StakeVerify` step 4 against parent state only: reject if `T` is already spent, then reject if `T` is already active. It does not inspect same-block `BlockSpentTags`.
@@ -97,7 +98,8 @@ Not implemented yet:
 - final `StakeVerify` steps 8-12 after statement hashes and proof verification are implemented
 - replacing caller-supplied Spark maturity/cover-set facts with concrete Spark consensus checks without changing the step-1-through-7 helper into a full verifier
 - Spark maturity and cover-set eligibility rules using current height, Spark ledger state, and consensus maturity/eligibility parameters
-- wiring value-domain checks for `V_STAKE`, `V_PAYOUT`, `V_MAX < q`, scalar conversion bounds, and ordinary fees outside the collateral proof
+- real scalar-order access, integer-to-scalar encoding, injectivity/no-wraparound proof, and value-conversion wiring into commitments and proof verification
+- wiring value-domain checks for `V_STAKE`, `V_PAYOUT`, `V_MAX < q`, and ordinary fees outside the collateral proof
 - any decision to reintroduce an optional collateral margin as a consensus policy
 - real expected payout amount derivation from consensus reward rules
 - `ParVerify`, `RepVerify`, and `TagVerify`

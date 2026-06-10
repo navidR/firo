@@ -120,6 +120,14 @@ enum class HelsingCanonicalTranscriptSkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class HelsingValueScalarConversionSkeletonResult {
+    VALUE_INTEGER_DOMAIN_INVALID,
+    SCALAR_ORDER_BOUND_INVALID,
+    VALUE_TO_SCALAR_ENCODING_UNIMPLEMENTED,
+    INJECTIVE_SCALAR_CONVERSION_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class PayoutVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -308,6 +316,10 @@ bool IsHelsingValueInRange(CAmount value, CAmount vMax);
 // Revised spec section 20 value-parameter bounds for caller-supplied public values.
 // This does not expose q or perform scalar conversion; the caller supplies V_MAX < q.
 bool AreHelsingValueParametersInRangeSkeleton(CAmount stakeValue, CAmount payoutValue, CAmount vMax, bool vMaxLessThanGroupOrder);
+// Revised spec section 20 requires integer-domain values before scalar conversion,
+// V_MAX < q, and an injective integer-to-scalar conversion with no modular
+// wraparound. This blocker has no accepting result and does not construct scalars.
+HelsingValueScalarConversionSkeletonResult CheckHelsingValueScalarConversionSkeleton(CAmount stakeValue, CAmount payoutValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool valueToScalarEncodingAvailable, bool injectiveScalarConversionAvailable);
 // Revised spec StakeVerify step 3 value-domain subset for caller-supplied public values.
 // This does not expose q or perform scalar conversion; the caller supplies V_MAX < q.
 bool IsStakeValueParameterInRangeSkeleton(CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder);

@@ -133,6 +133,25 @@ bool AreHelsingValueParametersInRangeSkeleton(CAmount stakeValue, CAmount payout
            IsHelsingValueInRange(payoutValue, vMax);
 }
 
+HelsingValueScalarConversionSkeletonResult CheckHelsingValueScalarConversionSkeleton(CAmount stakeValue, CAmount payoutValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool valueToScalarEncodingAvailable, bool injectiveScalarConversionAvailable)
+{
+    if (!IsHelsingValueInRange(stakeValue, vMax) ||
+        !IsHelsingValueInRange(payoutValue, vMax)) {
+        return HelsingValueScalarConversionSkeletonResult::VALUE_INTEGER_DOMAIN_INVALID;
+    }
+    if (!vMaxLessThanGroupOrder) {
+        return HelsingValueScalarConversionSkeletonResult::SCALAR_ORDER_BOUND_INVALID;
+    }
+    if (!valueToScalarEncodingAvailable) {
+        return HelsingValueScalarConversionSkeletonResult::VALUE_TO_SCALAR_ENCODING_UNIMPLEMENTED;
+    }
+    if (!injectiveScalarConversionAvailable) {
+        return HelsingValueScalarConversionSkeletonResult::INJECTIVE_SCALAR_CONVERSION_UNIMPLEMENTED;
+    }
+
+    return HelsingValueScalarConversionSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 bool IsStakeValueParameterInRangeSkeleton(CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder)
 {
     return vMaxLessThanGroupOrder && IsHelsingValueInRange(stakeValue, vMax);

@@ -423,6 +423,44 @@ BOOST_AUTO_TEST_CASE(value_parameter_skeleton_checks_stake_payout_and_scalar_ord
     BOOST_CHECK(!helsing::AreHelsingValueParametersInRangeSkeleton(0, std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max(), true));
 }
 
+BOOST_AUTO_TEST_CASE(value_scalar_conversion_skeleton_preserves_integer_domain_precedence)
+{
+    BOOST_CHECK(helsing::CheckHelsingValueScalarConversionSkeleton(-1, 0, 1, false, false, false) == helsing::HelsingValueScalarConversionSkeletonResult::VALUE_INTEGER_DOMAIN_INVALID);
+    BOOST_CHECK(helsing::CheckHelsingValueScalarConversionSkeleton(0, -1, 1, false, true, true) == helsing::HelsingValueScalarConversionSkeletonResult::VALUE_INTEGER_DOMAIN_INVALID);
+    BOOST_CHECK(helsing::CheckHelsingValueScalarConversionSkeleton(1, 0, 1, false, false, false) == helsing::HelsingValueScalarConversionSkeletonResult::VALUE_INTEGER_DOMAIN_INVALID);
+    BOOST_CHECK(helsing::CheckHelsingValueScalarConversionSkeleton(0, 1, 1, false, false, false) == helsing::HelsingValueScalarConversionSkeletonResult::VALUE_INTEGER_DOMAIN_INVALID);
+    BOOST_CHECK(helsing::CheckHelsingValueScalarConversionSkeleton(0, 0, 0, false, false, false) == helsing::HelsingValueScalarConversionSkeletonResult::VALUE_INTEGER_DOMAIN_INVALID);
+}
+
+BOOST_AUTO_TEST_CASE(value_scalar_conversion_skeleton_orders_scalar_bound_before_conversion)
+{
+    BOOST_CHECK(helsing::CheckHelsingValueScalarConversionSkeleton(0, 0, 1, false, false, false) == helsing::HelsingValueScalarConversionSkeletonResult::SCALAR_ORDER_BOUND_INVALID);
+    BOOST_CHECK(helsing::CheckHelsingValueScalarConversionSkeleton(1, 1, 2, false, true, true) == helsing::HelsingValueScalarConversionSkeletonResult::SCALAR_ORDER_BOUND_INVALID);
+}
+
+BOOST_AUTO_TEST_CASE(value_scalar_conversion_skeleton_orders_encoding_and_injectivity_blockers)
+{
+    BOOST_CHECK(helsing::CheckHelsingValueScalarConversionSkeleton(0, 0, 1, true, false, false) == helsing::HelsingValueScalarConversionSkeletonResult::VALUE_TO_SCALAR_ENCODING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingValueScalarConversionSkeleton(0, 0, 1, true, false, true) == helsing::HelsingValueScalarConversionSkeletonResult::VALUE_TO_SCALAR_ENCODING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingValueScalarConversionSkeleton(0, 0, 1, true, true, false) == helsing::HelsingValueScalarConversionSkeletonResult::INJECTIVE_SCALAR_CONVERSION_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(value_scalar_conversion_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(198, DeterministicPoint(198));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::HelsingValueScalarConversionSkeletonResult result = helsing::CheckHelsingValueScalarConversionSkeleton(MAX_MONEY - 1, MAX_MONEY - 1, MAX_MONEY, true, true, true);
+
+    BOOST_CHECK(result == helsing::HelsingValueScalarConversionSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(stake_value_parameter_skeleton_checks_stakeverify_value_domain)
 {
     BOOST_CHECK(helsing::IsStakeValueParameterInRangeSkeleton(0, 1, true));
