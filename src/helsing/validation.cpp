@@ -464,6 +464,14 @@ StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const S
     return StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED;
 }
 
+StakeVerificationBlockedSkeletonResult CheckStakeVerificationBlockedSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& outputSatisfiesSparkRules)
+{
+    StakeVerificationBlockedSkeletonResult result;
+    result.output_result = CheckStakeVerificationOutputsSkeleton(tx, helsingState, view, stakeValue, vMax, vMaxLessThanGroupOrder, canonicalEncodingsValid, canonicalContextValid, payoutAddressValid, updatePublicKeyValid, nodeSigningKeyMaterialValid, n, m, outputSatisfiesSparkRules);
+    result.proof_result = CheckStakeProofVerificationSkeleton(result.output_result);
+    return result;
+}
+
 StakeIdConstructionSkeletonResult CheckStakeIdConstructionSkeleton(bool stakeVerifyAccepted, bool canonicalStakeTxEncodingAvailable)
 {
     if (!stakeVerifyAccepted) {

@@ -141,6 +141,11 @@ enum class StakeProofVerificationSkeletonResult {
     STATEMENT_HASHING_UNIMPLEMENTED,
 };
 
+struct StakeVerificationBlockedSkeletonResult {
+    StakeVerificationOutputSkeletonResult output_result;
+    StakeProofVerificationSkeletonResult proof_result{StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED};
+};
+
 enum class StakeIdConstructionSkeletonResult {
     STAKE_VERIFY_NOT_ACCEPTED,
     CANONICAL_TX_ENCODING_UNIMPLEMENTED,
@@ -245,6 +250,9 @@ StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(cons
 // canonical statement hashing and real ParVerify/RepVerify/TagVerify are required
 // before any acceptance path may exist.
 StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult);
+// Revised spec StakeVerify steps 1-11 composition with no accepting result. This
+// runs the step-1-through-7 output checks, then the proof-verification blocker.
+StakeVerificationBlockedSkeletonResult CheckStakeVerificationBlockedSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& outputSatisfiesSparkRules);
 // Revised spec post-acceptance stake_id construction is deliberately unimplemented:
 // canonical(tx) and the consensus hash domain must be defined before deriving stake_id.
 StakeIdConstructionSkeletonResult CheckStakeIdConstructionSkeleton(bool stakeVerifyAccepted, bool canonicalStakeTxEncodingAvailable);
