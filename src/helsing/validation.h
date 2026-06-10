@@ -115,6 +115,11 @@ enum class StakeUpdateAuthorizationSkeletonResult {
     UPDATE_SIGNATURE_VERIFICATION_UNIMPLEMENTED,
 };
 
+struct StakeUpdateVerificationBlockedSkeletonResult {
+    StakeUpdateVerificationSkeletonResult prefix_result;
+    StakeUpdateAuthorizationSkeletonResult authorization_result{StakeUpdateAuthorizationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED};
+};
+
 struct StakeVerificationContextSkeletonResult {
     StakeVerificationPrefixSkeletonResult prefix_result{StakeVerificationPrefixSkeletonResult::OK};
     StakeValidationResult tag_result{StakeValidationResult::OK};
@@ -323,6 +328,10 @@ StakeUpdateVerificationSkeletonResult CheckStakeUpdateVerificationSkeleton(const
 // caller supplies implementation-availability flags, not consensus validation
 // results; this helper has no accepting result.
 StakeUpdateAuthorizationSkeletonResult CheckStakeUpdateAuthorizationSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool updateSignatureHashingAvailable);
+
+// Revised-spec StakeUpdateVerify steps 1-6 composition with no accepting result.
+// This runs field/eligibility checks, then the authorization blocker.
+StakeUpdateVerificationBlockedSkeletonResult CheckStakeUpdateVerificationBlockedSkeleton(const StakeUpdateTx& tx, const ValidationStateView& view, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool updateSignatureHashingAvailable);
 
 // Block-level skeleton for revised-spec ValidateBlock step 4 and StakeUpdateVerify steps 1-3 only.
 // This deliberately stops before context parsing, signature verification, effective-height rules,

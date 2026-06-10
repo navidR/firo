@@ -937,6 +937,14 @@ StakeUpdateAuthorizationSkeletonResult CheckStakeUpdateAuthorizationSkeleton(con
     return StakeUpdateAuthorizationSkeletonResult::UPDATE_SIGNATURE_VERIFICATION_UNIMPLEMENTED;
 }
 
+StakeUpdateVerificationBlockedSkeletonResult CheckStakeUpdateVerificationBlockedSkeleton(const StakeUpdateTx& tx, const ValidationStateView& view, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool updateSignatureHashingAvailable)
+{
+    StakeUpdateVerificationBlockedSkeletonResult result;
+    result.prefix_result = CheckStakeUpdateVerificationSkeleton(tx, view);
+    result.authorization_result = CheckStakeUpdateAuthorizationSkeleton(result.prefix_result, updatePublicKeyExtractionAvailable, canonicalNewContextValidationAvailable, updateSignatureHashingAvailable);
+    return result;
+}
+
 StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view)
 {
     for (const StakeUpdateTx& tx : update_txs) {
