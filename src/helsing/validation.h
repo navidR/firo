@@ -185,6 +185,14 @@ struct BlockValidationBlockedSkeletonResult {
     BlockValidationSuffixSkeletonResult suffix_result{BlockValidationSuffixSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED};
 };
 
+enum class PersistentBlockApplicationSkeletonResult {
+    ACCEPTED_BLOCK_DATA_UNAVAILABLE,
+    HELSING_STATE_STORAGE_UNIMPLEMENTED,
+    SPARK_OUTPUT_STORAGE_UNIMPLEMENTED,
+    UNDO_DATA_SERIALIZATION_UNIMPLEMENTED,
+    DISCONNECT_REPLAY_UNIMPLEMENTED,
+};
+
 enum class StakeIdConstructionSkeletonResult {
     STAKE_VERIFY_NOT_ACCEPTED,
     CANONICAL_TX_ENCODING_UNIMPLEMENTED,
@@ -410,6 +418,11 @@ BlockValidationSparkPrepassSkeletonResult CheckBlockValidationSparkPrepassSkelet
 // real Spark spend validation/tag extraction, StakeVerify, StakeUpdateVerify,
 // PayoutVerify, persistence, and undo data are required.
 BlockValidationBlockedSkeletonResult CheckBlockValidationBlockedSkeleton(const std::vector<GroupElement>& sparkSpendTags, const std::vector<StakeTx>& stake_txs, const std::vector<StakeUpdateTx>& update_txs, const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& parentView, int currentHeight, int stakeMaturity);
+
+// Persistent integration for revised spec section 6 state and section 12
+// mutation is deliberately blocked until accepted block data, storage, undo
+// serialization, and disconnect replay are all implemented together.
+PersistentBlockApplicationSkeletonResult CheckPersistentBlockApplicationSkeleton(bool acceptedBlockDataAvailable, bool helsingStateStorageAvailable, bool sparkOutputStorageAvailable, bool undoDataSerializationAvailable);
 
 } // namespace helsing
 

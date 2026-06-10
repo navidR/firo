@@ -1083,4 +1083,22 @@ BlockValidationBlockedSkeletonResult CheckBlockValidationBlockedSkeleton(
     return result;
 }
 
+PersistentBlockApplicationSkeletonResult CheckPersistentBlockApplicationSkeleton(bool acceptedBlockDataAvailable, bool helsingStateStorageAvailable, bool sparkOutputStorageAvailable, bool undoDataSerializationAvailable)
+{
+    if (!acceptedBlockDataAvailable) {
+        return PersistentBlockApplicationSkeletonResult::ACCEPTED_BLOCK_DATA_UNAVAILABLE;
+    }
+    if (!helsingStateStorageAvailable) {
+        return PersistentBlockApplicationSkeletonResult::HELSING_STATE_STORAGE_UNIMPLEMENTED;
+    }
+    if (!sparkOutputStorageAvailable) {
+        return PersistentBlockApplicationSkeletonResult::SPARK_OUTPUT_STORAGE_UNIMPLEMENTED;
+    }
+    if (!undoDataSerializationAvailable) {
+        return PersistentBlockApplicationSkeletonResult::UNDO_DATA_SERIALIZATION_UNIMPLEMENTED;
+    }
+
+    return PersistentBlockApplicationSkeletonResult::DISCONNECT_REPLAY_UNIMPLEMENTED;
+}
+
 } // namespace helsing

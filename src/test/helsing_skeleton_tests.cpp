@@ -4095,6 +4095,43 @@ BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_does_not_mutate_state_or_
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(persistent_block_application_skeleton_requires_accepted_block_data_first)
+{
+    BOOST_CHECK(helsing::CheckPersistentBlockApplicationSkeleton(false, false, false, false) == helsing::PersistentBlockApplicationSkeletonResult::ACCEPTED_BLOCK_DATA_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckPersistentBlockApplicationSkeleton(false, true, true, true) == helsing::PersistentBlockApplicationSkeletonResult::ACCEPTED_BLOCK_DATA_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(persistent_block_application_skeleton_blocks_storage_before_undo)
+{
+    BOOST_CHECK(helsing::CheckPersistentBlockApplicationSkeleton(true, false, true, true) == helsing::PersistentBlockApplicationSkeletonResult::HELSING_STATE_STORAGE_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPersistentBlockApplicationSkeleton(true, true, false, true) == helsing::PersistentBlockApplicationSkeletonResult::SPARK_OUTPUT_STORAGE_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(persistent_block_application_skeleton_blocks_undo_before_disconnect)
+{
+    BOOST_CHECK(helsing::CheckPersistentBlockApplicationSkeleton(true, true, true, false) == helsing::PersistentBlockApplicationSkeletonResult::UNDO_DATA_SERIALIZATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPersistentBlockApplicationSkeleton(true, true, true, true) == helsing::PersistentBlockApplicationSkeletonResult::DISCONNECT_REPLAY_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(persistent_block_application_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(191, DeterministicPoint(191));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::PersistentBlockApplicationSkeletonResult result = helsing::CheckPersistentBlockApplicationSkeleton(true, true, true, true);
+
+    BOOST_CHECK(result == helsing::PersistentBlockApplicationSkeletonResult::DISCONNECT_REPLAY_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(state_rejects_default_tag)
 {
     helsing::CHelsingState state;

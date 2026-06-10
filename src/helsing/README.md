@@ -71,6 +71,7 @@ Current scope:
 - `CheckBlockValidationPrefixWithSpentTagsSkeleton` composes revised spec `ValidateBlock` steps 2-5 without mutation: it builds `BlockSpentTags` from caller-supplied valid Spark-spend tags, copies them into a validation view, then runs the existing stake/update/payout prefix checks.
 - `CheckBlockValidationSparkPrepassSkeleton` is an explicit blocker for revised spec `ValidateBlock` step 1. It blocks ordinary Spark spend validation before any revealed-tag extraction and has no acceptance result.
 - `CheckBlockValidationBlockedSkeleton` composes full revised spec `ValidateBlock` without an accepting path by stopping at the step-1 Spark pre-pass blocker; it does not trust caller-supplied spend tags as consensus-valid block evidence.
+- `CheckPersistentBlockApplicationSkeleton` is an explicit blocker for persistent integration of revised spec section 6 state and section 12 mutation. It requires accepted block data, Helsing-state storage, `SparkOutputs` storage, undo serialization, and disconnect replay before any persistent path can be treated as complete.
 - `ApplyAcceptedStakesSkeleton` applies already accepted new stakes to in-memory `ActiveTags` and `StakeRecords`; it takes caller-supplied `stake_id` values because canonical stake-id hashing is not implemented.
 - `ApplyAcceptedStakeUpdateSkeleton` applies an already accepted update to `StakeRecords` by changing only `m` and `last_update_height`; it does not validate contexts or signatures.
 - `ApplyAcceptedStakeUpdatesSkeleton` applies already accepted stake updates as an all-or-nothing batch; duplicate updates for the same `stake_id` are rejected by the unwired skeleton because the revised spec does not define same-block duplicate-update ordering.
@@ -92,6 +93,7 @@ Not implemented yet:
 - real Spark transaction-type spend-path analysis for deciding when every spend path reveals a Spark tag
 - consensus wiring, persistence, and undo data for marking `SparkOutputs` as `helsing_eligible`
 - persistent block undo data for Helsing state mutations
+- persistent block disconnect/replay integration for Helsing state and `SparkOutputs`
 - consensus block-level duplicate new stake tag integration
 - consensus wiring for applying accepted new stakes during deterministic block application
 - any full block-acceptance path before real `StakeVerify`, `StakeUpdateVerify`, and `PayoutVerify` exist
