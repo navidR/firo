@@ -26,6 +26,7 @@ Current scope:
 - `IsCompleteStakeTxSkeleton` checks that caller-supplied `StakeTx` cover-set, context, and proof fields are populated before future staking verification; it does not define context grammar or verify proofs.
 - `IsCompleteStakeUpdateTxSkeleton` checks that caller-supplied `StakeUpdateTx` fields are populated before any future signature verification; it does not define context grammar or verify `sig_update`.
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
+- `SparkOutputType::PAYOUT` models the revised spec section 6 payout-output type label for `SparkOutputs`; it does not parse payout coins or make payout outputs eligible for staking.
 - `ExtractSparkOutputRecords` builds a consensus-inert `(txid, vout) -> SparkOutputRecord` view from valid Spark mint and spend-created output scripts.
 - `IsHelsingEligibleOutputCandidateSkeleton` checks the revised spec section 13 rule that outputs with any non-tag-revealing spend path must not be marked `helsing_eligible`; the caller supplies spend-path analysis.
 - `CheckHelsingEligibleOutputMarkingSkeleton` is an explicit blocker for real section 13 eligibility marking. It requires a valid Spark output record, then blocks before Spark spend-path analysis, persistent eligibility marking, undo data, and consensus wiring; it has no accepting result and does not mark outputs.

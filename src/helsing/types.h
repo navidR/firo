@@ -121,6 +121,7 @@ enum class SparkOutputType : uint8_t {
     UNKNOWN = 0,
     MINT = 1,
     SPEND = 2,
+    PAYOUT = 3,
 };
 
 struct SparkOutputRecord {

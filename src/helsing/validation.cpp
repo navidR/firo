@@ -1027,7 +1027,9 @@ bool IsValidSparkOutputRecord(const SparkOutputRecord& output)
            IsValidPublicPoint(output.C) &&
            IsValidPublicPoint(output.K) &&
            output.nHeight >= 0 &&
-           (output.type == SparkOutputType::MINT || output.type == SparkOutputType::SPEND);
+           (output.type == SparkOutputType::MINT ||
+            output.type == SparkOutputType::SPEND ||
+            output.type == SparkOutputType::PAYOUT);
 }
 
 bool IsHelsingEligibleOutputCandidateSkeleton(const SparkOutputRecord& output, bool allSpendPathsRevealTags)

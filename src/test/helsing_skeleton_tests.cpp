@@ -2475,6 +2475,10 @@ BOOST_AUTO_TEST_CASE(spark_output_record_helper_rejects_malformed_records)
     BOOST_CHECK(helsing::IsValidSparkOutputRecord(record));
 
     record = EligibleOutput(Output(1, 0), 20);
+    record.type = helsing::SparkOutputType::PAYOUT;
+    BOOST_CHECK(helsing::IsValidSparkOutputRecord(record));
+
+    record = EligibleOutput(Output(1, 0), 20);
     record.S = GroupElement();
     BOOST_CHECK(!helsing::IsValidSparkOutputRecord(record));
 
@@ -2508,10 +2512,6 @@ BOOST_AUTO_TEST_CASE(spark_output_record_helper_rejects_malformed_records)
 
     record = EligibleOutput(Output(1, 0), 20);
     record.type = static_cast<helsing::SparkOutputType>(255);
-    BOOST_CHECK(!helsing::IsValidSparkOutputRecord(record));
-
-    record = EligibleOutput(Output(1, 0), 20);
-    record.type = static_cast<helsing::SparkOutputType>(3);
     BOOST_CHECK(!helsing::IsValidSparkOutputRecord(record));
 
     record = EligibleOutput(Output(1, 0), 20);
@@ -6647,15 +6647,16 @@ BOOST_AUTO_TEST_CASE(rejects_missing_or_ineligible_outputs)
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::OUTPUT_NOT_ELIGIBLE);
 }
 
-BOOST_AUTO_TEST_CASE(accepts_mint_and_spend_output_types)
+BOOST_AUTO_TEST_CASE(accepts_mint_spend_and_payout_output_types)
 {
     helsing::StakeTx tx = ValidStakeTx();
     helsing::ValidationStateView view = ValidView(tx);
 
     view.sparkOutputs[tx.inCoinIDs[0]].type = helsing::SparkOutputType::SPEND;
-    view.sparkOutputs[tx.inCoinIDs[1]].type = helsing::SparkOutputType::SPEND;
+    view.sparkOutputs[tx.inCoinIDs[1]].type = helsing::SparkOutputType::PAYOUT;
 
     BOOST_CHECK(helsing::IsValidSparkOutputRecord(view.sparkOutputs[tx.inCoinIDs[0]]));
+    BOOST_CHECK(helsing::IsValidSparkOutputRecord(view.sparkOutputs[tx.inCoinIDs[1]]));
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::OK);
 }
 
@@ -6716,9 +6717,6 @@ BOOST_AUTO_TEST_CASE(rejects_malformed_output_records)
     view.sparkOutputs[tx.inCoinIDs[0]].type = static_cast<helsing::SparkOutputType>(255);
     BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
 
-    view = ValidView(tx);
-    view.sparkOutputs[tx.inCoinIDs[0]].type = static_cast<helsing::SparkOutputType>(3);
-    BOOST_CHECK(helsing::CheckStakeSkeleton(tx, view) == helsing::StakeValidationResult::INVALID_OUTPUT_RECORD);
 }
 
 BOOST_AUTO_TEST_CASE(rejects_missing_second_output)
