@@ -293,6 +293,15 @@ enum class StakeUpdateSignatureVerificationSkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class StakeUpdateCurrentContextKeySkeletonResult {
+    STAKE_UPDATE_PREFIX_FAILED,
+    CURRENT_CONTEXT_ENCODING_UNIMPLEMENTED,
+    UPDATE_PUBLIC_KEY_EXTRACTION_UNIMPLEMENTED,
+    UPDATE_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED,
+    CURRENT_CONTEXT_AUTHORITY_BINDING_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 struct StakeUpdateVerificationBlockedSkeletonResult {
     StakeUpdateVerificationSkeletonResult prefix_result;
     StakeUpdateAuthorizationSkeletonResult authorization_result{StakeUpdateAuthorizationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED};
@@ -736,6 +745,11 @@ StakeUpdateSignatureMessageSkeletonResult CheckStakeUpdateSignatureMessageSkelet
 // Verify(update_pk, update_message, sig_update). This blocker has no accepting
 // result and does not parse sig_update, validate update_pk, or verify signatures.
 StakeUpdateSignatureVerificationSkeletonResult CheckStakeUpdateSignatureVerificationSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updateMessageConstructionAvailable, bool canonicalSignatureEncodingAvailable, bool updatePublicKeyValidationAvailable, bool signatureSchemeBindingAvailable, bool updateSignatureVerificationAvailable);
+
+// Revised-spec StakeUpdateVerify step 4 extracts update_pk from the current
+// registered context m, not from m_new. This blocker has no accepting result and
+// does not parse contexts, extract keys, or bind authorization.
+StakeUpdateCurrentContextKeySkeletonResult CheckStakeUpdateCurrentContextKeySkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool canonicalCurrentContextEncodingAvailable, bool updatePublicKeyExtractionAvailable, bool updatePublicKeyValidationAvailable, bool currentContextAuthorityBindingAvailable);
 
 // Revised-spec StakeUpdateVerify steps 4-6 are deliberately blocked here. The
 // caller supplies implementation-availability flags, not consensus validation

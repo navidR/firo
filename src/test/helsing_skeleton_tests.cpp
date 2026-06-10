@@ -4358,6 +4358,56 @@ BOOST_AUTO_TEST_CASE(stake_update_signature_verification_skeleton_has_no_accepti
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(stake_update_current_context_key_skeleton_checks_prefix_first)
+{
+    const helsing::StakeUpdateVerificationSkeletonResult incompletePrefix{false, helsing::StakeValidationResult::OK};
+    const helsing::StakeUpdateVerificationSkeletonResult blockedPrefix{true, helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK};
+
+    BOOST_CHECK(helsing::CheckStakeUpdateCurrentContextKeySkeleton(incompletePrefix, false, false, false, false) == helsing::StakeUpdateCurrentContextKeySkeletonResult::STAKE_UPDATE_PREFIX_FAILED);
+    BOOST_CHECK(helsing::CheckStakeUpdateCurrentContextKeySkeleton(blockedPrefix, false, false, false, false) == helsing::StakeUpdateCurrentContextKeySkeletonResult::STAKE_UPDATE_PREFIX_FAILED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_current_context_key_skeleton_orders_key_blockers)
+{
+    const helsing::StakeUpdateVerificationSkeletonResult prefix{true, helsing::StakeValidationResult::OK};
+
+    BOOST_CHECK(helsing::CheckStakeUpdateCurrentContextKeySkeleton(prefix, false, false, false, false) == helsing::StakeUpdateCurrentContextKeySkeletonResult::CURRENT_CONTEXT_ENCODING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateCurrentContextKeySkeleton(prefix, true, false, false, false) == helsing::StakeUpdateCurrentContextKeySkeletonResult::UPDATE_PUBLIC_KEY_EXTRACTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateCurrentContextKeySkeleton(prefix, true, true, false, false) == helsing::StakeUpdateCurrentContextKeySkeletonResult::UPDATE_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateCurrentContextKeySkeleton(prefix, true, true, true, false) == helsing::StakeUpdateCurrentContextKeySkeletonResult::CURRENT_CONTEXT_AUTHORITY_BINDING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateCurrentContextKeySkeleton(prefix, true, true, true, true) == helsing::StakeUpdateCurrentContextKeySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_current_context_key_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(61, DeterministicPoint(61));
+    helsing::StakeUpdateTx tx;
+    tx.stake_id = record.stake_id;
+    tx.m_new.bytes = {0x6d, 0x3c};
+    tx.sig_update.bytes = {0x73, 0x3c};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::StakeUpdateVerificationSkeletonResult prefix = helsing::CheckStakeUpdateVerificationSkeleton(tx, view);
+    const helsing::StakeUpdateCurrentContextKeySkeletonResult result = helsing::CheckStakeUpdateCurrentContextKeySkeleton(prefix, true, true, true, true);
+
+    BOOST_CHECK(prefix.tx_complete);
+    BOOST_CHECK(prefix.stake_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result == helsing::StakeUpdateCurrentContextKeySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nLastUpdateHeight);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(stake_update_verification_blocked_skeleton_reports_authorization_after_prefix)
 {
     helsing::CHelsingState state;
