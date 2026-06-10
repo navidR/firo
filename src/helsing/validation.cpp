@@ -385,6 +385,25 @@ PayoutAlgorithmSkeletonResult CheckPayoutAlgorithmSkeleton(const PayoutTxSkeleto
     return PayoutAlgorithmSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED;
 }
 
+PayoutRegisteredAddressExtractionSkeletonResult CheckPayoutRegisteredAddressExtractionSkeleton(const PayoutVerificationEligibilitySkeletonResult& eligibilityResult, bool effectiveContextSelectionAvailable, bool payoutAddressGrammarAvailable, bool registeredPayoutAddressExtractionAvailable)
+{
+    if (eligibilityResult.prefix_result != PayoutVerificationPrefixSkeletonResult::OK ||
+        eligibilityResult.stake_result != StakeValidationResult::OK) {
+        return PayoutRegisteredAddressExtractionSkeletonResult::PAYOUT_ELIGIBILITY_FAILED;
+    }
+    if (!effectiveContextSelectionAvailable) {
+        return PayoutRegisteredAddressExtractionSkeletonResult::EFFECTIVE_CONTEXT_SELECTION_UNIMPLEMENTED;
+    }
+    if (!payoutAddressGrammarAvailable) {
+        return PayoutRegisteredAddressExtractionSkeletonResult::PAYOUT_ADDRESS_GRAMMAR_UNIMPLEMENTED;
+    }
+    if (!registeredPayoutAddressExtractionAvailable) {
+        return PayoutRegisteredAddressExtractionSkeletonResult::REGISTERED_PAYOUT_ADDRESS_EXTRACTION_UNIMPLEMENTED;
+    }
+
+    return PayoutRegisteredAddressExtractionSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 PayoutPublicValidationResult CheckPayoutPublicFieldsSkeleton(
     const PayoutTxSkeleton& tx,
     const PayoutBlockContextSkeleton& context,

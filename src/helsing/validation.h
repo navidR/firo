@@ -208,6 +208,14 @@ struct PayoutVerificationBlockedSkeletonResult {
     PayoutVerificationSuffixSkeletonResult suffix_result{PayoutVerificationSuffixSkeletonResult::PAYOUT_ELIGIBILITY_FAILED};
 };
 
+enum class PayoutRegisteredAddressExtractionSkeletonResult {
+    PAYOUT_ELIGIBILITY_FAILED,
+    EFFECTIVE_CONTEXT_SELECTION_UNIMPLEMENTED,
+    PAYOUT_ADDRESS_GRAMMAR_UNIMPLEMENTED,
+    REGISTERED_PAYOUT_ADDRESS_EXTRACTION_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class StakeVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -478,6 +486,10 @@ PayoutIdSourcePolicySkeletonResult CheckPayoutIdSourcePolicySkeleton(const Payou
 // blocked here. The caller supplies implementation-availability flags, not consensus
 // validation results; this helper has no accepting result and does not construct Coin.
 PayoutAlgorithmSkeletonResult CheckPayoutAlgorithmSkeleton(const PayoutTxSkeleton& tx, bool payoutIdentifierAvailable, bool payoutAddressParserAvailable, bool payoutKeyDerivationAvailable, bool payoutCoinConstructionAvailable);
+// Revised spec PayoutVerify step 8 requires extracting the effective registered
+// payout address from record.m before comparing it to tx.addr_pk. This blocker
+// has no accepting result and does not parse contexts or apply update rules.
+PayoutRegisteredAddressExtractionSkeletonResult CheckPayoutRegisteredAddressExtractionSkeleton(const PayoutVerificationEligibilitySkeletonResult& eligibilityResult, bool effectiveContextSelectionAvailable, bool payoutAddressGrammarAvailable, bool registeredPayoutAddressExtractionAvailable);
 // Revised spec PayoutVerify public-field suffix, using only caller-supplied expected values.
 // This checks steps 8, 9, 10, 11 input availability, and 13 equality in order; it
 // does not parse contexts, select masternodes, compute j, run Payout, or verify proofs.
