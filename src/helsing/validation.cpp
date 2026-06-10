@@ -299,6 +299,24 @@ HelsingTransactionWiringSkeletonResult CheckHelsingTransactionWiringSkeleton(boo
     return HelsingTransactionWiringSkeletonResult::BLOCK_INTEGRATION_UNIMPLEMENTED;
 }
 
+HelsingConsensusActivationSkeletonResult CheckHelsingConsensusActivationSkeleton(bool sparkCompatibilityReviewAvailable, bool activationParametersAvailable, bool chainparamsDeploymentWiringAvailable, bool historicalStateBootstrapAvailable)
+{
+    if (!sparkCompatibilityReviewAvailable) {
+        return HelsingConsensusActivationSkeletonResult::SPARK_COMPATIBILITY_REVIEW_UNIMPLEMENTED;
+    }
+    if (!activationParametersAvailable) {
+        return HelsingConsensusActivationSkeletonResult::ACTIVATION_PARAMETERS_UNIMPLEMENTED;
+    }
+    if (!chainparamsDeploymentWiringAvailable) {
+        return HelsingConsensusActivationSkeletonResult::CHAINPARAMS_DEPLOYMENT_WIRING_UNIMPLEMENTED;
+    }
+    if (!historicalStateBootstrapAvailable) {
+        return HelsingConsensusActivationSkeletonResult::HISTORICAL_STATE_BOOTSTRAP_UNIMPLEMENTED;
+    }
+
+    return HelsingConsensusActivationSkeletonResult::ACTIVATION_ENFORCEMENT_UNIMPLEMENTED;
+}
+
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid)
 {
     if (!IsCompleteStakeTxSkeleton(tx)) {

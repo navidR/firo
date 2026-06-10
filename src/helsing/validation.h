@@ -79,6 +79,14 @@ enum class HelsingTransactionWiringSkeletonResult {
     BLOCK_INTEGRATION_UNIMPLEMENTED,
 };
 
+enum class HelsingConsensusActivationSkeletonResult {
+    SPARK_COMPATIBILITY_REVIEW_UNIMPLEMENTED,
+    ACTIVATION_PARAMETERS_UNIMPLEMENTED,
+    CHAINPARAMS_DEPLOYMENT_WIRING_UNIMPLEMENTED,
+    HISTORICAL_STATE_BOOTSTRAP_UNIMPLEMENTED,
+    ACTIVATION_ENFORCEMENT_UNIMPLEMENTED,
+};
+
 enum class PayoutVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -321,6 +329,11 @@ bool IsCompleteStakeTxSkeleton(const StakeTx& tx);
 // and block ordering, but not the Firo consensus carrier/extraction grammar.
 // This blocker has no accepting result and must not be used to parse CTransaction.
 HelsingTransactionWiringSkeletonResult CheckHelsingTransactionWiringSkeleton(bool consensusTxCarrierAvailable, bool stakeTxExtractionAvailable, bool stakeUpdateTxExtractionAvailable, bool payoutTxExtractionAvailable);
+// Revised spec section 30 gives deployment compatibility questions, but not a
+// Firo activation mechanism, activation parameters, or historical-state
+// bootstrap rule. This blocker has no accepting result and must not be used to
+// decide whether Helsing consensus rules are active.
+HelsingConsensusActivationSkeletonResult CheckHelsingConsensusActivationSkeleton(bool sparkCompatibilityReviewAvailable, bool activationParametersAvailable, bool chainparamsDeploymentWiringAvailable, bool historicalStateBootstrapAvailable);
 // Revised spec StakeVerify steps 1-3 only. The caller supplies the result of
 // canonical-encoding validation because the consensus grammar is not implemented here.
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid);

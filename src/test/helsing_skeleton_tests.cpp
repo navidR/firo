@@ -6712,6 +6712,41 @@ BOOST_AUTO_TEST_CASE(payout_index_skeleton_treats_stake_id_and_amount_as_irrelev
     BOOST_CHECK(!helsing::ArePayoutIndexesDistinctSkeleton({first, second, duplicate}));
 }
 
+BOOST_AUTO_TEST_CASE(consensus_activation_skeleton_requires_spark_compatibility_first)
+{
+    BOOST_CHECK(helsing::CheckHelsingConsensusActivationSkeleton(false, false, false, false) == helsing::HelsingConsensusActivationSkeletonResult::SPARK_COMPATIBILITY_REVIEW_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingConsensusActivationSkeleton(false, true, true, true) == helsing::HelsingConsensusActivationSkeletonResult::SPARK_COMPATIBILITY_REVIEW_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(consensus_activation_skeleton_blocks_activation_parameters_before_chainparams)
+{
+    BOOST_CHECK(helsing::CheckHelsingConsensusActivationSkeleton(true, false, true, true) == helsing::HelsingConsensusActivationSkeletonResult::ACTIVATION_PARAMETERS_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingConsensusActivationSkeleton(true, false, false, false) == helsing::HelsingConsensusActivationSkeletonResult::ACTIVATION_PARAMETERS_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(consensus_activation_skeleton_blocks_chainparams_before_bootstrap)
+{
+    BOOST_CHECK(helsing::CheckHelsingConsensusActivationSkeleton(true, true, false, true) == helsing::HelsingConsensusActivationSkeletonResult::CHAINPARAMS_DEPLOYMENT_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingConsensusActivationSkeleton(true, true, false, false) == helsing::HelsingConsensusActivationSkeletonResult::CHAINPARAMS_DEPLOYMENT_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingConsensusActivationSkeleton(true, true, true, false) == helsing::HelsingConsensusActivationSkeletonResult::HISTORICAL_STATE_BOOTSTRAP_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(consensus_activation_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(196, DeterministicPoint(196));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::HelsingConsensusActivationSkeletonResult result = helsing::CheckHelsingConsensusActivationSkeleton(true, true, true, true);
+
+    BOOST_CHECK(result == helsing::HelsingConsensusActivationSkeletonResult::ACTIVATION_ENFORCEMENT_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(stake_wire_deserialization_rejects_truncated_or_noncanonical_streams)
 {
     std::vector<unsigned char> serializedOutput = ParseHex(WireHex(Output(1, 0)));
