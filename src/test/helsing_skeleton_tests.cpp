@@ -1584,6 +1584,42 @@ BOOST_AUTO_TEST_CASE(stake_id_construction_skeleton_does_not_return_stake_id)
     BOOST_CHECK(helsing::CheckStakeIdConstructionSkeleton(true, true) == helsing::StakeIdConstructionSkeletonResult::STAKE_ID_HASHING_UNIMPLEMENTED);
 }
 
+BOOST_AUTO_TEST_CASE(accepted_stake_record_construction_skeleton_requires_accepted_stake_first)
+{
+    BOOST_CHECK(helsing::CheckAcceptedStakeRecordConstructionSkeleton(false, false, false, false, false) == helsing::AcceptedStakeRecordConstructionSkeletonResult::STAKE_VERIFY_NOT_ACCEPTED);
+    BOOST_CHECK(helsing::CheckAcceptedStakeRecordConstructionSkeleton(false, true, true, true, true) == helsing::AcceptedStakeRecordConstructionSkeletonResult::STAKE_VERIFY_NOT_ACCEPTED);
+}
+
+BOOST_AUTO_TEST_CASE(accepted_stake_record_construction_skeleton_orders_post_acceptance_blockers)
+{
+    BOOST_CHECK(helsing::CheckAcceptedStakeRecordConstructionSkeleton(true, false, false, false, false) == helsing::AcceptedStakeRecordConstructionSkeletonResult::STAKE_ID_CONSTRUCTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckAcceptedStakeRecordConstructionSkeleton(true, true, false, false, false) == helsing::AcceptedStakeRecordConstructionSkeletonResult::BLOCK_APPLICATION_HEIGHT_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckAcceptedStakeRecordConstructionSkeleton(true, true, true, false, false) == helsing::AcceptedStakeRecordConstructionSkeletonResult::ACTIVE_TAG_INSERTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckAcceptedStakeRecordConstructionSkeleton(true, true, true, true, false) == helsing::AcceptedStakeRecordConstructionSkeletonResult::STAKE_RECORD_FIELD_CONSTRUCTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckAcceptedStakeRecordConstructionSkeleton(true, true, true, true, true) == helsing::AcceptedStakeRecordConstructionSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(accepted_stake_record_construction_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(201, DeterministicPoint(201));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::AcceptedStakeRecordConstructionSkeletonResult result = helsing::CheckAcceptedStakeRecordConstructionSkeleton(true, true, true, true, true);
+
+    BOOST_CHECK(result == helsing::AcceptedStakeRecordConstructionSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK_EQUAL(stored->nHeight, record.nHeight);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nLastUpdateHeight);
+}
+
 BOOST_AUTO_TEST_CASE(stake_tx_completeness_skeleton_accepts_populated_fields)
 {
     const helsing::StakeTx tx = ValidStakeTx();

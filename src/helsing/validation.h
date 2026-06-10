@@ -463,6 +463,15 @@ enum class StakeIdConstructionSkeletonResult {
     STAKE_ID_HASHING_UNIMPLEMENTED,
 };
 
+enum class AcceptedStakeRecordConstructionSkeletonResult {
+    STAKE_VERIFY_NOT_ACCEPTED,
+    STAKE_ID_CONSTRUCTION_UNIMPLEMENTED,
+    BLOCK_APPLICATION_HEIGHT_UNIMPLEMENTED,
+    ACTIVE_TAG_INSERTION_UNIMPLEMENTED,
+    STAKE_RECORD_FIELD_CONSTRUCTION_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class HelsingEligibleOutputMarkingSkeletonResult {
     OUTPUT_RECORD_INVALID,
     SPARK_SPEND_PATH_ANALYSIS_UNIMPLEMENTED,
@@ -679,6 +688,10 @@ StakeVerificationBlockedSkeletonResult CheckStakeVerificationBlockedSkeleton(con
 // Revised spec post-acceptance stake_id construction is deliberately unimplemented:
 // canonical(tx) and the consensus hash domain must be defined before deriving stake_id.
 StakeIdConstructionSkeletonResult CheckStakeIdConstructionSkeleton(bool stakeVerifyAccepted, bool canonicalStakeTxEncodingAvailable);
+// Revised spec post-acceptance stake-record construction is deliberately blocked:
+// StakeVerify does not mutate state, and deterministic block application must derive
+// stake_id, insert ActiveTags[T], and build StakeRecords[stake_id] together.
+AcceptedStakeRecordConstructionSkeletonResult CheckAcceptedStakeRecordConstructionSkeleton(bool stakeVerifyAccepted, bool stakeIdConstructionAvailable, bool blockApplicationHeightAvailable, bool activeTagInsertionAvailable, bool stakeRecordFieldConstructionAvailable);
 // Revised spec optional collateral-margin subset: validate V_STAKE + margin as integers
 // before scalar conversion. The caller must separately enforce V_MAX < q.
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax);

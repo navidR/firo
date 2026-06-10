@@ -61,6 +61,7 @@ Current scope:
 - `CheckStakeProofTranscriptBindingSkeleton` is an explicit blocker for revised spec section 5.2 proof transcript binding. It requires an available `stake_stmt`, then blocks before proving that `ParVerify`, `RepVerify`, and `TagVerify` each bind the full staking statement; it has no accepting result and does not build transcripts.
 - `CheckStakeVerificationBlockedSkeleton` composes revised spec `StakeVerify` without an accepting path: it runs the step-1-through-6 prefix and stops at the real step-7 Spark maturity/cover-set blocker before statement construction or proof verification.
 - `CheckStakeIdConstructionSkeleton` is an explicit blocker for post-acceptance `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction. It does not hash caller-supplied bytes or return a stake ID.
+- `CheckAcceptedStakeRecordConstructionSkeleton` is an explicit blocker for revised spec section 11 post-acceptance record construction. It requires accepted `StakeVerify`, stake-id construction, block-application height, `ActiveTags[T]` insertion, and `StakeRecords[stake_id]` field construction before consensus wiring; it has no accepting result and does not mutate state.
 - `IsExpectedPayoutAmountInRangeSkeleton` checks the revised spec `PayoutVerify` step 10 equality and integer range for caller-supplied values.
 - `IsPayoutValueParameterInRangeSkeleton` checks revised spec `PayoutVerify` step 10 for caller-supplied `V_PAYOUT`, expected amount, `V_MAX`, and `V_MAX < q`; it does not expose the scalar order, perform scalar conversion, or recompute payout amounts.
 - `CheckPayoutAmountDerivationSkeleton` is an explicit blocker for revised spec `PayoutVerify` step 10 real expected-payout derivation. It requires prior payout selection success, then blocks before Firo consensus reward rules, amount derivation, amount comparison, and value-domain consensus parameters; it has no accepting result.
@@ -118,6 +119,7 @@ Not implemented yet:
 - global canonical encoding grammar, hash-to-field method, domain strings, proof transcript labels, and transcript consensus wiring
 - proof transcripts that bind the full `stake_stmt` for `ParVerify`, `RepVerify`, and `TagVerify`
 - canonical `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction
+- consensus post-acceptance construction of `ActiveTags[T]` and `StakeRecords[stake_id]` from `StakeVerify` results during deterministic block application
 - final `StakeVerify` steps 8-12 after statement hashes and proof verification are implemented
 - replacing caller-supplied Spark maturity/cover-set facts with concrete Spark consensus checks without changing the step-1-through-7 helper into a full verifier
 - Spark maturity and cover-set eligibility rules using current height, Spark ledger state, and consensus maturity/eligibility parameters

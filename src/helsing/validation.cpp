@@ -977,6 +977,27 @@ StakeIdConstructionSkeletonResult CheckStakeIdConstructionSkeleton(bool stakeVer
     return StakeIdConstructionSkeletonResult::STAKE_ID_HASHING_UNIMPLEMENTED;
 }
 
+AcceptedStakeRecordConstructionSkeletonResult CheckAcceptedStakeRecordConstructionSkeleton(bool stakeVerifyAccepted, bool stakeIdConstructionAvailable, bool blockApplicationHeightAvailable, bool activeTagInsertionAvailable, bool stakeRecordFieldConstructionAvailable)
+{
+    if (!stakeVerifyAccepted) {
+        return AcceptedStakeRecordConstructionSkeletonResult::STAKE_VERIFY_NOT_ACCEPTED;
+    }
+    if (!stakeIdConstructionAvailable) {
+        return AcceptedStakeRecordConstructionSkeletonResult::STAKE_ID_CONSTRUCTION_UNIMPLEMENTED;
+    }
+    if (!blockApplicationHeightAvailable) {
+        return AcceptedStakeRecordConstructionSkeletonResult::BLOCK_APPLICATION_HEIGHT_UNIMPLEMENTED;
+    }
+    if (!activeTagInsertionAvailable) {
+        return AcceptedStakeRecordConstructionSkeletonResult::ACTIVE_TAG_INSERTION_UNIMPLEMENTED;
+    }
+    if (!stakeRecordFieldConstructionAvailable) {
+        return AcceptedStakeRecordConstructionSkeletonResult::STAKE_RECORD_FIELD_CONSTRUCTION_UNIMPLEMENTED;
+    }
+
+    return AcceptedStakeRecordConstructionSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 bool IsHelsingStakeValueWithMarginInRangeSkeleton(CAmount stakeValue, CAmount margin, CAmount vMax)
 {
     if (!IsHelsingValueInRange(stakeValue, vMax) || margin < 0) {
