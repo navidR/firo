@@ -56,7 +56,7 @@ const StakeRecord* CHelsingState::GetStakeRecord(const uint256& stake_id) const
 
 bool CHelsingState::AddActiveStake(const StakeRecord& record)
 {
-    if (record.stake_id.IsNull() || record.nHeight < 0 || !IsUsableTag(record.T) || IsSpentTag(record.T) || IsActiveTag(record.T)) {
+    if (record.stake_id.IsNull() || record.m.bytes.empty() || record.nHeight < 0 || !IsUsableTag(record.T) || IsSpentTag(record.T) || IsActiveTag(record.T)) {
         return false;
     }
     if (stakeRecords.count(record.stake_id) != 0) {
@@ -105,7 +105,7 @@ bool CHelsingState::ApplyAcceptedStakesSkeleton(const std::vector<std::pair<uint
 
 bool CHelsingState::ApplyAcceptedStakeUpdateSkeleton(const uint256& stake_id, const StakeContext& m_new, int nHeight)
 {
-    if (nHeight < 0) {
+    if (m_new.bytes.empty() || nHeight < 0) {
         return false;
     }
 
