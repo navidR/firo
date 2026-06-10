@@ -80,6 +80,16 @@ struct PayoutVerificationEligibilitySkeletonResult {
     StakeValidationResult stake_result{StakeValidationResult::OK};
 };
 
+enum class PayoutVerificationSuffixSkeletonResult {
+    PAYOUT_ELIGIBILITY_FAILED,
+    REGISTERED_PAYOUT_ADDRESS_EXTRACTION_UNIMPLEMENTED,
+    DETERMINISTIC_SELECTION_UNIMPLEMENTED,
+    EXPECTED_PAYOUT_AMOUNT_UNIMPLEMENTED,
+    PAYOUT_ID_CONSTRUCTION_UNIMPLEMENTED,
+    PAYOUT_ALGORITHM_UNIMPLEMENTED,
+    PAYOUT_COIN_COMPARISON_UNIMPLEMENTED,
+};
+
 enum class StakeVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -280,6 +290,10 @@ StakeValidationResult CheckPayoutBlockEligibilitySkeleton(const std::vector<Payo
 // Revised-spec PayoutVerify steps 1-7 only. This composes field/canonical prefix
 // checks with stake lookup, active status, spent-tag checks, and maturity.
 PayoutVerificationEligibilitySkeletonResult CheckPayoutVerificationEligibilitySkeleton(const PayoutTxSkeleton& tx, const ValidationStateView& view, int currentHeight, int stakeMaturity, bool canonicalEncodingsValid);
+// Revised-spec PayoutVerify steps 8-13 are deliberately blocked here. The caller
+// supplies implementation-availability flags, not consensus validation results;
+// this helper has no accepting result and does not call the payout algorithm.
+PayoutVerificationSuffixSkeletonResult CheckPayoutVerificationSuffixSkeleton(const PayoutVerificationEligibilitySkeletonResult& eligibilityResult, bool registeredPayoutAddressExtractionAvailable, bool deterministicSelectionAvailable, bool expectedPayoutAmountAvailable, bool payoutIdConstructionAvailable, bool payoutAlgorithmAvailable);
 // Structural skeleton for revised-spec PayoutVerify steps 3-13 using caller-supplied
 // expected public values for steps that are not implemented yet. This does not parse
 // contexts, select masternodes, compute j, run Payout, or verify payout coins.

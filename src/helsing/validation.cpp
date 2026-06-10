@@ -817,6 +817,31 @@ PayoutVerificationEligibilitySkeletonResult CheckPayoutVerificationEligibilitySk
     return result;
 }
 
+PayoutVerificationSuffixSkeletonResult CheckPayoutVerificationSuffixSkeleton(const PayoutVerificationEligibilitySkeletonResult& eligibilityResult, bool registeredPayoutAddressExtractionAvailable, bool deterministicSelectionAvailable, bool expectedPayoutAmountAvailable, bool payoutIdConstructionAvailable, bool payoutAlgorithmAvailable)
+{
+    if (eligibilityResult.prefix_result != PayoutVerificationPrefixSkeletonResult::OK ||
+        eligibilityResult.stake_result != StakeValidationResult::OK) {
+        return PayoutVerificationSuffixSkeletonResult::PAYOUT_ELIGIBILITY_FAILED;
+    }
+    if (!registeredPayoutAddressExtractionAvailable) {
+        return PayoutVerificationSuffixSkeletonResult::REGISTERED_PAYOUT_ADDRESS_EXTRACTION_UNIMPLEMENTED;
+    }
+    if (!deterministicSelectionAvailable) {
+        return PayoutVerificationSuffixSkeletonResult::DETERMINISTIC_SELECTION_UNIMPLEMENTED;
+    }
+    if (!expectedPayoutAmountAvailable) {
+        return PayoutVerificationSuffixSkeletonResult::EXPECTED_PAYOUT_AMOUNT_UNIMPLEMENTED;
+    }
+    if (!payoutIdConstructionAvailable) {
+        return PayoutVerificationSuffixSkeletonResult::PAYOUT_ID_CONSTRUCTION_UNIMPLEMENTED;
+    }
+    if (!payoutAlgorithmAvailable) {
+        return PayoutVerificationSuffixSkeletonResult::PAYOUT_ALGORITHM_UNIMPLEMENTED;
+    }
+
+    return PayoutVerificationSuffixSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED;
+}
+
 PayoutVerificationSkeletonResult CheckPayoutVerificationSkeleton(
     const PayoutTxSkeleton& tx,
     const ValidationStateView& view,
