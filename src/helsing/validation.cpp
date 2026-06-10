@@ -673,6 +673,27 @@ HelsingCanonicalTranscriptSkeletonResult CheckHelsingCanonicalTranscriptSkeleton
     return HelsingCanonicalTranscriptSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+HelsingPublicParametersHashSkeletonResult CheckHelsingPublicParametersHashSkeleton(bool sparkParameterSnapshotAvailable, bool helsingGeneratorSetAvailable, bool proofSystemParameterBindingAvailable, bool canonicalParameterEncodingAvailable, bool publicParameterHashingAvailable)
+{
+    if (!sparkParameterSnapshotAvailable) {
+        return HelsingPublicParametersHashSkeletonResult::SPARK_PARAMETER_SNAPSHOT_UNIMPLEMENTED;
+    }
+    if (!helsingGeneratorSetAvailable) {
+        return HelsingPublicParametersHashSkeletonResult::HELSING_GENERATOR_SET_UNIMPLEMENTED;
+    }
+    if (!proofSystemParameterBindingAvailable) {
+        return HelsingPublicParametersHashSkeletonResult::PROOF_SYSTEM_PARAMETER_BINDING_UNIMPLEMENTED;
+    }
+    if (!canonicalParameterEncodingAvailable) {
+        return HelsingPublicParametersHashSkeletonResult::CANONICAL_PARAMETER_ENCODING_UNIMPLEMENTED;
+    }
+    if (!publicParameterHashingAvailable) {
+        return HelsingPublicParametersHashSkeletonResult::PUBLIC_PARAMETER_HASHING_UNIMPLEMENTED;
+    }
+
+    return HelsingPublicParametersHashSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid)
 {
     if (!IsCompleteStakeTxSkeleton(tx)) {

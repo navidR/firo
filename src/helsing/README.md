@@ -17,6 +17,7 @@ Current scope:
 - `CheckStakeContextTimingFieldsSkeleton` is an explicit blocker for revised spec section 7 optional activation/expiration fields in public context `m`. It blocks before defining the field grammar, activation-field semantics, expiration-field semantics, or consensus wiring; it has no accepting result and does not parse context bytes or mutate state.
 - `CheckCollateralMovementStatusPolicySkeleton` is an explicit blocker for moved-collateral status semantics. Revised spec section 12 step 6 says block application sets the matching stake record status to `spent`, while sections 13 and 24 describe the same collateral movement as deactivation; this helper blocks before choosing a canonical status mapping or wiring it into consensus.
 - `CheckHelsingCanonicalTranscriptSkeleton` is an explicit blocker for the revised spec section 5/5.1 canonical transcript setup. It blocks before canonical encoding grammar, consensus hash-to-field method, domain-separation strings, proof transcript labels, and consensus wiring; it has no accepting result and does not hash transcripts.
+- `CheckHelsingPublicParametersHashSkeleton` is an explicit blocker for the revised spec section 5.2 `pp_hash` input to `stake_stmt`. It blocks before defining the Spark parameter snapshot, Helsing generator set, proof-system parameter binding, canonical parameter encoding, and hash construction; it has no accepting result and does not construct `pp_hash`.
 - `PayoutBlockContextSkeleton` models the revised spec section 16 payout-id input fields `{chain_id, block_height, prev_block_hash, payout_index, selected_stake_id}` without defining or computing `j`.
 - `IsCompletePayoutBlockContextSkeleton` checks that caller-supplied section 16 payout-id input fields are populated before any future `j` construction; it does not define canonical `chain_id` or `enc_*` grammar.
 - `DoesPayoutContextMatchTxSkeleton` checks that caller-supplied payout tx and block-context skeletons agree on `payout_index` and `selected_stake_id`; it does not construct `j`.
@@ -120,6 +121,7 @@ Not implemented yet:
 
 - canonical `stake_stmt`, `incoins_root`, context hashing, and any accepting `StakeVerify` proof path
 - consensus binding of `chain_id`, `protocol_version`, `pp_hash`, and `V_STAKE` into `stake_stmt`
+- consensus `pp_hash` construction from the deployed Spark parameter snapshot, Helsing generators, and proof-system parameters
 - consensus binding of `incoins_root`, public offsets, public tag, and `context_hash` into `stake_stmt`
 - global canonical encoding grammar, hash-to-field method, domain strings, proof transcript labels, and transcript consensus wiring
 - proof transcripts that bind the full `stake_stmt` for `ParVerify`, `RepVerify`, and `TagVerify`

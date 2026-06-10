@@ -2117,6 +2117,43 @@ BOOST_AUTO_TEST_CASE(canonical_transcript_skeleton_has_no_accepting_or_mutating_
     BOOST_CHECK(!state.IsSpentTag(record.T));
 }
 
+BOOST_AUTO_TEST_CASE(public_parameters_hash_skeleton_requires_spark_snapshot_first)
+{
+    BOOST_CHECK(helsing::CheckHelsingPublicParametersHashSkeleton(false, false, false, false, false) == helsing::HelsingPublicParametersHashSkeletonResult::SPARK_PARAMETER_SNAPSHOT_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingPublicParametersHashSkeleton(false, true, true, true, true) == helsing::HelsingPublicParametersHashSkeletonResult::SPARK_PARAMETER_SNAPSHOT_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(public_parameters_hash_skeleton_orders_parameter_blockers)
+{
+    BOOST_CHECK(helsing::CheckHelsingPublicParametersHashSkeleton(true, false, true, true, true) == helsing::HelsingPublicParametersHashSkeletonResult::HELSING_GENERATOR_SET_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingPublicParametersHashSkeleton(true, false, false, false, false) == helsing::HelsingPublicParametersHashSkeletonResult::HELSING_GENERATOR_SET_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingPublicParametersHashSkeleton(true, true, false, true, true) == helsing::HelsingPublicParametersHashSkeletonResult::PROOF_SYSTEM_PARAMETER_BINDING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingPublicParametersHashSkeleton(true, true, true, false, true) == helsing::HelsingPublicParametersHashSkeletonResult::CANONICAL_PARAMETER_ENCODING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingPublicParametersHashSkeleton(true, true, true, true, false) == helsing::HelsingPublicParametersHashSkeletonResult::PUBLIC_PARAMETER_HASHING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingPublicParametersHashSkeleton(true, true, true, true, true) == helsing::HelsingPublicParametersHashSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(public_parameters_hash_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(201, DeterministicPoint(201));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::HelsingPublicParametersHashSkeletonResult result = helsing::CheckHelsingPublicParametersHashSkeleton(true, true, true, true, true);
+
+    BOOST_CHECK(result == helsing::HelsingPublicParametersHashSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->T == record.T);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(payout_address_match_skeleton_compares_extracted_registered_address)
 {
     helsing::PayoutTxSkeleton tx;

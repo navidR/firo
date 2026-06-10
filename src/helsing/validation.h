@@ -207,6 +207,15 @@ enum class HelsingCanonicalTranscriptSkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class HelsingPublicParametersHashSkeletonResult {
+    SPARK_PARAMETER_SNAPSHOT_UNIMPLEMENTED,
+    HELSING_GENERATOR_SET_UNIMPLEMENTED,
+    PROOF_SYSTEM_PARAMETER_BINDING_UNIMPLEMENTED,
+    CANONICAL_PARAMETER_ENCODING_UNIMPLEMENTED,
+    PUBLIC_PARAMETER_HASHING_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class HelsingValueScalarConversionSkeletonResult {
     VALUE_INTEGER_DOMAIN_INVALID,
     SCALAR_ORDER_BOUND_INVALID,
@@ -675,6 +684,11 @@ CollateralMovementStatusPolicySkeletonResult CheckCollateralMovementStatusPolicy
 // labels before proof paths can be consensus-valid. This blocker has no accepting
 // result and does not hash or verify transcripts.
 HelsingCanonicalTranscriptSkeletonResult CheckHelsingCanonicalTranscriptSkeleton(bool canonicalEncodingGrammarAvailable, bool hashToFieldMethodAvailable, bool domainSeparationStringsAvailable, bool proofTranscriptLabelsAvailable);
+// Revised spec sections 3-5.2 require consensus-visible public parameters and
+// `pp_hash` to be bound into `stake_stmt`, but do not define the concrete
+// parameter inventory or canonical hash construction. This blocker has no
+// accepting result and does not construct `pp_hash`.
+HelsingPublicParametersHashSkeletonResult CheckHelsingPublicParametersHashSkeleton(bool sparkParameterSnapshotAvailable, bool helsingGeneratorSetAvailable, bool proofSystemParameterBindingAvailable, bool canonicalParameterEncodingAvailable, bool publicParameterHashingAvailable);
 // Revised spec StakeVerify steps 1-3 only. The caller supplies the result of
 // canonical-encoding validation because the consensus grammar is not implemented here.
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid);
