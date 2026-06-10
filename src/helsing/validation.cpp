@@ -470,7 +470,7 @@ StakeStatementConstructionSkeletonResult CheckStakeStatementConstructionSkeleton
     return StakeStatementConstructionSkeletonResult::STAKE_STATEMENT_HASHING_UNIMPLEMENTED;
 }
 
-StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult)
+StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool stakeStatementAvailable, bool parVerifierAvailable, bool repVerifierAvailable)
 {
     if (prefixResult.cover_set_result.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||
         prefixResult.cover_set_result.context_result.tag_result != StakeValidationResult::OK ||
@@ -479,15 +479,25 @@ StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const S
         prefixResult.output_result != StakeValidationResult::OK) {
         return StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED;
     }
+    if (!stakeStatementAvailable) {
+        return StakeProofVerificationSkeletonResult::STAKE_STATEMENT_UNAVAILABLE;
+    }
+    if (!parVerifierAvailable) {
+        return StakeProofVerificationSkeletonResult::PAR_VERIFY_UNIMPLEMENTED;
+    }
+    if (!repVerifierAvailable) {
+        return StakeProofVerificationSkeletonResult::REP_VERIFY_UNIMPLEMENTED;
+    }
 
-    return StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED;
+    return StakeProofVerificationSkeletonResult::TAG_VERIFY_UNIMPLEMENTED;
 }
 
 StakeVerificationBlockedSkeletonResult CheckStakeVerificationBlockedSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& outputSatisfiesSparkRules)
 {
     StakeVerificationBlockedSkeletonResult result;
     result.output_result = CheckStakeVerificationOutputsSkeleton(tx, helsingState, view, stakeValue, vMax, vMaxLessThanGroupOrder, canonicalEncodingsValid, canonicalContextValid, payoutAddressValid, updatePublicKeyValid, nodeSigningKeyMaterialValid, n, m, outputSatisfiesSparkRules);
-    result.proof_result = CheckStakeProofVerificationSkeleton(result.output_result);
+    result.statement_result = CheckStakeStatementConstructionSkeleton(result.output_result, false, false);
+    result.proof_result = CheckStakeProofVerificationSkeleton(result.output_result, false, false, false);
     return result;
 }
 

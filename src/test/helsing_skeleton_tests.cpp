@@ -886,7 +886,22 @@ BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_blocks_after_valid_prefix
     prefix.cover_set_result.cover_set_result = helsing::StakeValidationResult::OK;
     prefix.output_result = helsing::StakeValidationResult::OK;
 
-    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, false, false, false) == helsing::StakeProofVerificationSkeletonResult::STAKE_STATEMENT_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_checks_proof_order)
+{
+    helsing::StakeVerificationOutputSkeletonResult prefix;
+    prefix.cover_set_result.context_result.prefix_result = helsing::StakeVerificationPrefixSkeletonResult::OK;
+    prefix.cover_set_result.context_result.tag_result = helsing::StakeValidationResult::OK;
+    prefix.cover_set_result.context_result.context_valid = true;
+    prefix.cover_set_result.cover_set_result = helsing::StakeValidationResult::OK;
+    prefix.output_result = helsing::StakeValidationResult::OK;
+
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, false, true, true) == helsing::StakeProofVerificationSkeletonResult::STAKE_STATEMENT_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, false, false) == helsing::StakeProofVerificationSkeletonResult::PAR_VERIFY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, false) == helsing::StakeProofVerificationSkeletonResult::REP_VERIFY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, true) == helsing::StakeProofVerificationSkeletonResult::TAG_VERIFY_UNIMPLEMENTED);
 }
 
 BOOST_AUTO_TEST_CASE(stake_statement_construction_skeleton_blocks_incoins_root_after_valid_prefix)
@@ -961,30 +976,31 @@ BOOST_AUTO_TEST_CASE(stake_statement_construction_skeleton_does_not_fake_stateme
     BOOST_REQUIRE(prefix.output_result == helsing::StakeValidationResult::OK);
 
     BOOST_CHECK(helsing::CheckStakeStatementConstructionSkeleton(prefix, true, true) == helsing::StakeStatementConstructionSkeletonResult::STAKE_STATEMENT_HASHING_UNIMPLEMENTED);
-    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, false, true, true) == helsing::StakeProofVerificationSkeletonResult::STAKE_STATEMENT_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, true) == helsing::StakeProofVerificationSkeletonResult::TAG_VERIFY_UNIMPLEMENTED);
 }
 
 BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_preserves_prefix_failures)
 {
     helsing::StakeVerificationOutputSkeletonResult prefix;
     prefix.cover_set_result.context_result.prefix_result = helsing::StakeVerificationPrefixSkeletonResult::TX_INCOMPLETE;
-    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, true) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
 
     prefix.cover_set_result.context_result.prefix_result = helsing::StakeVerificationPrefixSkeletonResult::OK;
     prefix.cover_set_result.context_result.tag_result = helsing::StakeValidationResult::TAG_ALREADY_SPENT;
-    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, true) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
 
     prefix.cover_set_result.context_result.tag_result = helsing::StakeValidationResult::OK;
     prefix.cover_set_result.context_result.context_valid = false;
-    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, true) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
 
     prefix.cover_set_result.context_result.context_valid = true;
     prefix.cover_set_result.cover_set_result = helsing::StakeValidationResult::INVALID_COVER_SET_CARDINALITY;
-    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, true) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
 
     prefix.cover_set_result.cover_set_result = helsing::StakeValidationResult::OK;
     prefix.output_result = helsing::StakeValidationResult::OUTPUT_NOT_FOUND;
-    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, true) == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
 }
 
 BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_does_not_fake_proof_acceptance)
@@ -1009,10 +1025,10 @@ BOOST_AUTO_TEST_CASE(stake_proof_verification_skeleton_does_not_fake_proof_accep
     const helsing::StakeVerificationOutputSkeletonResult prefix = helsing::CheckStakeVerificationOutputsSkeleton(tx, state, view, 0, 1, true, true, true, true, true, true, 2, 2, sparkRules);
     BOOST_REQUIRE(prefix.output_result == helsing::StakeValidationResult::OK);
 
-    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix) == helsing::StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeProofVerificationSkeleton(prefix, true, true, true) == helsing::StakeProofVerificationSkeletonResult::TAG_VERIFY_UNIMPLEMENTED);
 }
 
-BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_reports_proof_blocker_after_outputs)
+BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_reports_statement_blocker_after_outputs)
 {
     helsing::StakeTx tx = ValidStakeTx();
     tx.inCoinIDs = {Output(1, 0), Output(1, 1), Output(2, 0), Output(3, 0)};
@@ -1035,7 +1051,8 @@ BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_reports_proof_blocker_a
     BOOST_CHECK(result.output_result.cover_set_result.context_result.context_valid);
     BOOST_CHECK(result.output_result.cover_set_result.cover_set_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.output_result.output_result == helsing::StakeValidationResult::OK);
-    BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED);
+    BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::INCOINS_ROOT_HASHING_UNIMPLEMENTED);
+    BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_STATEMENT_UNAVAILABLE);
 }
 
 BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_checks_prefix_before_proofs)
@@ -1052,6 +1069,7 @@ BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_checks_prefix_before_pr
     BOOST_CHECK(result.output_result.cover_set_result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::TX_INCOMPLETE);
     BOOST_CHECK(result.output_result.cover_set_result.context_result.tag_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.output_result.output_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::STAKE_PREFIX_FAILED);
     BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
 }
 
@@ -1077,6 +1095,7 @@ BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_checks_output_rules_bef
     BOOST_CHECK(result.output_result.cover_set_result.context_result.prefix_result == helsing::StakeVerificationPrefixSkeletonResult::OK);
     BOOST_CHECK(result.output_result.cover_set_result.cover_set_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.output_result.output_result == helsing::StakeValidationResult::OUTPUT_NOT_FOUND);
+    BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::STAKE_PREFIX_FAILED);
     BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED);
 }
 
@@ -1098,7 +1117,8 @@ BOOST_AUTO_TEST_CASE(stake_verification_blocked_skeleton_does_not_mutate_state)
 
     const helsing::StakeVerificationBlockedSkeletonResult result = helsing::CheckStakeVerificationBlockedSkeleton(tx, state, view, 0, 1, true, true, true, true, true, true, 2, 2, sparkRules);
 
-    BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STATEMENT_HASHING_UNIMPLEMENTED);
+    BOOST_CHECK(result.statement_result == helsing::StakeStatementConstructionSkeletonResult::INCOINS_ROOT_HASHING_UNIMPLEMENTED);
+    BOOST_CHECK(result.proof_result == helsing::StakeProofVerificationSkeletonResult::STAKE_STATEMENT_UNAVAILABLE);
     BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 0U);
     BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 0U);
     BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);

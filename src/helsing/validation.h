@@ -145,7 +145,10 @@ struct StakeVerificationOutputSkeletonResult {
 
 enum class StakeProofVerificationSkeletonResult {
     STAKE_PREFIX_FAILED,
-    STATEMENT_HASHING_UNIMPLEMENTED,
+    STAKE_STATEMENT_UNAVAILABLE,
+    PAR_VERIFY_UNIMPLEMENTED,
+    REP_VERIFY_UNIMPLEMENTED,
+    TAG_VERIFY_UNIMPLEMENTED,
 };
 
 enum class StakeStatementConstructionSkeletonResult {
@@ -157,6 +160,7 @@ enum class StakeStatementConstructionSkeletonResult {
 
 struct StakeVerificationBlockedSkeletonResult {
     StakeVerificationOutputSkeletonResult output_result;
+    StakeStatementConstructionSkeletonResult statement_result{StakeStatementConstructionSkeletonResult::STAKE_PREFIX_FAILED};
     StakeProofVerificationSkeletonResult proof_result{StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED};
 };
 
@@ -279,12 +283,13 @@ StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(cons
 // blocked here. The caller supplies implementation-availability flags; this helper
 // has no accepting result and does not compute incoins_root, context_hash, or stake_stmt.
 StakeStatementConstructionSkeletonResult CheckStakeStatementConstructionSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool incoinsRootHashingAvailable, bool contextHashingAvailable);
-// Revised spec StakeVerify steps 8-11 are deliberately unimplemented here:
-// canonical statement hashing and real ParVerify/RepVerify/TagVerify are required
-// before any acceptance path may exist.
-StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult);
+// Revised spec StakeVerify steps 9-11 are deliberately unimplemented here:
+// real ParVerify/RepVerify/TagVerify bound to stake_stmt are required before any
+// acceptance path may exist. The caller-supplied booleans are implementation
+// availability flags, not proof-verification results.
+StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool stakeStatementAvailable, bool parVerifierAvailable, bool repVerifierAvailable);
 // Revised spec StakeVerify steps 1-11 composition with no accepting result. This
-// runs the step-1-through-7 output checks, then the proof-verification blocker.
+// runs the step-1-through-7 output checks, then the statement and proof blockers.
 StakeVerificationBlockedSkeletonResult CheckStakeVerificationBlockedSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& outputSatisfiesSparkRules);
 // Revised spec post-acceptance stake_id construction is deliberately unimplemented:
 // canonical(tx) and the consensus hash domain must be defined before deriving stake_id.
