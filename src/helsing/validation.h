@@ -146,6 +146,15 @@ enum class HelsingTransactionWiringSkeletonResult {
     BLOCK_INTEGRATION_UNIMPLEMENTED,
 };
 
+enum class StakeNonConsumingRegistrationSkeletonResult {
+    STAKE_VERIFY_NOT_ACCEPTED,
+    CONSENSUS_TX_CARRIER_POLICY_UNIMPLEMENTED,
+    COLLATERAL_SPEND_MUTATION_EXCLUSION_UNIMPLEMENTED,
+    COLLATERAL_SPENDABILITY_POLICY_UNIMPLEMENTED,
+    MOVED_COLLATERAL_DETECTION_WIRING_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class HelsingConsensusActivationSkeletonResult {
     SPARK_COMPATIBILITY_REVIEW_UNIMPLEMENTED,
     ACTIVATION_PARAMETERS_UNIMPLEMENTED,
@@ -626,6 +635,10 @@ bool IsCompleteStakeTxSkeleton(const StakeTx& tx);
 // and block ordering, but not the Firo consensus carrier/extraction grammar.
 // This blocker has no accepting result and must not be used to parse CTransaction.
 HelsingTransactionWiringSkeletonResult CheckHelsingTransactionWiringSkeleton(bool consensusTxCarrierAvailable, bool stakeTxExtractionAvailable, bool stakeUpdateTxExtractionAvailable, bool payoutTxExtractionAvailable);
+// Revised spec section 9 says a staking transaction does not consume the staked
+// coin; it creates a registration while the coin remains owner-spendable. This
+// blocker has no accepting result and does not mutate Spark or Helsing state.
+StakeNonConsumingRegistrationSkeletonResult CheckStakeNonConsumingRegistrationSkeleton(bool stakeVerifyAccepted, bool consensusTxCarrierPolicyAvailable, bool collateralSpendMutationExclusionAvailable, bool collateralSpendabilityPolicyAvailable, bool movedCollateralDetectionWiringAvailable);
 // Revised spec section 30 gives deployment compatibility questions, but not a
 // Firo activation mechanism, activation parameters, or historical-state
 // bootstrap rule. This blocker has no accepting result and must not be used to

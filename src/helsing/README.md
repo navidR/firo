@@ -10,6 +10,7 @@ Current scope:
 - `StakeUpdateTx` models the revised spec fields `{stake_id, m_new, sig_update}` as a byte-carrying data structure only.
 - `PayoutTxSkeleton` models the revised spec fields `{selected_stake_id, payout_index, addr_pk, V_PAYOUT, Coin}` as a byte-carrying data structure only.
 - `CheckHelsingTransactionWiringSkeleton` is an explicit blocker for wiring the section 9, 14, and 15 payloads into real Firo consensus transactions and section 12 block extraction. It has no accepting result and does not parse `CTransaction`.
+- `CheckStakeNonConsumingRegistrationSkeleton` is an explicit blocker for revised spec section 9 non-consuming staking registration semantics. It requires an accepted `StakeVerify` result, then blocks before defining the Firo transaction-carrier policy, proving staking registration does not mark collateral spent, preserving owner spendability, wiring later moved-collateral detection, or treating the policy as consensus-enforced.
 - `CheckHelsingConsensusActivationSkeleton` is an explicit blocker for real Firo deployment activation. Section 30 lists Spark compatibility questions, but the revised spec does not define activation parameters, chainparams/versionbits wiring, historical-state bootstrap, or enforcement points; this helper has no accepting result.
 - `CheckHelsingMasternodeLifecycleSkeleton` is an explicit blocker for integrating accepted Helsing stakes, updates, and payouts with Firo deterministic masternode lifecycle state. The revised spec defines public staking context and selected-stake checks, but not Firo masternode-list registration, update propagation, or payment wiring; this helper has no accepting result.
 - `CheckStakeStatusLifecycleSkeleton` is an explicit blocker for revised spec section 6 stake status lifecycle support. It blocks canonical status encoding, expiration rules, deactivation rules, `ActiveTags` consistency, and consensus wiring; it has no accepting result and does not change the current in-memory enum.
@@ -130,6 +131,7 @@ Not implemented yet:
 - real scalar-order access, integer-to-scalar encoding, injectivity/no-wraparound proof, and value-conversion wiring into commitments and proof verification
 - wiring value-domain checks for `V_STAKE`, `V_PAYOUT`, and `V_MAX < q`
 - ordinary transaction-fee handling outside the collateral proof
+- consensus transaction-carrier policy proving Helsing staking registration does not consume the hidden Spark collateral and leaves owner spendability to ordinary Spark spends
 - real wallet/prover staking algorithm support for Spark witness extraction, offset hashing, offset commitment construction, statement-bound proof generation, and staking transaction emission
 - wallet persistence of staking cover sets and overlap-aware later spending policy
 - deployed Spark serial-commitment uniqueness compatibility audit, all-output-id serial indexes, and any required domain-separated payout-output class

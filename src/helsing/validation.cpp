@@ -532,6 +532,27 @@ HelsingTransactionWiringSkeletonResult CheckHelsingTransactionWiringSkeleton(boo
     return HelsingTransactionWiringSkeletonResult::BLOCK_INTEGRATION_UNIMPLEMENTED;
 }
 
+StakeNonConsumingRegistrationSkeletonResult CheckStakeNonConsumingRegistrationSkeleton(bool stakeVerifyAccepted, bool consensusTxCarrierPolicyAvailable, bool collateralSpendMutationExclusionAvailable, bool collateralSpendabilityPolicyAvailable, bool movedCollateralDetectionWiringAvailable)
+{
+    if (!stakeVerifyAccepted) {
+        return StakeNonConsumingRegistrationSkeletonResult::STAKE_VERIFY_NOT_ACCEPTED;
+    }
+    if (!consensusTxCarrierPolicyAvailable) {
+        return StakeNonConsumingRegistrationSkeletonResult::CONSENSUS_TX_CARRIER_POLICY_UNIMPLEMENTED;
+    }
+    if (!collateralSpendMutationExclusionAvailable) {
+        return StakeNonConsumingRegistrationSkeletonResult::COLLATERAL_SPEND_MUTATION_EXCLUSION_UNIMPLEMENTED;
+    }
+    if (!collateralSpendabilityPolicyAvailable) {
+        return StakeNonConsumingRegistrationSkeletonResult::COLLATERAL_SPENDABILITY_POLICY_UNIMPLEMENTED;
+    }
+    if (!movedCollateralDetectionWiringAvailable) {
+        return StakeNonConsumingRegistrationSkeletonResult::MOVED_COLLATERAL_DETECTION_WIRING_UNIMPLEMENTED;
+    }
+
+    return StakeNonConsumingRegistrationSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 HelsingConsensusActivationSkeletonResult CheckHelsingConsensusActivationSkeleton(bool sparkCompatibilityReviewAvailable, bool activationParametersAvailable, bool chainparamsDeploymentWiringAvailable, bool historicalStateBootstrapAvailable)
 {
     if (!sparkCompatibilityReviewAvailable) {

@@ -1906,6 +1906,41 @@ BOOST_AUTO_TEST_CASE(helsing_transaction_wiring_skeleton_does_not_parse_payload_
     BOOST_CHECK(helsing::CheckHelsingTransactionWiringSkeleton(true, true, true, true) == helsing::HelsingTransactionWiringSkeletonResult::BLOCK_INTEGRATION_UNIMPLEMENTED);
 }
 
+BOOST_AUTO_TEST_CASE(stake_non_consuming_registration_skeleton_requires_accepted_stake_first)
+{
+    BOOST_CHECK(helsing::CheckStakeNonConsumingRegistrationSkeleton(false, false, false, false, false) == helsing::StakeNonConsumingRegistrationSkeletonResult::STAKE_VERIFY_NOT_ACCEPTED);
+    BOOST_CHECK(helsing::CheckStakeNonConsumingRegistrationSkeleton(false, true, true, true, true) == helsing::StakeNonConsumingRegistrationSkeletonResult::STAKE_VERIFY_NOT_ACCEPTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_non_consuming_registration_skeleton_orders_section_nine_blockers)
+{
+    BOOST_CHECK(helsing::CheckStakeNonConsumingRegistrationSkeleton(true, false, true, true, true) == helsing::StakeNonConsumingRegistrationSkeletonResult::CONSENSUS_TX_CARRIER_POLICY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeNonConsumingRegistrationSkeleton(true, false, false, false, false) == helsing::StakeNonConsumingRegistrationSkeletonResult::CONSENSUS_TX_CARRIER_POLICY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeNonConsumingRegistrationSkeleton(true, true, false, true, true) == helsing::StakeNonConsumingRegistrationSkeletonResult::COLLATERAL_SPEND_MUTATION_EXCLUSION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeNonConsumingRegistrationSkeleton(true, true, true, false, true) == helsing::StakeNonConsumingRegistrationSkeletonResult::COLLATERAL_SPENDABILITY_POLICY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeNonConsumingRegistrationSkeleton(true, true, true, true, false) == helsing::StakeNonConsumingRegistrationSkeletonResult::MOVED_COLLATERAL_DETECTION_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeNonConsumingRegistrationSkeleton(true, true, true, true, true) == helsing::StakeNonConsumingRegistrationSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_non_consuming_registration_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(247, DeterministicPoint(247));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::StakeNonConsumingRegistrationSkeletonResult result = helsing::CheckStakeNonConsumingRegistrationSkeleton(true, true, true, true, true);
+
+    BOOST_CHECK(result == helsing::StakeNonConsumingRegistrationSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(masternode_lifecycle_skeleton_requires_accepted_stake_first)
 {
     BOOST_CHECK(helsing::CheckHelsingMasternodeLifecycleSkeleton(false, false, false, false, false) == helsing::HelsingMasternodeLifecycleSkeletonResult::ACCEPTED_STAKE_UNAVAILABLE);
