@@ -181,6 +181,15 @@ enum class StakeStatusLifecycleSkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class StakeContextTimingFieldsSkeletonResult {
+    STAKE_CONTEXT_EMPTY,
+    CANONICAL_CONTEXT_ENCODING_UNIMPLEMENTED,
+    TIMING_FIELD_GRAMMAR_UNIMPLEMENTED,
+    ACTIVATION_FIELD_SEMANTICS_UNIMPLEMENTED,
+    EXPIRATION_FIELD_SEMANTICS_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class CollateralMovementStatusPolicySkeletonResult {
     BLOCK_SPENT_TAGS_UNAVAILABLE,
     SPENT_TAG_PERSISTENCE_UNIMPLEMENTED,
@@ -653,6 +662,10 @@ HelsingMasternodeLifecycleSkeletonResult CheckHelsingMasternodeLifecycleSkeleton
 // expired, and deactivated, and ActiveTags contains exactly active backing tags.
 // This blocker has no accepting result and does not define status transitions.
 StakeStatusLifecycleSkeletonResult CheckStakeStatusLifecycleSkeleton(bool stakeRecordStateAvailable, bool canonicalStatusEncodingAvailable, bool expirationRuleAvailable, bool deactivationRuleAvailable, bool activeTagConsistencyAvailable);
+// Revised spec section 7 says public context m may include optional activation
+// or expiration fields, but does not define their grammar or consensus effect.
+// This blocker has no accepting result and does not parse m or mutate state.
+StakeContextTimingFieldsSkeletonResult CheckStakeContextTimingFieldsSkeleton(const StakeContext& context, bool canonicalContextEncodingAvailable, bool timingFieldGrammarAvailable, bool activationFieldSemanticsAvailable, bool expirationFieldSemanticsAvailable);
 // Revised spec section 12 step 6 marks moved collateral records "spent", while
 // sections 13 and 24 describe the same collateral movement as deactivation.
 // This blocker has no accepting result and does not choose that status mapping.

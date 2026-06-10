@@ -2010,6 +2010,48 @@ BOOST_AUTO_TEST_CASE(stake_status_lifecycle_skeleton_has_no_accepting_or_mutatin
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(stake_context_timing_fields_skeleton_rejects_empty_context_first)
+{
+    const helsing::StakeContext emptyContext;
+
+    BOOST_CHECK(helsing::CheckStakeContextTimingFieldsSkeleton(emptyContext, false, false, false, false) == helsing::StakeContextTimingFieldsSkeletonResult::STAKE_CONTEXT_EMPTY);
+    BOOST_CHECK(helsing::CheckStakeContextTimingFieldsSkeleton(emptyContext, true, true, true, true) == helsing::StakeContextTimingFieldsSkeletonResult::STAKE_CONTEXT_EMPTY);
+}
+
+BOOST_AUTO_TEST_CASE(stake_context_timing_fields_skeleton_orders_section_seven_blockers)
+{
+    helsing::StakeContext context;
+    context.bytes = {0x6d, 0x07};
+
+    BOOST_CHECK(helsing::CheckStakeContextTimingFieldsSkeleton(context, false, false, false, false) == helsing::StakeContextTimingFieldsSkeletonResult::CANONICAL_CONTEXT_ENCODING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeContextTimingFieldsSkeleton(context, true, false, true, true) == helsing::StakeContextTimingFieldsSkeletonResult::TIMING_FIELD_GRAMMAR_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeContextTimingFieldsSkeleton(context, true, true, false, true) == helsing::StakeContextTimingFieldsSkeletonResult::ACTIVATION_FIELD_SEMANTICS_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeContextTimingFieldsSkeleton(context, true, true, true, false) == helsing::StakeContextTimingFieldsSkeletonResult::EXPIRATION_FIELD_SEMANTICS_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeContextTimingFieldsSkeleton(context, true, true, true, true) == helsing::StakeContextTimingFieldsSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_context_timing_fields_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(200, DeterministicPoint(200));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::StakeContextTimingFieldsSkeletonResult result = helsing::CheckStakeContextTimingFieldsSkeleton(record.m, true, true, true, true);
+
+    BOOST_CHECK(result == helsing::StakeContextTimingFieldsSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nHeight, record.nHeight);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nLastUpdateHeight);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(collateral_movement_status_policy_skeleton_requires_block_spent_tags_first)
 {
     BOOST_CHECK(helsing::CheckCollateralMovementStatusPolicySkeleton(false, false, false, false, false) == helsing::CollateralMovementStatusPolicySkeletonResult::BLOCK_SPENT_TAGS_UNAVAILABLE);

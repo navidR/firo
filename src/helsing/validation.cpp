@@ -613,6 +613,27 @@ StakeStatusLifecycleSkeletonResult CheckStakeStatusLifecycleSkeleton(bool stakeR
     return StakeStatusLifecycleSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+StakeContextTimingFieldsSkeletonResult CheckStakeContextTimingFieldsSkeleton(const StakeContext& context, bool canonicalContextEncodingAvailable, bool timingFieldGrammarAvailable, bool activationFieldSemanticsAvailable, bool expirationFieldSemanticsAvailable)
+{
+    if (context.bytes.empty()) {
+        return StakeContextTimingFieldsSkeletonResult::STAKE_CONTEXT_EMPTY;
+    }
+    if (!canonicalContextEncodingAvailable) {
+        return StakeContextTimingFieldsSkeletonResult::CANONICAL_CONTEXT_ENCODING_UNIMPLEMENTED;
+    }
+    if (!timingFieldGrammarAvailable) {
+        return StakeContextTimingFieldsSkeletonResult::TIMING_FIELD_GRAMMAR_UNIMPLEMENTED;
+    }
+    if (!activationFieldSemanticsAvailable) {
+        return StakeContextTimingFieldsSkeletonResult::ACTIVATION_FIELD_SEMANTICS_UNIMPLEMENTED;
+    }
+    if (!expirationFieldSemanticsAvailable) {
+        return StakeContextTimingFieldsSkeletonResult::EXPIRATION_FIELD_SEMANTICS_UNIMPLEMENTED;
+    }
+
+    return StakeContextTimingFieldsSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 CollateralMovementStatusPolicySkeletonResult CheckCollateralMovementStatusPolicySkeleton(bool blockSpentTagsAvailable, bool spentTagPersistenceAvailable, bool activeStakeLookupAvailable, bool spentDeactivatedStatusMappingAvailable, bool activeTagRemovalAvailable)
 {
     if (!blockSpentTagsAvailable) {
