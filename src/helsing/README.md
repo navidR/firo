@@ -61,6 +61,7 @@ Current scope:
 - `IsExpectedPayoutAmountInRangeSkeleton` checks the revised spec `PayoutVerify` step 10 equality and integer range for caller-supplied values.
 - `IsPayoutValueParameterInRangeSkeleton` checks revised spec `PayoutVerify` step 10 for caller-supplied `V_PAYOUT`, expected amount, `V_MAX`, and `V_MAX < q`; it does not expose the scalar order, perform scalar conversion, or recompute payout amounts.
 - `CheckPayoutAmountDerivationSkeleton` is an explicit blocker for revised spec `PayoutVerify` step 10 real expected-payout derivation. It requires prior payout selection success, then blocks before Firo consensus reward rules, amount derivation, amount comparison, and value-domain consensus parameters; it has no accepting result.
+- `CheckPayoutDeterministicSelectionSkeleton` is an explicit blocker for revised spec `PayoutVerify` step 9. It requires prior payout-address checking, then blocks before deriving the active stake set from `state_at_parent`, defining the chain deterministic masternode selection rule, binding the payout position, comparing `selected_stake_id`, or wiring selection into consensus.
 - `IsCompletePayoutTxSkeleton` checks that caller-supplied `PayoutTxSkeleton` identity/address/coin fields are populated before future payout verification; it does not define payout address or coin encodings.
 - `CheckPayoutVerificationPrefixSkeleton` checks revised spec `PayoutVerify` steps 1-2 only: field presence and a caller-supplied canonical-encoding result. It deliberately stops before stake lookup, registered address extraction, deterministic selection, value checks, payout-id construction, and payout coin recomputation.
 - `CheckPayoutRegisteredAddressExtractionSkeleton` is an explicit blocker for revised spec `PayoutVerify` step 8. It requires step-1-through-7 eligibility first, then blocks before selecting the effective context, defining payout-address grammar, extracting the registered address from `record.m`, or wiring that extraction into consensus.
@@ -132,6 +133,7 @@ Not implemented yet:
 - any full block-acceptance path before real `StakeVerify`, `StakeUpdateVerify`, and `PayoutVerify` exist
 - full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, payout address parsing, deterministic Spark payout coin construction, and payout coin comparison
 - consensus effective-context selection and payout-address extraction from `record.m`
+- consensus active-stake snapshot, deterministic masternode selection rule, payout-position binding, and selected-stake comparison
 - real payout-output extraction from accepted payout transactions after `PayoutVerify`
 - real deterministic payout ordinal selection and payout identifier `j` construction
 - consensus source-set, forbidden-dependency, and non-circularity checks for payout identifier `j`

@@ -57,6 +57,15 @@ enum class PayoutAmountDerivationSkeletonResult {
     PAYOUT_VALUE_DOMAIN_CONSENSUS_PARAMETERS_UNIMPLEMENTED,
 };
 
+enum class PayoutDeterministicSelectionSkeletonResult {
+    PAYOUT_ADDRESS_CHECK_NOT_ACCEPTED,
+    ACTIVE_STAKE_SET_SNAPSHOT_UNIMPLEMENTED,
+    DETERMINISTIC_SELECTION_RULE_UNIMPLEMENTED,
+    PAYOUT_POSITION_BINDING_UNIMPLEMENTED,
+    SELECTED_STAKE_COMPARISON_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class PayoutIdConstructionSkeletonResult {
     PAYOUT_ID_INPUTS_INCOMPLETE,
     CANONICAL_PAYOUT_ID_ENCODING_UNIMPLEMENTED,
@@ -490,6 +499,10 @@ PayoutAlgorithmSkeletonResult CheckPayoutAlgorithmSkeleton(const PayoutTxSkeleto
 // payout address from record.m before comparing it to tx.addr_pk. This blocker
 // has no accepting result and does not parse contexts or apply update rules.
 PayoutRegisteredAddressExtractionSkeletonResult CheckPayoutRegisteredAddressExtractionSkeleton(const PayoutVerificationEligibilitySkeletonResult& eligibilityResult, bool effectiveContextSelectionAvailable, bool payoutAddressGrammarAvailable, bool registeredPayoutAddressExtractionAvailable);
+// Revised spec PayoutVerify step 9 requires recomputing the selected masternode
+// under the chain deterministic rule for this payout position. This blocker has
+// no accepting result and does not iterate or select active stakes.
+PayoutDeterministicSelectionSkeletonResult CheckPayoutDeterministicSelectionSkeleton(bool payoutAddressCheckAccepted, bool activeStakeSetSnapshotAvailable, bool deterministicSelectionRuleAvailable, bool payoutPositionBindingAvailable, bool selectedStakeComparisonAvailable);
 // Revised spec PayoutVerify public-field suffix, using only caller-supplied expected values.
 // This checks steps 8, 9, 10, 11 input availability, and 13 equality in order; it
 // does not parse contexts, select masternodes, compute j, run Payout, or verify proofs.

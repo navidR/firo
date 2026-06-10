@@ -403,6 +403,37 @@ BOOST_AUTO_TEST_CASE(payout_amount_derivation_skeleton_has_no_accepting_or_mutat
     BOOST_CHECK(!state.IsSpentTag(record.T));
 }
 
+BOOST_AUTO_TEST_CASE(payout_deterministic_selection_skeleton_requires_address_check_first)
+{
+    BOOST_CHECK(helsing::CheckPayoutDeterministicSelectionSkeleton(false, false, false, false, false) == helsing::PayoutDeterministicSelectionSkeletonResult::PAYOUT_ADDRESS_CHECK_NOT_ACCEPTED);
+    BOOST_CHECK(helsing::CheckPayoutDeterministicSelectionSkeleton(false, true, true, true, true) == helsing::PayoutDeterministicSelectionSkeletonResult::PAYOUT_ADDRESS_CHECK_NOT_ACCEPTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_deterministic_selection_skeleton_orders_selection_blockers)
+{
+    BOOST_CHECK(helsing::CheckPayoutDeterministicSelectionSkeleton(true, false, false, false, false) == helsing::PayoutDeterministicSelectionSkeletonResult::ACTIVE_STAKE_SET_SNAPSHOT_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutDeterministicSelectionSkeleton(true, true, false, true, true) == helsing::PayoutDeterministicSelectionSkeletonResult::DETERMINISTIC_SELECTION_RULE_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutDeterministicSelectionSkeleton(true, true, true, false, true) == helsing::PayoutDeterministicSelectionSkeletonResult::PAYOUT_POSITION_BINDING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutDeterministicSelectionSkeleton(true, true, true, true, false) == helsing::PayoutDeterministicSelectionSkeletonResult::SELECTED_STAKE_COMPARISON_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutDeterministicSelectionSkeleton(true, true, true, true, true) == helsing::PayoutDeterministicSelectionSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_deterministic_selection_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(216, DeterministicPoint(216));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::PayoutDeterministicSelectionSkeletonResult result = helsing::CheckPayoutDeterministicSelectionSkeleton(true, true, true, true, true);
+
+    BOOST_CHECK(result == helsing::PayoutDeterministicSelectionSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(value_parameter_skeleton_checks_stake_payout_and_scalar_order_bounds)
 {
     BOOST_CHECK(helsing::AreHelsingValueParametersInRangeSkeleton(0, 0, 1, true));

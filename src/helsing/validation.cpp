@@ -245,6 +245,27 @@ PayoutAmountDerivationSkeletonResult CheckPayoutAmountDerivationSkeleton(bool pa
     return PayoutAmountDerivationSkeletonResult::PAYOUT_VALUE_DOMAIN_CONSENSUS_PARAMETERS_UNIMPLEMENTED;
 }
 
+PayoutDeterministicSelectionSkeletonResult CheckPayoutDeterministicSelectionSkeleton(bool payoutAddressCheckAccepted, bool activeStakeSetSnapshotAvailable, bool deterministicSelectionRuleAvailable, bool payoutPositionBindingAvailable, bool selectedStakeComparisonAvailable)
+{
+    if (!payoutAddressCheckAccepted) {
+        return PayoutDeterministicSelectionSkeletonResult::PAYOUT_ADDRESS_CHECK_NOT_ACCEPTED;
+    }
+    if (!activeStakeSetSnapshotAvailable) {
+        return PayoutDeterministicSelectionSkeletonResult::ACTIVE_STAKE_SET_SNAPSHOT_UNIMPLEMENTED;
+    }
+    if (!deterministicSelectionRuleAvailable) {
+        return PayoutDeterministicSelectionSkeletonResult::DETERMINISTIC_SELECTION_RULE_UNIMPLEMENTED;
+    }
+    if (!payoutPositionBindingAvailable) {
+        return PayoutDeterministicSelectionSkeletonResult::PAYOUT_POSITION_BINDING_UNIMPLEMENTED;
+    }
+    if (!selectedStakeComparisonAvailable) {
+        return PayoutDeterministicSelectionSkeletonResult::SELECTED_STAKE_COMPARISON_UNIMPLEMENTED;
+    }
+
+    return PayoutDeterministicSelectionSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 HelsingDuplicateSerialCompatibilitySkeletonResult CheckHelsingDuplicateSerialCompatibilitySkeleton(bool sparkSerialUniquenessReviewAvailable, bool duplicateSerialsAllowedAtOutputCreation, bool duplicateSerialIndexReturnsAllOutputIdsAvailable, bool domainSeparatedPayoutOutputClassAvailable)
 {
     if (!sparkSerialUniquenessReviewAvailable) {
