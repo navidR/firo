@@ -945,6 +945,57 @@ BOOST_AUTO_TEST_CASE(stake_verification_cover_set_skeleton_stops_before_outputs_
     BOOST_CHECK(result.cover_set_result == helsing::StakeValidationResult::OK);
 }
 
+BOOST_AUTO_TEST_CASE(stake_cover_set_ledger_source_skeleton_preserves_cover_set_prefix)
+{
+    helsing::StakeVerificationCoverSetSkeletonResult prefix;
+    prefix.context_result.prefix_result = helsing::StakeVerificationPrefixSkeletonResult::MALFORMED_OR_NONCANONICAL;
+    BOOST_CHECK(helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, true, true, true, true) == helsing::StakeCoverSetLedgerSourceSkeletonResult::STAKE_COVER_SET_PREFIX_FAILED);
+
+    prefix.context_result.prefix_result = helsing::StakeVerificationPrefixSkeletonResult::OK;
+    prefix.context_result.tag_result = helsing::StakeValidationResult::TAG_ALREADY_SPENT;
+    BOOST_CHECK(helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, true, true, true, true) == helsing::StakeCoverSetLedgerSourceSkeletonResult::STAKE_COVER_SET_PREFIX_FAILED);
+
+    prefix.context_result.tag_result = helsing::StakeValidationResult::OK;
+    prefix.context_result.context_valid = false;
+    BOOST_CHECK(helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, true, true, true, true) == helsing::StakeCoverSetLedgerSourceSkeletonResult::STAKE_COVER_SET_PREFIX_FAILED);
+
+    prefix.context_result.context_valid = true;
+    prefix.cover_set_result = helsing::StakeValidationResult::INVALID_COVER_SET_CARDINALITY;
+    BOOST_CHECK(helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, true, true, true, true) == helsing::StakeCoverSetLedgerSourceSkeletonResult::STAKE_COVER_SET_PREFIX_FAILED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_cover_set_ledger_source_skeleton_orders_section_eight_blockers)
+{
+    helsing::StakeVerificationCoverSetSkeletonResult prefix;
+
+    BOOST_CHECK(helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, false, true, true, true) == helsing::StakeCoverSetLedgerSourceSkeletonResult::SPARK_OUTPUT_INDEX_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, false, false, false, false) == helsing::StakeCoverSetLedgerSourceSkeletonResult::SPARK_OUTPUT_INDEX_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, true, false, true, true) == helsing::StakeCoverSetLedgerSourceSkeletonResult::RAW_COMMITMENT_REJECTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, true, true, false, true) == helsing::StakeCoverSetLedgerSourceSkeletonResult::LEDGER_COMMITMENT_RECONSTRUCTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, true, true, true, false) == helsing::StakeCoverSetLedgerSourceSkeletonResult::STATEMENT_INPUT_BINDING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, true, true, true, true) == helsing::StakeCoverSetLedgerSourceSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_cover_set_ledger_source_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::StakeTx tx = ValidStakeTx();
+    tx.inCoinIDs = {Output(1, 0), Output(1, 1), Output(2, 0), Output(3, 0)};
+
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(246, DeterministicPoint(246));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::StakeVerificationCoverSetSkeletonResult prefix = helsing::CheckStakeVerificationCoverSetSkeleton(tx, state, 0, 1, true, true, true, true, true, true, 2, 2);
+    const helsing::StakeCoverSetLedgerSourceSkeletonResult result = helsing::CheckStakeCoverSetLedgerSourceSkeleton(prefix, true, true, true, true);
+
+    BOOST_CHECK(result == helsing::StakeCoverSetLedgerSourceSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(stake_cover_set_output_rules_skeleton_accepts_existing_eligible_outputs_with_spark_rules)
 {
     const std::vector<helsing::OutputId> inCoinIDs = {Output(1, 0), Output(1, 1), Output(2, 0), Output(3, 0)};

@@ -763,6 +763,30 @@ StakeVerificationCoverSetSkeletonResult CheckStakeVerificationCoverSetSkeleton(
     return result;
 }
 
+StakeCoverSetLedgerSourceSkeletonResult CheckStakeCoverSetLedgerSourceSkeleton(const StakeVerificationCoverSetSkeletonResult& prefixResult, bool sparkOutputIndexAvailable, bool rawCommitmentRejectionAvailable, bool ledgerCommitmentReconstructionAvailable, bool statementInputBindingAvailable)
+{
+    if (prefixResult.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||
+        prefixResult.context_result.tag_result != StakeValidationResult::OK ||
+        !prefixResult.context_result.context_valid ||
+        prefixResult.cover_set_result != StakeValidationResult::OK) {
+        return StakeCoverSetLedgerSourceSkeletonResult::STAKE_COVER_SET_PREFIX_FAILED;
+    }
+    if (!sparkOutputIndexAvailable) {
+        return StakeCoverSetLedgerSourceSkeletonResult::SPARK_OUTPUT_INDEX_UNIMPLEMENTED;
+    }
+    if (!rawCommitmentRejectionAvailable) {
+        return StakeCoverSetLedgerSourceSkeletonResult::RAW_COMMITMENT_REJECTION_UNIMPLEMENTED;
+    }
+    if (!ledgerCommitmentReconstructionAvailable) {
+        return StakeCoverSetLedgerSourceSkeletonResult::LEDGER_COMMITMENT_RECONSTRUCTION_UNIMPLEMENTED;
+    }
+    if (!statementInputBindingAvailable) {
+        return StakeCoverSetLedgerSourceSkeletonResult::STATEMENT_INPUT_BINDING_UNIMPLEMENTED;
+    }
+
+    return StakeCoverSetLedgerSourceSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeValidationResult CheckStakeCoverSetOutputRulesSkeleton(const std::vector<OutputId>& inCoinIDs, const ValidationStateView& view, const std::map<OutputId, bool>& outputSatisfiesSparkRules)
 {
     for (const OutputId& output_id : inCoinIDs) {

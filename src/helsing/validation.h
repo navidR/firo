@@ -366,6 +366,15 @@ struct StakeVerificationCoverSetSkeletonResult {
     StakeValidationResult cover_set_result{StakeValidationResult::OK};
 };
 
+enum class StakeCoverSetLedgerSourceSkeletonResult {
+    STAKE_COVER_SET_PREFIX_FAILED,
+    SPARK_OUTPUT_INDEX_UNIMPLEMENTED,
+    RAW_COMMITMENT_REJECTION_UNIMPLEMENTED,
+    LEDGER_COMMITMENT_RECONSTRUCTION_UNIMPLEMENTED,
+    STATEMENT_INPUT_BINDING_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 struct StakeVerificationOutputSkeletonResult {
     StakeVerificationCoverSetSkeletonResult cover_set_result;
     StakeValidationResult output_result{StakeValidationResult::OK};
@@ -662,6 +671,10 @@ StakeValidationResult CheckStakeCoverSetIdentifiersSkeleton(const std::vector<Ou
 // Revised spec StakeVerify steps 1-6 only. This composes the caller-supplied
 // prefix/context facts with step 6 identifiers and stops before output lookup.
 StakeVerificationCoverSetSkeletonResult CheckStakeVerificationCoverSetSkeleton(const StakeTx& tx, const CHelsingState& helsingState, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m);
+// Revised spec section 8 requires validators to use InCoinIDs and reconstruct
+// commitments from SparkOutputs, not trust prover-supplied raw commitments.
+// This blocker has no accepting result and does not parse transaction carriers.
+StakeCoverSetLedgerSourceSkeletonResult CheckStakeCoverSetLedgerSourceSkeleton(const StakeVerificationCoverSetSkeletonResult& prefixResult, bool sparkOutputIndexAvailable, bool rawCommitmentRejectionAvailable, bool ledgerCommitmentReconstructionAvailable, bool statementInputBindingAvailable);
 // Revised spec StakeVerify step 7 explicit predicates only: output lookup,
 // helsing_eligible, and caller-supplied Spark maturity/cover-set rule status.
 StakeValidationResult CheckStakeCoverSetOutputRulesSkeleton(const std::vector<OutputId>& inCoinIDs, const ValidationStateView& view, const std::map<OutputId, bool>& outputSatisfiesSparkRules);
