@@ -7132,6 +7132,76 @@ BOOST_AUTO_TEST_CASE(payout_id_construction_skeleton_does_not_construct_identifi
     BOOST_CHECK(helsing::CheckPayoutIdConstructionSkeleton(tx, context, true) == helsing::PayoutIdConstructionSkeletonResult::PAYOUT_ID_HASHING_UNIMPLEMENTED);
 }
 
+BOOST_AUTO_TEST_CASE(payout_id_source_policy_skeleton_blocks_incomplete_inputs_before_policy)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(67);
+    tx.payout_index = 22;
+
+    helsing::PayoutBlockContextSkeleton context;
+    context.chain_id = {0x66};
+    context.block_height = 507;
+    context.prev_block_hash = DeterministicHash(68);
+    context.payout_index = tx.payout_index;
+    context.selected_stake_id = tx.selected_stake_id;
+    BOOST_REQUIRE(helsing::ArePayoutIdInputsCompleteSkeleton(tx, context));
+
+    helsing::PayoutBlockContextSkeleton incompleteContext = context;
+    incompleteContext.prev_block_hash.SetNull();
+    BOOST_CHECK(helsing::CheckPayoutIdSourcePolicySkeleton(tx, incompleteContext, true, true, true, true) == helsing::PayoutIdSourcePolicySkeletonResult::PAYOUT_ID_INPUTS_INCOMPLETE);
+
+    helsing::PayoutBlockContextSkeleton mismatchedContext = context;
+    ++mismatchedContext.payout_index;
+    BOOST_CHECK(helsing::CheckPayoutIdSourcePolicySkeleton(tx, mismatchedContext, false, true, true, true) == helsing::PayoutIdSourcePolicySkeletonResult::PAYOUT_ID_INPUTS_INCOMPLETE);
+}
+
+BOOST_AUTO_TEST_CASE(payout_id_source_policy_skeleton_orders_source_blockers)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(69);
+    tx.payout_index = 23;
+
+    helsing::PayoutBlockContextSkeleton context;
+    context.chain_id = {0x66};
+    context.block_height = 508;
+    context.prev_block_hash = DeterministicHash(70);
+    context.payout_index = tx.payout_index;
+    context.selected_stake_id = tx.selected_stake_id;
+
+    BOOST_CHECK(helsing::CheckPayoutIdSourcePolicySkeleton(tx, context, false, true, true, true) == helsing::PayoutIdSourcePolicySkeletonResult::CANONICAL_PAYOUT_ID_ENCODING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutIdSourcePolicySkeleton(tx, context, true, false, false, false) == helsing::PayoutIdSourcePolicySkeletonResult::DETERMINISTIC_SOURCE_SET_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutIdSourcePolicySkeleton(tx, context, true, true, false, true) == helsing::PayoutIdSourcePolicySkeletonResult::FORBIDDEN_SOURCE_EXCLUSION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutIdSourcePolicySkeleton(tx, context, true, true, true, false) == helsing::PayoutIdSourcePolicySkeletonResult::NONCIRCULAR_DEPENDENCY_REVIEW_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutIdSourcePolicySkeleton(tx, context, true, true, true, true) == helsing::PayoutIdSourcePolicySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_id_source_policy_skeleton_does_not_construct_or_apply_payout)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(214, DeterministicPoint(214));
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = record.stake_id;
+    tx.payout_index = 24;
+
+    helsing::PayoutBlockContextSkeleton context;
+    context.chain_id = {0x66};
+    context.block_height = 509;
+    context.prev_block_hash = DeterministicHash(215);
+    context.payout_index = tx.payout_index;
+    context.selected_stake_id = tx.selected_stake_id;
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(helsing::CheckPayoutIdSourcePolicySkeleton(tx, context, true, true, true, true) == helsing::PayoutIdSourcePolicySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK(stored->T == record.T);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(payout_algorithm_skeleton_blocks_after_complete_inputs)
 {
     helsing::PayoutTxSkeleton tx;

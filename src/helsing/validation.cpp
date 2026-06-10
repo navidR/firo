@@ -343,6 +343,27 @@ PayoutIdConstructionSkeletonResult CheckPayoutIdConstructionSkeleton(const Payou
     return PayoutIdConstructionSkeletonResult::PAYOUT_ID_HASHING_UNIMPLEMENTED;
 }
 
+PayoutIdSourcePolicySkeletonResult CheckPayoutIdSourcePolicySkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context, bool canonicalPayoutIdEncodingAvailable, bool deterministicSourceSetAvailable, bool forbiddenSourceExclusionAvailable, bool nonCircularDependencyReviewAvailable)
+{
+    if (!ArePayoutIdInputsCompleteSkeleton(tx, context)) {
+        return PayoutIdSourcePolicySkeletonResult::PAYOUT_ID_INPUTS_INCOMPLETE;
+    }
+    if (!canonicalPayoutIdEncodingAvailable) {
+        return PayoutIdSourcePolicySkeletonResult::CANONICAL_PAYOUT_ID_ENCODING_UNIMPLEMENTED;
+    }
+    if (!deterministicSourceSetAvailable) {
+        return PayoutIdSourcePolicySkeletonResult::DETERMINISTIC_SOURCE_SET_UNIMPLEMENTED;
+    }
+    if (!forbiddenSourceExclusionAvailable) {
+        return PayoutIdSourcePolicySkeletonResult::FORBIDDEN_SOURCE_EXCLUSION_UNIMPLEMENTED;
+    }
+    if (!nonCircularDependencyReviewAvailable) {
+        return PayoutIdSourcePolicySkeletonResult::NONCIRCULAR_DEPENDENCY_REVIEW_UNIMPLEMENTED;
+    }
+
+    return PayoutIdSourcePolicySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 PayoutAlgorithmSkeletonResult CheckPayoutAlgorithmSkeleton(const PayoutTxSkeleton& tx, bool payoutIdentifierAvailable, bool payoutAddressParserAvailable, bool payoutKeyDerivationAvailable, bool payoutCoinConstructionAvailable)
 {
     if (!IsCompletePayoutTxSkeleton(tx)) {

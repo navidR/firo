@@ -18,6 +18,7 @@ Current scope:
 - `DoesPayoutContextMatchTxSkeleton` checks that caller-supplied payout tx and block-context skeletons agree on `payout_index` and `selected_stake_id`; it does not construct `j`.
 - `ArePayoutIdInputsCompleteSkeleton` checks only that section 16 payout-id inputs are available across the block context and tx identity fields before any future `j` construction.
 - `CheckPayoutIdConstructionSkeleton` is an explicit blocker for revised spec section 16 payout identifier `j` construction. It does not define canonical `chain_id`/`enc_*` grammar, hash the inputs, or return `j`.
+- `CheckPayoutIdSourcePolicySkeleton` is an explicit blocker for revised spec section 16 payout-id source policy. It blocks before proving the deterministic source set, excluding current block hash/coinbase/payout-coin-dependent inputs, reviewing non-circularity, or wiring those rules into consensus.
 - `CheckPayoutAlgorithmSkeleton` is an explicit blocker for revised spec section 17 payout coin recomputation and section 18 steps 11-13. It preserves incomplete payout tx failures, then blocks missing payout identifier, address parsing, key derivation, coin construction, and coin comparison; it has no acceptance result.
 - `IsCompleteStakeTxSkeleton` checks that caller-supplied `StakeTx` cover-set, context, and proof fields are populated before future staking verification; it does not define context grammar or verify proofs.
 - `IsCompleteStakeUpdateTxSkeleton` checks that caller-supplied `StakeUpdateTx` fields are populated before any future signature verification; it does not define context grammar or verify `sig_update`.
@@ -131,6 +132,7 @@ Not implemented yet:
 - full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, payout address parsing, deterministic Spark payout coin construction, and payout coin comparison
 - real payout-output extraction from accepted payout transactions after `PayoutVerify`
 - real deterministic payout ordinal selection and payout identifier `j` construction
+- consensus source-set, forbidden-dependency, and non-circularity checks for payout identifier `j`
 - canonical `chain_id`, `enc_int`, `enc_hash`, and `enc_bytes` encodings for payout-id construction
 - real payout address and payout coin encodings for `PayoutTxSkeleton`
 - canonical stake context grammar, including payout address, update key, node signing material, and implementation-specific masternode context rules

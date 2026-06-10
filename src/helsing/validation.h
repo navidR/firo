@@ -63,6 +63,15 @@ enum class PayoutIdConstructionSkeletonResult {
     PAYOUT_ID_HASHING_UNIMPLEMENTED,
 };
 
+enum class PayoutIdSourcePolicySkeletonResult {
+    PAYOUT_ID_INPUTS_INCOMPLETE,
+    CANONICAL_PAYOUT_ID_ENCODING_UNIMPLEMENTED,
+    DETERMINISTIC_SOURCE_SET_UNIMPLEMENTED,
+    FORBIDDEN_SOURCE_EXCLUSION_UNIMPLEMENTED,
+    NONCIRCULAR_DEPENDENCY_REVIEW_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class PayoutOrdinalSelectionSkeletonResult {
     PAYOUT_SET_UNAVAILABLE,
     PAYOUT_INDEXES_NOT_DISTINCT,
@@ -461,6 +470,10 @@ bool ArePayoutIdInputsCompleteSkeleton(const PayoutTxSkeleton& tx, const PayoutB
 // Revised spec section 16 payout-id construction is deliberately unimplemented:
 // canonical chain_id/enc_* grammar and hash construction are required before deriving j.
 PayoutIdConstructionSkeletonResult CheckPayoutIdConstructionSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context, bool canonicalPayoutIdEncodingAvailable);
+// Revised spec section 16 also requires j to use deterministic, unique, and
+// non-circular sources, excluding current block hash, coinbase txid, and payout
+// coin dependent values. This blocker has no accepting result and does not hash j.
+PayoutIdSourcePolicySkeletonResult CheckPayoutIdSourcePolicySkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context, bool canonicalPayoutIdEncodingAvailable, bool deterministicSourceSetAvailable, bool forbiddenSourceExclusionAvailable, bool nonCircularDependencyReviewAvailable);
 // Revised spec section 17 payout algorithm and section 18 steps 11-13 are deliberately
 // blocked here. The caller supplies implementation-availability flags, not consensus
 // validation results; this helper has no accepting result and does not construct Coin.
