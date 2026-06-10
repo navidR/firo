@@ -281,6 +281,24 @@ bool IsCompleteStakeTxSkeleton(const StakeTx& tx)
            !tx.pi_tag.empty();
 }
 
+HelsingTransactionWiringSkeletonResult CheckHelsingTransactionWiringSkeleton(bool consensusTxCarrierAvailable, bool stakeTxExtractionAvailable, bool stakeUpdateTxExtractionAvailable, bool payoutTxExtractionAvailable)
+{
+    if (!consensusTxCarrierAvailable) {
+        return HelsingTransactionWiringSkeletonResult::CONSENSUS_TX_CARRIER_UNIMPLEMENTED;
+    }
+    if (!stakeTxExtractionAvailable) {
+        return HelsingTransactionWiringSkeletonResult::STAKE_TX_EXTRACTION_UNIMPLEMENTED;
+    }
+    if (!stakeUpdateTxExtractionAvailable) {
+        return HelsingTransactionWiringSkeletonResult::STAKE_UPDATE_TX_EXTRACTION_UNIMPLEMENTED;
+    }
+    if (!payoutTxExtractionAvailable) {
+        return HelsingTransactionWiringSkeletonResult::PAYOUT_TX_EXTRACTION_UNIMPLEMENTED;
+    }
+
+    return HelsingTransactionWiringSkeletonResult::BLOCK_INTEGRATION_UNIMPLEMENTED;
+}
+
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid)
 {
     if (!IsCompleteStakeTxSkeleton(tx)) {

@@ -1436,6 +1436,44 @@ BOOST_AUTO_TEST_CASE(stake_update_completeness_skeleton_does_not_define_context_
     BOOST_CHECK(helsing::IsCompleteStakeUpdateTxSkeleton(tx));
 }
 
+BOOST_AUTO_TEST_CASE(helsing_transaction_wiring_skeleton_blocks_missing_carrier_first)
+{
+    BOOST_CHECK(helsing::CheckHelsingTransactionWiringSkeleton(false, false, false, false) == helsing::HelsingTransactionWiringSkeletonResult::CONSENSUS_TX_CARRIER_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingTransactionWiringSkeleton(false, true, true, true) == helsing::HelsingTransactionWiringSkeletonResult::CONSENSUS_TX_CARRIER_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(helsing_transaction_wiring_skeleton_orders_payload_extractors)
+{
+    BOOST_CHECK(helsing::CheckHelsingTransactionWiringSkeleton(true, false, false, false) == helsing::HelsingTransactionWiringSkeletonResult::STAKE_TX_EXTRACTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingTransactionWiringSkeleton(true, true, false, false) == helsing::HelsingTransactionWiringSkeletonResult::STAKE_UPDATE_TX_EXTRACTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingTransactionWiringSkeleton(true, true, true, false) == helsing::HelsingTransactionWiringSkeletonResult::PAYOUT_TX_EXTRACTION_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(helsing_transaction_wiring_skeleton_has_no_accepting_path)
+{
+    BOOST_CHECK(helsing::CheckHelsingTransactionWiringSkeleton(true, true, true, true) == helsing::HelsingTransactionWiringSkeletonResult::BLOCK_INTEGRATION_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(helsing_transaction_wiring_skeleton_does_not_parse_payload_structs)
+{
+    const helsing::StakeTx stakeTx = ValidStakeTx();
+    helsing::StakeUpdateTx updateTx;
+    updateTx.stake_id = DeterministicHash(232);
+    updateTx.m_new.bytes = {0x02};
+    updateTx.sig_update.bytes = {0x03};
+    helsing::PayoutTxSkeleton payoutTx;
+    payoutTx.selected_stake_id = DeterministicHash(233);
+    payoutTx.payout_index = 1;
+    payoutTx.addr_pk.bytes = {0x04};
+    payoutTx.V_PAYOUT = 1;
+    payoutTx.coin.bytes = {0x05};
+
+    BOOST_CHECK(helsing::IsCompleteStakeTxSkeleton(stakeTx));
+    BOOST_CHECK(helsing::IsCompleteStakeUpdateTxSkeleton(updateTx));
+    BOOST_CHECK(helsing::IsCompletePayoutTxSkeleton(payoutTx));
+    BOOST_CHECK(helsing::CheckHelsingTransactionWiringSkeleton(true, true, true, true) == helsing::HelsingTransactionWiringSkeletonResult::BLOCK_INTEGRATION_UNIMPLEMENTED);
+}
+
 BOOST_AUTO_TEST_CASE(payout_address_match_skeleton_compares_extracted_registered_address)
 {
     helsing::PayoutTxSkeleton tx;

@@ -71,6 +71,14 @@ enum class PayoutOutputRecordConstructionSkeletonResult {
     PAYOUT_OUTPUT_RECORD_CONSTRUCTION_UNIMPLEMENTED,
 };
 
+enum class HelsingTransactionWiringSkeletonResult {
+    CONSENSUS_TX_CARRIER_UNIMPLEMENTED,
+    STAKE_TX_EXTRACTION_UNIMPLEMENTED,
+    STAKE_UPDATE_TX_EXTRACTION_UNIMPLEMENTED,
+    PAYOUT_TX_EXTRACTION_UNIMPLEMENTED,
+    BLOCK_INTEGRATION_UNIMPLEMENTED,
+};
+
 enum class PayoutVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -309,6 +317,10 @@ bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx);
 // Revised spec StakeTx field-completeness only. This does not check output-id grammar,
 // group-element encodings, context grammar, value parameters, or proof validity.
 bool IsCompleteStakeTxSkeleton(const StakeTx& tx);
+// Revised spec sections 9, 14, 15, and 12 define Helsing transaction payloads
+// and block ordering, but not the Firo consensus carrier/extraction grammar.
+// This blocker has no accepting result and must not be used to parse CTransaction.
+HelsingTransactionWiringSkeletonResult CheckHelsingTransactionWiringSkeleton(bool consensusTxCarrierAvailable, bool stakeTxExtractionAvailable, bool stakeUpdateTxExtractionAvailable, bool payoutTxExtractionAvailable);
 // Revised spec StakeVerify steps 1-3 only. The caller supplies the result of
 // canonical-encoding validation because the consensus grammar is not implemented here.
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid);
