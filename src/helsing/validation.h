@@ -49,6 +49,14 @@ enum class PayoutPublicValidationResult {
     PAYOUT_COIN_MISMATCH,
 };
 
+enum class PayoutAmountDerivationSkeletonResult {
+    PAYOUT_SELECTION_PREFIX_FAILED,
+    CONSENSUS_REWARD_RULES_UNIMPLEMENTED,
+    EXPECTED_PAYOUT_AMOUNT_DERIVATION_UNIMPLEMENTED,
+    PAYOUT_AMOUNT_COMPARISON_UNIMPLEMENTED,
+    PAYOUT_VALUE_DOMAIN_CONSENSUS_PARAMETERS_UNIMPLEMENTED,
+};
+
 enum class PayoutIdConstructionSkeletonResult {
     PAYOUT_ID_INPUTS_INCOMPLETE,
     CANONICAL_PAYOUT_ID_ENCODING_UNIMPLEMENTED,
@@ -284,6 +292,11 @@ bool IsExpectedPayoutAmountInRangeSkeleton(CAmount payoutValue, CAmount expected
 // Revised spec PayoutVerify step 10 value-domain subset for caller-supplied public values.
 // This does not expose q or perform scalar conversion; the caller supplies V_MAX < q.
 bool IsPayoutValueParameterInRangeSkeleton(CAmount payoutValue, CAmount expectedAmount, CAmount vMax, bool vMaxLessThanGroupOrder);
+// Revised spec PayoutVerify step 10 requires recomputing the expected payout
+// amount after step-9 deterministic selection. The revised spec does not define
+// Firo reward-rule inputs or payout-amount derivation, so this blocker has no
+// accepting result and does not compute an amount.
+PayoutAmountDerivationSkeletonResult CheckPayoutAmountDerivationSkeleton(bool payoutSelectionPrefixAccepted, bool consensusRewardRulesAvailable, bool expectedPayoutAmountDerivationAvailable, bool payoutAmountComparisonAvailable);
 // Revised spec PayoutTx field-completeness only. This does not check canonical
 // encodings, value-domain parameters, registered address, selected stake, j, or payout coin.
 bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx);

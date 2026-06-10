@@ -48,6 +48,7 @@ Current scope:
 - `CheckStakeIdConstructionSkeleton` is an explicit blocker for post-acceptance `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction. It does not hash caller-supplied bytes or return a stake ID.
 - `IsExpectedPayoutAmountInRangeSkeleton` checks the revised spec `PayoutVerify` step 10 equality and integer range for caller-supplied values.
 - `IsPayoutValueParameterInRangeSkeleton` checks revised spec `PayoutVerify` step 10 for caller-supplied `V_PAYOUT`, expected amount, `V_MAX`, and `V_MAX < q`; it does not expose the scalar order, perform scalar conversion, or recompute payout amounts.
+- `CheckPayoutAmountDerivationSkeleton` is an explicit blocker for revised spec `PayoutVerify` step 10 real expected-payout derivation. It requires prior payout selection success, then blocks before Firo consensus reward rules, amount derivation, amount comparison, and value-domain consensus parameters; it has no accepting result.
 - `IsCompletePayoutTxSkeleton` checks that caller-supplied `PayoutTxSkeleton` identity/address/coin fields are populated before future payout verification; it does not define payout address or coin encodings.
 - `CheckPayoutVerificationPrefixSkeleton` checks revised spec `PayoutVerify` steps 1-2 only: field presence and a caller-supplied canonical-encoding result. It deliberately stops before stake lookup, registered address extraction, deterministic selection, value checks, payout-id construction, and payout coin recomputation.
 - `DoesPayoutAddressMatchRegisteredSkeleton` checks revised spec `PayoutVerify` step 8 byte equality against a caller-supplied, already extracted registered payout address.
@@ -94,7 +95,7 @@ Not implemented yet:
 - Spark maturity and cover-set eligibility rules using current height, Spark ledger state, and consensus maturity/eligibility parameters
 - wiring value-domain checks for `V_STAKE`, `V_PAYOUT`, `V_MAX < q`, scalar conversion bounds, and ordinary fees outside the collateral proof
 - any decision to reintroduce an optional collateral margin as a consensus policy
-- deriving the expected payout amount from consensus reward rules
+- real expected payout amount derivation from consensus reward rules
 - `ParVerify`, `RepVerify`, and `TagVerify`
 - consensus block-level ordinary Spark spend validation and `BlockSpentTags` extraction/integration
 - real Spark transaction-type spend-path analysis for deciding when every spend path reveals a Spark tag

@@ -373,6 +373,36 @@ BOOST_AUTO_TEST_CASE(payout_value_parameter_skeleton_checks_payoutverify_amount_
     BOOST_CHECK(!helsing::IsPayoutValueParameterInRangeSkeleton(std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max(), std::numeric_limits<CAmount>::max(), true));
 }
 
+BOOST_AUTO_TEST_CASE(payout_amount_derivation_skeleton_requires_selection_prefix_first)
+{
+    BOOST_CHECK(helsing::CheckPayoutAmountDerivationSkeleton(false, false, false, false) == helsing::PayoutAmountDerivationSkeletonResult::PAYOUT_SELECTION_PREFIX_FAILED);
+    BOOST_CHECK(helsing::CheckPayoutAmountDerivationSkeleton(false, true, true, true) == helsing::PayoutAmountDerivationSkeletonResult::PAYOUT_SELECTION_PREFIX_FAILED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_amount_derivation_skeleton_orders_reward_and_derivation_blockers)
+{
+    BOOST_CHECK(helsing::CheckPayoutAmountDerivationSkeleton(true, false, true, true) == helsing::PayoutAmountDerivationSkeletonResult::CONSENSUS_REWARD_RULES_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutAmountDerivationSkeleton(true, false, false, false) == helsing::PayoutAmountDerivationSkeletonResult::CONSENSUS_REWARD_RULES_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutAmountDerivationSkeleton(true, true, false, true) == helsing::PayoutAmountDerivationSkeletonResult::EXPECTED_PAYOUT_AMOUNT_DERIVATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutAmountDerivationSkeleton(true, true, true, false) == helsing::PayoutAmountDerivationSkeletonResult::PAYOUT_AMOUNT_COMPARISON_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_amount_derivation_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(197, DeterministicPoint(197));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::PayoutAmountDerivationSkeletonResult result = helsing::CheckPayoutAmountDerivationSkeleton(true, true, true, true);
+
+    BOOST_CHECK(result == helsing::PayoutAmountDerivationSkeletonResult::PAYOUT_VALUE_DOMAIN_CONSENSUS_PARAMETERS_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(value_parameter_skeleton_checks_stake_payout_and_scalar_order_bounds)
 {
     BOOST_CHECK(helsing::AreHelsingValueParametersInRangeSkeleton(0, 0, 1, true));

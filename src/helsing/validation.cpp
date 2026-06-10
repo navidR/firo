@@ -148,6 +148,24 @@ bool IsPayoutValueParameterInRangeSkeleton(CAmount payoutValue, CAmount expected
     return vMaxLessThanGroupOrder && IsExpectedPayoutAmountInRangeSkeleton(payoutValue, expectedAmount, vMax);
 }
 
+PayoutAmountDerivationSkeletonResult CheckPayoutAmountDerivationSkeleton(bool payoutSelectionPrefixAccepted, bool consensusRewardRulesAvailable, bool expectedPayoutAmountDerivationAvailable, bool payoutAmountComparisonAvailable)
+{
+    if (!payoutSelectionPrefixAccepted) {
+        return PayoutAmountDerivationSkeletonResult::PAYOUT_SELECTION_PREFIX_FAILED;
+    }
+    if (!consensusRewardRulesAvailable) {
+        return PayoutAmountDerivationSkeletonResult::CONSENSUS_REWARD_RULES_UNIMPLEMENTED;
+    }
+    if (!expectedPayoutAmountDerivationAvailable) {
+        return PayoutAmountDerivationSkeletonResult::EXPECTED_PAYOUT_AMOUNT_DERIVATION_UNIMPLEMENTED;
+    }
+    if (!payoutAmountComparisonAvailable) {
+        return PayoutAmountDerivationSkeletonResult::PAYOUT_AMOUNT_COMPARISON_UNIMPLEMENTED;
+    }
+
+    return PayoutAmountDerivationSkeletonResult::PAYOUT_VALUE_DOMAIN_CONSENSUS_PARAMETERS_UNIMPLEMENTED;
+}
+
 bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx)
 {
     return !tx.selected_stake_id.IsNull() &&
