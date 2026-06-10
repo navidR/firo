@@ -294,6 +294,15 @@ enum class StakeStatementConstructionSkeletonResult {
     STAKE_STATEMENT_HASHING_UNIMPLEMENTED,
 };
 
+enum class StakeStatementProtocolBindingSkeletonResult {
+    STAKE_PREFIX_FAILED,
+    CHAIN_ID_BINDING_UNIMPLEMENTED,
+    PROTOCOL_VERSION_BINDING_UNIMPLEMENTED,
+    PUBLIC_PARAMETERS_HASH_BINDING_UNIMPLEMENTED,
+    COLLATERAL_VALUE_BINDING_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 struct StakeVerificationBlockedSkeletonResult {
     StakeVerificationOutputSkeletonResult output_result;
     StakeCoverSetSparkRulesBlockedSkeletonResult spark_rules_result;
@@ -504,6 +513,11 @@ StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(cons
 // blocked here. The caller supplies implementation-availability flags; this helper
 // has no accepting result and does not compute incoins_root, context_hash, or stake_stmt.
 StakeStatementConstructionSkeletonResult CheckStakeStatementConstructionSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool incoinsRootHashingAvailable, bool contextHashingAvailable);
+// Revised spec section 5.2 requires stake_stmt to bind chain_id,
+// protocol_version, pp_hash, and V_STAKE before proof transcripts can be
+// consensus-valid. This blocker has no accepting result and does not construct
+// stake_stmt.
+StakeStatementProtocolBindingSkeletonResult CheckStakeStatementProtocolBindingSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool chainIdBindingAvailable, bool protocolVersionBindingAvailable, bool publicParametersHashBindingAvailable, bool collateralValueBindingAvailable);
 // Revised spec StakeVerify steps 9-11 are deliberately unimplemented here:
 // real ParVerify/RepVerify/TagVerify bound to stake_stmt are required before any
 // acceptance path may exist. The caller-supplied booleans are implementation

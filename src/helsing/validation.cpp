@@ -720,6 +720,31 @@ StakeStatementConstructionSkeletonResult CheckStakeStatementConstructionSkeleton
     return StakeStatementConstructionSkeletonResult::STAKE_STATEMENT_HASHING_UNIMPLEMENTED;
 }
 
+StakeStatementProtocolBindingSkeletonResult CheckStakeStatementProtocolBindingSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool chainIdBindingAvailable, bool protocolVersionBindingAvailable, bool publicParametersHashBindingAvailable, bool collateralValueBindingAvailable)
+{
+    if (prefixResult.cover_set_result.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||
+        prefixResult.cover_set_result.context_result.tag_result != StakeValidationResult::OK ||
+        !prefixResult.cover_set_result.context_result.context_valid ||
+        prefixResult.cover_set_result.cover_set_result != StakeValidationResult::OK ||
+        prefixResult.output_result != StakeValidationResult::OK) {
+        return StakeStatementProtocolBindingSkeletonResult::STAKE_PREFIX_FAILED;
+    }
+    if (!chainIdBindingAvailable) {
+        return StakeStatementProtocolBindingSkeletonResult::CHAIN_ID_BINDING_UNIMPLEMENTED;
+    }
+    if (!protocolVersionBindingAvailable) {
+        return StakeStatementProtocolBindingSkeletonResult::PROTOCOL_VERSION_BINDING_UNIMPLEMENTED;
+    }
+    if (!publicParametersHashBindingAvailable) {
+        return StakeStatementProtocolBindingSkeletonResult::PUBLIC_PARAMETERS_HASH_BINDING_UNIMPLEMENTED;
+    }
+    if (!collateralValueBindingAvailable) {
+        return StakeStatementProtocolBindingSkeletonResult::COLLATERAL_VALUE_BINDING_UNIMPLEMENTED;
+    }
+
+    return StakeStatementProtocolBindingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool stakeStatementAvailable, bool parVerifierAvailable, bool repVerifierAvailable)
 {
     if (prefixResult.cover_set_result.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||
