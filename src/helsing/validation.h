@@ -87,6 +87,13 @@ enum class PayoutOutputRecordConstructionSkeletonResult {
     PAYOUT_OUTPUT_RECORD_CONSTRUCTION_UNIMPLEMENTED,
 };
 
+enum class HelsingDuplicateSerialCompatibilitySkeletonResult {
+    SPARK_SERIAL_UNIQUENESS_REVIEW_UNIMPLEMENTED,
+    PAYOUT_OUTPUT_DOMAIN_SEPARATION_UNIMPLEMENTED,
+    DUPLICATE_SERIAL_OUTPUT_ID_INDEX_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class HelsingTransactionWiringSkeletonResult {
     CONSENSUS_TX_CARRIER_UNIMPLEMENTED,
     STAKE_TX_EXTRACTION_UNIMPLEMENTED,
@@ -375,6 +382,12 @@ bool IsPayoutValueParameterInRangeSkeleton(CAmount payoutValue, CAmount expected
 // Firo reward-rule inputs or payout-amount derivation, so this blocker has no
 // accepting result and does not compute an amount.
 PayoutAmountDerivationSkeletonResult CheckPayoutAmountDerivationSkeleton(bool payoutSelectionPrefixAccepted, bool consensusRewardRulesAvailable, bool expectedPayoutAmountDerivationAvailable, bool payoutAmountComparisonAvailable);
+// Revised spec sections 19 and 30 require duplicate serial commitments to be
+// safe at output creation, or else a domain-separated payout-output class that
+// ordinary mints cannot pre-create. Any serial-commitment index must return all
+// matching output_ids. This blocker has no accepting result and does not change
+// existing Spark consensus indexes.
+HelsingDuplicateSerialCompatibilitySkeletonResult CheckHelsingDuplicateSerialCompatibilitySkeleton(bool sparkSerialUniquenessReviewAvailable, bool duplicateSerialsAllowedAtOutputCreation, bool duplicateSerialIndexReturnsAllOutputIdsAvailable, bool domainSeparatedPayoutOutputClassAvailable);
 // Revised spec PayoutTx field-completeness only. This does not check canonical
 // encodings, value-domain parameters, registered address, selected stake, j, or payout coin.
 bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx);

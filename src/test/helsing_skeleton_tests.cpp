@@ -2335,6 +2335,42 @@ BOOST_AUTO_TEST_CASE(extractor_preserves_duplicate_serial_commitments_under_dist
     BOOST_CHECK(outputs.at(firstId).output_id != outputs.at(secondId).output_id);
 }
 
+BOOST_AUTO_TEST_CASE(duplicate_serial_compatibility_skeleton_requires_spark_review_first)
+{
+    BOOST_CHECK(helsing::CheckHelsingDuplicateSerialCompatibilitySkeleton(false, false, false, false) == helsing::HelsingDuplicateSerialCompatibilitySkeletonResult::SPARK_SERIAL_UNIQUENESS_REVIEW_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingDuplicateSerialCompatibilitySkeleton(false, true, true, true) == helsing::HelsingDuplicateSerialCompatibilitySkeletonResult::SPARK_SERIAL_UNIQUENESS_REVIEW_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(duplicate_serial_compatibility_skeleton_orders_preferred_duplicate_path)
+{
+    BOOST_CHECK(helsing::CheckHelsingDuplicateSerialCompatibilitySkeleton(true, true, false, false) == helsing::HelsingDuplicateSerialCompatibilitySkeletonResult::DUPLICATE_SERIAL_OUTPUT_ID_INDEX_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingDuplicateSerialCompatibilitySkeleton(true, true, true, false) == helsing::HelsingDuplicateSerialCompatibilitySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(duplicate_serial_compatibility_skeleton_orders_domain_separation_fallback)
+{
+    BOOST_CHECK(helsing::CheckHelsingDuplicateSerialCompatibilitySkeleton(true, false, true, false) == helsing::HelsingDuplicateSerialCompatibilitySkeletonResult::PAYOUT_OUTPUT_DOMAIN_SEPARATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingDuplicateSerialCompatibilitySkeleton(true, false, false, false) == helsing::HelsingDuplicateSerialCompatibilitySkeletonResult::PAYOUT_OUTPUT_DOMAIN_SEPARATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingDuplicateSerialCompatibilitySkeleton(true, false, false, true) == helsing::HelsingDuplicateSerialCompatibilitySkeletonResult::DUPLICATE_SERIAL_OUTPUT_ID_INDEX_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingDuplicateSerialCompatibilitySkeleton(true, false, true, true) == helsing::HelsingDuplicateSerialCompatibilitySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(duplicate_serial_compatibility_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(202, DeterministicPoint(202));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::HelsingDuplicateSerialCompatibilitySkeletonResult result = helsing::CheckHelsingDuplicateSerialCompatibilitySkeleton(true, true, true, true);
+
+    BOOST_CHECK(result == helsing::HelsingDuplicateSerialCompatibilitySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(extractor_appends_records_for_block_view_accumulation)
 {
     const SparkOutputFixture first = SparkMintOutput(5, 45);

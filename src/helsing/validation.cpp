@@ -245,6 +245,21 @@ PayoutAmountDerivationSkeletonResult CheckPayoutAmountDerivationSkeleton(bool pa
     return PayoutAmountDerivationSkeletonResult::PAYOUT_VALUE_DOMAIN_CONSENSUS_PARAMETERS_UNIMPLEMENTED;
 }
 
+HelsingDuplicateSerialCompatibilitySkeletonResult CheckHelsingDuplicateSerialCompatibilitySkeleton(bool sparkSerialUniquenessReviewAvailable, bool duplicateSerialsAllowedAtOutputCreation, bool duplicateSerialIndexReturnsAllOutputIdsAvailable, bool domainSeparatedPayoutOutputClassAvailable)
+{
+    if (!sparkSerialUniquenessReviewAvailable) {
+        return HelsingDuplicateSerialCompatibilitySkeletonResult::SPARK_SERIAL_UNIQUENESS_REVIEW_UNIMPLEMENTED;
+    }
+    if (!duplicateSerialsAllowedAtOutputCreation && !domainSeparatedPayoutOutputClassAvailable) {
+        return HelsingDuplicateSerialCompatibilitySkeletonResult::PAYOUT_OUTPUT_DOMAIN_SEPARATION_UNIMPLEMENTED;
+    }
+    if (!duplicateSerialIndexReturnsAllOutputIdsAvailable) {
+        return HelsingDuplicateSerialCompatibilitySkeletonResult::DUPLICATE_SERIAL_OUTPUT_ID_INDEX_UNIMPLEMENTED;
+    }
+
+    return HelsingDuplicateSerialCompatibilitySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx)
 {
     return !tx.selected_stake_id.IsNull() &&
