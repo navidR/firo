@@ -316,6 +316,27 @@ bool IsStakeContextValidSkeleton(const StakeContext& context, bool canonicalCont
            nodeSigningKeyMaterialValid;
 }
 
+StakeContextValidationBlockedSkeletonResult CheckStakeContextValidationBlockedSkeleton(const StakeContext& context, bool canonicalContextEncodingAvailable, bool payoutAddressValidationAvailable, bool updatePublicKeyValidationAvailable, bool nodeSigningKeyValidationAvailable)
+{
+    if (context.bytes.empty()) {
+        return StakeContextValidationBlockedSkeletonResult::STAKE_CONTEXT_EMPTY;
+    }
+    if (!canonicalContextEncodingAvailable) {
+        return StakeContextValidationBlockedSkeletonResult::CANONICAL_CONTEXT_ENCODING_UNIMPLEMENTED;
+    }
+    if (!payoutAddressValidationAvailable) {
+        return StakeContextValidationBlockedSkeletonResult::PAYOUT_ADDRESS_VALIDATION_UNIMPLEMENTED;
+    }
+    if (!updatePublicKeyValidationAvailable) {
+        return StakeContextValidationBlockedSkeletonResult::UPDATE_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED;
+    }
+    if (!nodeSigningKeyValidationAvailable) {
+        return StakeContextValidationBlockedSkeletonResult::NODE_SIGNING_KEY_VALIDATION_UNIMPLEMENTED;
+    }
+
+    return StakeContextValidationBlockedSkeletonResult::MASTERNODE_CONTEXT_RULES_UNIMPLEMENTED;
+}
+
 StakeVerificationContextSkeletonResult CheckStakeVerificationContextSkeleton(
     const StakeTx& tx,
     const CHelsingState& helsingState,

@@ -32,6 +32,7 @@ Current scope:
 - `CheckStakeVerificationPrefixSkeleton` checks revised spec `StakeVerify` steps 1-3 only: field presence, a caller-supplied canonical-encoding result, and caller-supplied `V_STAKE` value parameters. It deliberately stops before tag-state, context, cover-set, statement-hash, and proof verification.
 - `CheckStakeTagStateSkeleton` checks revised spec `StakeVerify` step 4 against parent state only: reject if `T` is already spent, then reject if `T` is already active. It does not inspect same-block `BlockSpentTags`.
 - `IsStakeContextValidSkeleton` checks revised spec `StakeVerify` step 5 only as a predicate over caller-supplied context-validation facts: non-empty context, canonical context, valid payout address, valid update key, and valid node signing key material. It does not define `enc_context(m)` or any concrete address/key grammar.
+- `CheckStakeContextValidationBlockedSkeleton` is an explicit blocker for revised spec section 7 and `StakeVerify` step 5 context validation. It blocks before canonical context encoding, payout address validation, update public-key validation, node signing-key validation, and implementation-specific masternode context rules; it has no acceptance result.
 - `CheckStakeVerificationContextSkeleton` composes revised spec `StakeVerify` steps 1-5 only: field presence, caller-supplied canonical encodings, caller-supplied value parameters, parent-state tag checks, and caller-supplied context facts. It deliberately stops before same-block `BlockSpentTags`, cover-set lookup, statement hashes, and proof verification.
 - `CheckStakeCoverSetIdentifiersSkeleton` checks revised spec `StakeVerify` step 6 only: `len(InCoinIDs) = N = n^m` and strictly sorted distinct output identifiers. It deliberately stops before output lookup, output eligibility, Spark maturity, statement hashes, and proof verification.
 - `CheckStakeVerificationCoverSetSkeleton` composes revised spec `StakeVerify` steps 1-6 only using caller-supplied canonical/context facts and public cover-set parameters. It deliberately stops before output lookup, output eligibility, Spark maturity, statement hashes, and proof verification.
@@ -102,7 +103,7 @@ Not implemented yet:
 - deterministic payout ordinal selection and payout identifier `j` construction
 - canonical `chain_id`, `enc_int`, `enc_hash`, and `enc_bytes` encodings for payout-id construction
 - real payout address and payout coin encodings for `PayoutTxSkeleton`
-- canonical stake context grammar, including payout address, update key, node signing material, and rejection of empty or non-canonical contexts
+- canonical stake context grammar, including payout address, update key, node signing material, and implementation-specific masternode context rules
 - full stake update verification, including real `update_pk` extraction, canonical `m_new` validation, `enc_context(m_new)`, update-message hashing, canonical `sig_update`, update signature verification, and update effective-height rules
 - consensus wiring for applying accepted stake updates during deterministic block application
 - consensus policy for multiple `StakeUpdate` transactions targeting the same `stake_id` in one block

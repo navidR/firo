@@ -109,6 +109,15 @@ enum class StakeVerificationPrefixSkeletonResult {
     INVALID_VALUE_PARAMETER,
 };
 
+enum class StakeContextValidationBlockedSkeletonResult {
+    STAKE_CONTEXT_EMPTY,
+    CANONICAL_CONTEXT_ENCODING_UNIMPLEMENTED,
+    PAYOUT_ADDRESS_VALIDATION_UNIMPLEMENTED,
+    UPDATE_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED,
+    NODE_SIGNING_KEY_VALIDATION_UNIMPLEMENTED,
+    MASTERNODE_CONTEXT_RULES_UNIMPLEMENTED,
+};
+
 struct StakeUpdateVerificationSkeletonResult {
     bool tx_complete{false};
     StakeValidationResult stake_result{StakeValidationResult::OK};
@@ -278,6 +287,10 @@ StakeValidationResult CheckStakeTagStateSkeleton(const GroupElement& tag, const 
 // Revised spec StakeVerify step 5 predicate with caller-supplied context facts.
 // This does not define enc_context(m), address grammar, update-key grammar, or node-key grammar.
 bool IsStakeContextValidSkeleton(const StakeContext& context, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid);
+// Revised spec section 7 and StakeVerify step 5 context validation are deliberately
+// blocked here. The caller supplies implementation-availability flags, not validation
+// results; this helper has no accepting result and does not parse context fields.
+StakeContextValidationBlockedSkeletonResult CheckStakeContextValidationBlockedSkeleton(const StakeContext& context, bool canonicalContextEncodingAvailable, bool payoutAddressValidationAvailable, bool updatePublicKeyValidationAvailable, bool nodeSigningKeyValidationAvailable);
 // Revised spec StakeVerify steps 1-5 only. The caller supplies canonical
 // encoding and context-validation facts; this stops before cover sets and proofs.
 StakeVerificationContextSkeletonResult CheckStakeVerificationContextSkeleton(const StakeTx& tx, const CHelsingState& helsingState, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid);

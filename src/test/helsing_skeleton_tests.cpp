@@ -540,6 +540,33 @@ BOOST_AUTO_TEST_CASE(stake_context_validation_skeleton_does_not_define_context_g
     BOOST_CHECK(helsing::IsStakeContextValidSkeleton(context, true, true, true, true));
 }
 
+BOOST_AUTO_TEST_CASE(stake_context_validation_blocked_skeleton_rejects_empty_context_first)
+{
+    helsing::StakeContext context;
+
+    BOOST_CHECK(helsing::CheckStakeContextValidationBlockedSkeleton(context, false, false, false, false) == helsing::StakeContextValidationBlockedSkeletonResult::STAKE_CONTEXT_EMPTY);
+    BOOST_CHECK(helsing::CheckStakeContextValidationBlockedSkeleton(context, true, true, true, true) == helsing::StakeContextValidationBlockedSkeletonResult::STAKE_CONTEXT_EMPTY);
+}
+
+BOOST_AUTO_TEST_CASE(stake_context_validation_blocked_skeleton_preserves_spec_minimum_order)
+{
+    helsing::StakeContext context;
+    context.bytes = {0x6d};
+
+    BOOST_CHECK(helsing::CheckStakeContextValidationBlockedSkeleton(context, false, false, false, false) == helsing::StakeContextValidationBlockedSkeletonResult::CANONICAL_CONTEXT_ENCODING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeContextValidationBlockedSkeleton(context, true, false, false, false) == helsing::StakeContextValidationBlockedSkeletonResult::PAYOUT_ADDRESS_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeContextValidationBlockedSkeleton(context, true, true, false, false) == helsing::StakeContextValidationBlockedSkeletonResult::UPDATE_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeContextValidationBlockedSkeleton(context, true, true, true, false) == helsing::StakeContextValidationBlockedSkeletonResult::NODE_SIGNING_KEY_VALIDATION_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_context_validation_blocked_skeleton_has_no_accepting_path)
+{
+    helsing::StakeContext context;
+    context.bytes = {0xff, 0x00, 0x6d, 0x01};
+
+    BOOST_CHECK(helsing::CheckStakeContextValidationBlockedSkeleton(context, true, true, true, true) == helsing::StakeContextValidationBlockedSkeletonResult::MASTERNODE_CONTEXT_RULES_UNIMPLEMENTED);
+}
+
 BOOST_AUTO_TEST_CASE(stake_verification_context_skeleton_accepts_steps_one_through_five)
 {
     const helsing::StakeTx tx = ValidStakeTx();
