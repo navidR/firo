@@ -302,6 +302,16 @@ enum class StakeUpdateCurrentContextKeySkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class StakeUpdateNewContextValidationSkeletonResult {
+    STAKE_UPDATE_PREFIX_FAILED,
+    CANONICAL_NEW_CONTEXT_ENCODING_UNIMPLEMENTED,
+    NEW_CONTEXT_PAYOUT_ADDRESS_VALIDATION_UNIMPLEMENTED,
+    NEW_CONTEXT_UPDATE_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED,
+    NEW_CONTEXT_NODE_SIGNING_KEY_VALIDATION_UNIMPLEMENTED,
+    NEW_CONTEXT_MASTERNODE_RULES_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 struct StakeUpdateVerificationBlockedSkeletonResult {
     StakeUpdateVerificationSkeletonResult prefix_result;
     StakeUpdateAuthorizationSkeletonResult authorization_result{StakeUpdateAuthorizationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED};
@@ -750,6 +760,11 @@ StakeUpdateSignatureVerificationSkeletonResult CheckStakeUpdateSignatureVerifica
 // registered context m, not from m_new. This blocker has no accepting result and
 // does not parse contexts, extract keys, or bind authorization.
 StakeUpdateCurrentContextKeySkeletonResult CheckStakeUpdateCurrentContextKeySkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool canonicalCurrentContextEncodingAvailable, bool updatePublicKeyExtractionAvailable, bool updatePublicKeyValidationAvailable, bool currentContextAuthorityBindingAvailable);
+
+// Revised-spec StakeUpdateVerify step 5 validates m_new as a canonical
+// masternode context. This blocker has no accepting result and does not parse
+// context fields or decide implementation-specific masternode rules.
+StakeUpdateNewContextValidationSkeletonResult CheckStakeUpdateNewContextValidationSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool canonicalNewContextEncodingAvailable, bool payoutAddressValidationAvailable, bool updatePublicKeyValidationAvailable, bool nodeSigningKeyValidationAvailable, bool masternodeContextRulesAvailable);
 
 // Revised-spec StakeUpdateVerify steps 4-6 are deliberately blocked here. The
 // caller supplies implementation-availability flags, not consensus validation

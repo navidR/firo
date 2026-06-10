@@ -1519,6 +1519,30 @@ StakeUpdateCurrentContextKeySkeletonResult CheckStakeUpdateCurrentContextKeySkel
     return StakeUpdateCurrentContextKeySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+StakeUpdateNewContextValidationSkeletonResult CheckStakeUpdateNewContextValidationSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool canonicalNewContextEncodingAvailable, bool payoutAddressValidationAvailable, bool updatePublicKeyValidationAvailable, bool nodeSigningKeyValidationAvailable, bool masternodeContextRulesAvailable)
+{
+    if (!prefixResult.tx_complete || prefixResult.stake_result != StakeValidationResult::OK) {
+        return StakeUpdateNewContextValidationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED;
+    }
+    if (!canonicalNewContextEncodingAvailable) {
+        return StakeUpdateNewContextValidationSkeletonResult::CANONICAL_NEW_CONTEXT_ENCODING_UNIMPLEMENTED;
+    }
+    if (!payoutAddressValidationAvailable) {
+        return StakeUpdateNewContextValidationSkeletonResult::NEW_CONTEXT_PAYOUT_ADDRESS_VALIDATION_UNIMPLEMENTED;
+    }
+    if (!updatePublicKeyValidationAvailable) {
+        return StakeUpdateNewContextValidationSkeletonResult::NEW_CONTEXT_UPDATE_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED;
+    }
+    if (!nodeSigningKeyValidationAvailable) {
+        return StakeUpdateNewContextValidationSkeletonResult::NEW_CONTEXT_NODE_SIGNING_KEY_VALIDATION_UNIMPLEMENTED;
+    }
+    if (!masternodeContextRulesAvailable) {
+        return StakeUpdateNewContextValidationSkeletonResult::NEW_CONTEXT_MASTERNODE_RULES_UNIMPLEMENTED;
+    }
+
+    return StakeUpdateNewContextValidationSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeUpdateAuthorizationSkeletonResult CheckStakeUpdateAuthorizationSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool updateSignatureHashingAvailable)
 {
     if (!prefixResult.tx_complete || prefixResult.stake_result != StakeValidationResult::OK) {
