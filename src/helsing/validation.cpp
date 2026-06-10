@@ -451,6 +451,25 @@ StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(
     return result;
 }
 
+StakeStatementConstructionSkeletonResult CheckStakeStatementConstructionSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool incoinsRootHashingAvailable, bool contextHashingAvailable)
+{
+    if (prefixResult.cover_set_result.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||
+        prefixResult.cover_set_result.context_result.tag_result != StakeValidationResult::OK ||
+        !prefixResult.cover_set_result.context_result.context_valid ||
+        prefixResult.cover_set_result.cover_set_result != StakeValidationResult::OK ||
+        prefixResult.output_result != StakeValidationResult::OK) {
+        return StakeStatementConstructionSkeletonResult::STAKE_PREFIX_FAILED;
+    }
+    if (!incoinsRootHashingAvailable) {
+        return StakeStatementConstructionSkeletonResult::INCOINS_ROOT_HASHING_UNIMPLEMENTED;
+    }
+    if (!contextHashingAvailable) {
+        return StakeStatementConstructionSkeletonResult::CONTEXT_HASHING_UNIMPLEMENTED;
+    }
+
+    return StakeStatementConstructionSkeletonResult::STAKE_STATEMENT_HASHING_UNIMPLEMENTED;
+}
+
 StakeProofVerificationSkeletonResult CheckStakeProofVerificationSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult)
 {
     if (prefixResult.cover_set_result.context_result.prefix_result != StakeVerificationPrefixSkeletonResult::OK ||

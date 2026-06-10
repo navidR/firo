@@ -148,6 +148,13 @@ enum class StakeProofVerificationSkeletonResult {
     STATEMENT_HASHING_UNIMPLEMENTED,
 };
 
+enum class StakeStatementConstructionSkeletonResult {
+    STAKE_PREFIX_FAILED,
+    INCOINS_ROOT_HASHING_UNIMPLEMENTED,
+    CONTEXT_HASHING_UNIMPLEMENTED,
+    STAKE_STATEMENT_HASHING_UNIMPLEMENTED,
+};
+
 struct StakeVerificationBlockedSkeletonResult {
     StakeVerificationOutputSkeletonResult output_result;
     StakeProofVerificationSkeletonResult proof_result{StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED};
@@ -268,6 +275,10 @@ StakeValidationResult CheckStakeCoverSetOutputRulesSkeleton(const std::vector<Ou
 // Revised spec StakeVerify steps 1-7 only. This composes caller-supplied
 // context/Spark facts and stops before statement hashes and proof verification.
 StakeVerificationOutputSkeletonResult CheckStakeVerificationOutputsSkeleton(const StakeTx& tx, const CHelsingState& helsingState, const ValidationStateView& view, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid, bool canonicalContextValid, bool payoutAddressValid, bool updatePublicKeyValid, bool nodeSigningKeyMaterialValid, size_t n, size_t m, const std::map<OutputId, bool>& outputSatisfiesSparkRules);
+// Revised spec section 5.2 and StakeVerify step 8 statement construction is deliberately
+// blocked here. The caller supplies implementation-availability flags; this helper
+// has no accepting result and does not compute incoins_root, context_hash, or stake_stmt.
+StakeStatementConstructionSkeletonResult CheckStakeStatementConstructionSkeleton(const StakeVerificationOutputSkeletonResult& prefixResult, bool incoinsRootHashingAvailable, bool contextHashingAvailable);
 // Revised spec StakeVerify steps 8-11 are deliberately unimplemented here:
 // canonical statement hashing and real ParVerify/RepVerify/TagVerify are required
 // before any acceptance path may exist.
