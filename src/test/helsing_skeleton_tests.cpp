@@ -2955,6 +2955,114 @@ BOOST_AUTO_TEST_CASE(payout_verification_suffix_skeleton_does_not_mutate_state)
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(payout_verification_blocked_skeleton_reports_suffix_after_eligibility)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(67, DeterministicPoint(67));
+    helsing::PayoutTxSkeleton payout;
+    payout.selected_stake_id = record.stake_id;
+    payout.payout_index = 38;
+    payout.addr_pk.bytes = {0x61};
+    payout.V_PAYOUT = 61;
+    payout.coin.bytes = {0x63};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::PayoutVerificationBlockedSkeletonResult result = helsing::CheckPayoutVerificationBlockedSkeleton(payout, view, record.nHeight + 10, 10, true, true, true, true, true, true);
+
+    BOOST_CHECK(result.eligibility_result.prefix_result == helsing::PayoutVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.eligibility_result.stake_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.suffix_result == helsing::PayoutVerificationSuffixSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_verification_blocked_skeleton_checks_prefix_before_suffix)
+{
+    helsing::ValidationStateView view;
+    helsing::PayoutTxSkeleton payout;
+    payout.selected_stake_id = DeterministicHash(68);
+    payout.payout_index = 39;
+    payout.addr_pk.bytes = {0x61};
+
+    const helsing::PayoutVerificationBlockedSkeletonResult result = helsing::CheckPayoutVerificationBlockedSkeleton(payout, view, 300, 0, false, false, false, false, false, false);
+
+    BOOST_CHECK(result.eligibility_result.prefix_result == helsing::PayoutVerificationPrefixSkeletonResult::TX_INCOMPLETE);
+    BOOST_CHECK(result.eligibility_result.stake_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.suffix_result == helsing::PayoutVerificationSuffixSkeletonResult::PAYOUT_ELIGIBILITY_FAILED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_verification_blocked_skeleton_checks_state_before_suffix)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(69, DeterministicPoint(69));
+    helsing::PayoutTxSkeleton payout;
+    payout.selected_stake_id = record.stake_id;
+    payout.payout_index = 40;
+    payout.addr_pk.bytes = {0x61};
+    payout.V_PAYOUT = 62;
+    payout.coin.bytes = {0x63};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    view.blockSpentTags.insert(record.T);
+    const helsing::PayoutVerificationBlockedSkeletonResult result = helsing::CheckPayoutVerificationBlockedSkeleton(payout, view, record.nHeight + 10, 10, true, false, false, false, false, false);
+
+    BOOST_CHECK(result.eligibility_result.prefix_result == helsing::PayoutVerificationPrefixSkeletonResult::OK);
+    BOOST_CHECK(result.eligibility_result.stake_result == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+    BOOST_CHECK(result.suffix_result == helsing::PayoutVerificationSuffixSkeletonResult::PAYOUT_ELIGIBILITY_FAILED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_verification_blocked_skeleton_orders_suffix_after_eligibility)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(70, DeterministicPoint(70));
+    helsing::PayoutTxSkeleton payout;
+    payout.selected_stake_id = record.stake_id;
+    payout.payout_index = 41;
+    payout.addr_pk.bytes = {0x61};
+    payout.V_PAYOUT = 63;
+    payout.coin.bytes = {0x63};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    BOOST_CHECK(helsing::CheckPayoutVerificationBlockedSkeleton(payout, view, record.nHeight + 10, 10, true, false, false, false, false, false).suffix_result == helsing::PayoutVerificationSuffixSkeletonResult::REGISTERED_PAYOUT_ADDRESS_EXTRACTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutVerificationBlockedSkeleton(payout, view, record.nHeight + 10, 10, true, true, false, false, false, false).suffix_result == helsing::PayoutVerificationSuffixSkeletonResult::DETERMINISTIC_SELECTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutVerificationBlockedSkeleton(payout, view, record.nHeight + 10, 10, true, true, true, false, false, false).suffix_result == helsing::PayoutVerificationSuffixSkeletonResult::EXPECTED_PAYOUT_AMOUNT_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutVerificationBlockedSkeleton(payout, view, record.nHeight + 10, 10, true, true, true, true, false, false).suffix_result == helsing::PayoutVerificationSuffixSkeletonResult::PAYOUT_ID_CONSTRUCTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutVerificationBlockedSkeleton(payout, view, record.nHeight + 10, 10, true, true, true, true, true, false).suffix_result == helsing::PayoutVerificationSuffixSkeletonResult::PAYOUT_ALGORITHM_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_verification_blocked_skeleton_does_not_mutate_state)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(71, DeterministicPoint(71));
+    helsing::PayoutTxSkeleton payout;
+    payout.selected_stake_id = record.stake_id;
+    payout.payout_index = 42;
+    payout.addr_pk.bytes = {0x61};
+    payout.V_PAYOUT = 64;
+    payout.coin.bytes = {0x63};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::PayoutVerificationBlockedSkeletonResult result = helsing::CheckPayoutVerificationBlockedSkeleton(payout, view, record.nHeight + 10, 10, true, true, true, true, true, true);
+
+    BOOST_CHECK(result.suffix_result == helsing::PayoutVerificationSuffixSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(payout_verification_skeleton_checks_eligibility_before_public_fields)
 {
     helsing::CHelsingState state;

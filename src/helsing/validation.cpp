@@ -842,6 +842,14 @@ PayoutVerificationSuffixSkeletonResult CheckPayoutVerificationSuffixSkeleton(con
     return PayoutVerificationSuffixSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED;
 }
 
+PayoutVerificationBlockedSkeletonResult CheckPayoutVerificationBlockedSkeleton(const PayoutTxSkeleton& tx, const ValidationStateView& view, int currentHeight, int stakeMaturity, bool canonicalEncodingsValid, bool registeredPayoutAddressExtractionAvailable, bool deterministicSelectionAvailable, bool expectedPayoutAmountAvailable, bool payoutIdConstructionAvailable, bool payoutAlgorithmAvailable)
+{
+    PayoutVerificationBlockedSkeletonResult result;
+    result.eligibility_result = CheckPayoutVerificationEligibilitySkeleton(tx, view, currentHeight, stakeMaturity, canonicalEncodingsValid);
+    result.suffix_result = CheckPayoutVerificationSuffixSkeleton(result.eligibility_result, registeredPayoutAddressExtractionAvailable, deterministicSelectionAvailable, expectedPayoutAmountAvailable, payoutIdConstructionAvailable, payoutAlgorithmAvailable);
+    return result;
+}
+
 PayoutVerificationSkeletonResult CheckPayoutVerificationSkeleton(
     const PayoutTxSkeleton& tx,
     const ValidationStateView& view,
