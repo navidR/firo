@@ -857,6 +857,12 @@ StakeValidationResult CheckStakeCoverSetOutputRulesSkeleton(const std::vector<Ou
         if (output == nullptr) {
             return StakeValidationResult::OUTPUT_NOT_FOUND;
         }
+        if (output->output_id != output_id) {
+            return StakeValidationResult::OUTPUT_ID_MISMATCH;
+        }
+        if (!IsValidSparkOutputRecord(*output)) {
+            return StakeValidationResult::INVALID_OUTPUT_RECORD;
+        }
         if (!output->helsing_eligible) {
             return StakeValidationResult::OUTPUT_NOT_ELIGIBLE;
         }
@@ -883,15 +889,22 @@ StakeCoverSetSparkRulesBlockedSkeletonResult CheckStakeCoverSetSparkRulesBlocked
             result.output_result = StakeValidationResult::OUTPUT_NOT_FOUND;
             return result;
         }
+        if (output->output_id != output_id) {
+            result.output_result = StakeValidationResult::OUTPUT_ID_MISMATCH;
+            return result;
+        }
+        if (!IsValidSparkOutputRecord(*output)) {
+            result.output_result = StakeValidationResult::INVALID_OUTPUT_RECORD;
+            return result;
+        }
         if (!output->helsing_eligible) {
             result.output_result = StakeValidationResult::OUTPUT_NOT_ELIGIBLE;
             return result;
         }
-
-        result.spark_rules_result = StakeCoverSetSparkRulesSkeletonResult::SPARK_MATURITY_OR_COVER_SET_RULES_UNIMPLEMENTED;
-        return result;
     }
 
+    result.output_result = StakeValidationResult::OK;
+    result.spark_rules_result = StakeCoverSetSparkRulesSkeletonResult::SPARK_MATURITY_OR_COVER_SET_RULES_UNIMPLEMENTED;
     return result;
 }
 
@@ -1294,6 +1307,9 @@ StakeValidationResult BuildBlockSpentTagsSkeleton(const std::vector<GroupElement
 {
     std::unordered_set<GroupElement, spark::CLTagHash> collected;
     for (const GroupElement& tag : spentTags) {
+        if (!IsValidPublicPoint(tag)) {
+            return StakeValidationResult::INVALID_GROUP_ELEMENT;
+        }
         if (!collected.insert(tag).second) {
             return StakeValidationResult::DUPLICATE_SPENT_TAG_IN_BLOCK;
         }
@@ -1429,12 +1445,12 @@ StakeValidationResult CheckStakeSkeleton(const StakeTx& tx, const ValidationStat
         if (view.helsingState->IsSpentTag(tx.T)) {
             return StakeValidationResult::TAG_ALREADY_SPENT;
         }
-        if (view.helsingState->IsActiveTag(tx.T)) {
-            return StakeValidationResult::TAG_ALREADY_ACTIVE;
-        }
     }
     if (view.HasBlockSpentTag(tx.T)) {
         return StakeValidationResult::TAG_SPENT_IN_BLOCK;
+    }
+    if (view.helsingState != nullptr && view.helsingState->IsActiveTag(tx.T)) {
+        return StakeValidationResult::TAG_ALREADY_ACTIVE;
     }
 
     for (const auto& output_id : tx.inCoinIDs) {
