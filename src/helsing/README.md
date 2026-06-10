@@ -20,6 +20,7 @@ Current scope:
 - `CheckPayoutIdConstructionSkeleton` is an explicit blocker for revised spec section 16 payout identifier `j` construction. It does not define canonical `chain_id`/`enc_*` grammar, hash the inputs, or return `j`.
 - `CheckPayoutIdSourcePolicySkeleton` is an explicit blocker for revised spec section 16 payout-id source policy. It blocks before proving the deterministic source set, excluding current block hash/coinbase/payout-coin-dependent inputs, reviewing non-circularity, or wiring those rules into consensus.
 - `CheckPayoutAlgorithmSkeleton` is an explicit blocker for revised spec section 17 payout coin recomputation and section 18 steps 11-13. It preserves incomplete payout tx failures, then blocks missing payout identifier, address parsing, key derivation, coin construction, and coin comparison; it has no acceptance result.
+- `CheckPayoutCoinFormulaSkeleton` is an explicit blocker for revised spec section 17 deterministic payout coin formula. It requires prior algorithm inputs, then blocks `H_PAYOUT` derivation, recovery key derivation, serial commitment derivation, value commitment derivation, payout coin encoding, and consensus wiring; it has no accepting result.
 - `IsCompleteStakeTxSkeleton` checks that caller-supplied `StakeTx` cover-set, context, and proof fields are populated before future staking verification; it does not define context grammar or verify proofs.
 - `IsCompleteStakeUpdateTxSkeleton` checks that caller-supplied `StakeUpdateTx` fields are populated before any future signature verification; it does not define context grammar or verify `sig_update`.
 - `SparkOutputRecord` models the validator view of Spark outputs used by `InCoinIDs`.
@@ -137,6 +138,7 @@ Not implemented yet:
 - real payout-output extraction from accepted payout transactions after `PayoutVerify`
 - real deterministic payout ordinal selection and payout identifier `j` construction
 - consensus source-set, forbidden-dependency, and non-circularity checks for payout identifier `j`
+- real `H_PAYOUT` derivation, payout recovery key derivation, payout serial/value commitment construction, and payout coin encoding
 - canonical `chain_id`, `enc_int`, `enc_hash`, and `enc_bytes` encodings for payout-id construction
 - real payout address and payout coin encodings for `PayoutTxSkeleton`
 - canonical stake context grammar, including payout address, update key, node signing material, and implementation-specific masternode context rules

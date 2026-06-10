@@ -7286,6 +7286,38 @@ BOOST_AUTO_TEST_CASE(payout_algorithm_skeleton_does_not_construct_or_compare_coi
     BOOST_CHECK(helsing::CheckPayoutAlgorithmSkeleton(tx, true, true, true, true) == helsing::PayoutAlgorithmSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED);
 }
 
+BOOST_AUTO_TEST_CASE(payout_coin_formula_skeleton_requires_algorithm_inputs_first)
+{
+    BOOST_CHECK(helsing::CheckPayoutCoinFormulaSkeleton(false, false, false, false, false, false) == helsing::PayoutCoinFormulaSkeletonResult::PAYOUT_ALGORITHM_INPUTS_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckPayoutCoinFormulaSkeleton(false, true, true, true, true, true) == helsing::PayoutCoinFormulaSkeletonResult::PAYOUT_ALGORITHM_INPUTS_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(payout_coin_formula_skeleton_orders_formula_blockers)
+{
+    BOOST_CHECK(helsing::CheckPayoutCoinFormulaSkeleton(true, false, false, false, false, false) == helsing::PayoutCoinFormulaSkeletonResult::H_PAYOUT_DERIVATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutCoinFormulaSkeleton(true, true, false, true, true, true) == helsing::PayoutCoinFormulaSkeletonResult::RECOVERY_KEY_DERIVATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutCoinFormulaSkeleton(true, true, true, false, true, true) == helsing::PayoutCoinFormulaSkeletonResult::SERIAL_COMMITMENT_DERIVATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutCoinFormulaSkeleton(true, true, true, true, false, true) == helsing::PayoutCoinFormulaSkeletonResult::VALUE_COMMITMENT_DERIVATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutCoinFormulaSkeleton(true, true, true, true, true, false) == helsing::PayoutCoinFormulaSkeletonResult::PAYOUT_COIN_ENCODING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutCoinFormulaSkeleton(true, true, true, true, true, true) == helsing::PayoutCoinFormulaSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_coin_formula_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(217, DeterministicPoint(217));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::PayoutCoinFormulaSkeletonResult result = helsing::CheckPayoutCoinFormulaSkeleton(true, true, true, true, true, true);
+
+    BOOST_CHECK(result == helsing::PayoutCoinFormulaSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(payout_registered_address_extraction_skeleton_checks_eligibility_first)
 {
     const helsing::PayoutVerificationEligibilitySkeletonResult prefixFailure{helsing::PayoutVerificationPrefixSkeletonResult::TX_INCOMPLETE, helsing::StakeValidationResult::OK};

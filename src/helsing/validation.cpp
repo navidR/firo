@@ -406,6 +406,30 @@ PayoutAlgorithmSkeletonResult CheckPayoutAlgorithmSkeleton(const PayoutTxSkeleto
     return PayoutAlgorithmSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED;
 }
 
+PayoutCoinFormulaSkeletonResult CheckPayoutCoinFormulaSkeleton(bool payoutAlgorithmInputsAvailable, bool hPayoutDerivationAvailable, bool recoveryKeyDerivationAvailable, bool serialCommitmentDerivationAvailable, bool valueCommitmentDerivationAvailable, bool payoutCoinEncodingAvailable)
+{
+    if (!payoutAlgorithmInputsAvailable) {
+        return PayoutCoinFormulaSkeletonResult::PAYOUT_ALGORITHM_INPUTS_UNAVAILABLE;
+    }
+    if (!hPayoutDerivationAvailable) {
+        return PayoutCoinFormulaSkeletonResult::H_PAYOUT_DERIVATION_UNIMPLEMENTED;
+    }
+    if (!recoveryKeyDerivationAvailable) {
+        return PayoutCoinFormulaSkeletonResult::RECOVERY_KEY_DERIVATION_UNIMPLEMENTED;
+    }
+    if (!serialCommitmentDerivationAvailable) {
+        return PayoutCoinFormulaSkeletonResult::SERIAL_COMMITMENT_DERIVATION_UNIMPLEMENTED;
+    }
+    if (!valueCommitmentDerivationAvailable) {
+        return PayoutCoinFormulaSkeletonResult::VALUE_COMMITMENT_DERIVATION_UNIMPLEMENTED;
+    }
+    if (!payoutCoinEncodingAvailable) {
+        return PayoutCoinFormulaSkeletonResult::PAYOUT_COIN_ENCODING_UNIMPLEMENTED;
+    }
+
+    return PayoutCoinFormulaSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 PayoutRegisteredAddressExtractionSkeletonResult CheckPayoutRegisteredAddressExtractionSkeleton(const PayoutVerificationEligibilitySkeletonResult& eligibilityResult, bool effectiveContextSelectionAvailable, bool payoutAddressGrammarAvailable, bool registeredPayoutAddressExtractionAvailable)
 {
     if (eligibilityResult.prefix_result != PayoutVerificationPrefixSkeletonResult::OK ||
