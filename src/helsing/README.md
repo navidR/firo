@@ -29,6 +29,7 @@ Current scope:
 - `CheckPayoutOutputRecordConstructionSkeleton` is an explicit blocker for constructing revised spec step 9 `SparkOutputs` records from accepted payout transactions. It requires a real `(txid, vout)` output identifier and blocks before parsing payout coin blobs into Spark fields.
 - `ApplyAcceptedPayoutOutputRecordsSkeleton` applies already accepted payout output records to `SparkOutputs` by `(txid, vout)` only; it does not recompute payout coins or decide Helsing eligibility.
 - `CheckHelsingDuplicateSerialCompatibilitySkeleton` is an explicit blocker for revised spec section 19 and deployment section 30 duplicate-serial compatibility. It blocks before the Spark serial-uniqueness audit, any required payout-output domain separation, serial-index all-output-id behavior, and consensus wiring.
+- `CheckHelsingSparkTagLinkabilityCompatibilitySkeleton` is an explicit blocker for revised spec sections 13 and 21 plus deployment section 30 Spark tag-linkability compatibility. It blocks before deployed Spark tag-linkability review, Spark spend-soundness review, eligible-output tag-reveal tests, and consensus wiring.
 - `ApplyAcceptedBlockWithPayoutOutputsSkeleton` applies revised spec section 12 steps 6-9 to in-memory Helsing state and `SparkOutputs` atomically for already accepted block data.
 - `IsValidCoverSetCardinality` checks the revised spec formula `len(InCoinIDs) = N = n^m` for caller-supplied public parameters.
 - `IsStakeMatureForPayout` checks the revised spec payout maturity inequality for caller-supplied heights and `STAKE_MATURITY`.
@@ -108,6 +109,7 @@ Not implemented yet:
 - real wallet/prover staking algorithm support for Spark witness extraction, offset hashing, offset commitment construction, statement-bound proof generation, and staking transaction emission
 - wallet persistence of staking cover sets and overlap-aware later spending policy
 - deployed Spark serial-commitment uniqueness compatibility audit, all-output-id serial indexes, and any required domain-separated payout-output class
+- deployed Spark tag-linkability and spend-soundness compatibility review, eligible-output tag-reveal tests, and consensus wiring for those guarantees
 - any decision to reintroduce an optional collateral margin as a consensus policy
 - real expected payout amount derivation from consensus reward rules
 - `ParVerify`, `RepVerify`, and `TagVerify`

@@ -94,6 +94,13 @@ enum class HelsingDuplicateSerialCompatibilitySkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class HelsingSparkTagLinkabilityCompatibilitySkeletonResult {
+    SPARK_TAG_LINKABILITY_REVIEW_UNIMPLEMENTED,
+    SPARK_SPEND_SOUNDNESS_REVIEW_UNIMPLEMENTED,
+    ELIGIBLE_OUTPUT_TAG_REVEAL_TESTS_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class HelsingTransactionWiringSkeletonResult {
     CONSENSUS_TX_CARRIER_UNIMPLEMENTED,
     STAKE_TX_EXTRACTION_UNIMPLEMENTED,
@@ -388,6 +395,11 @@ PayoutAmountDerivationSkeletonResult CheckPayoutAmountDerivationSkeleton(bool pa
 // matching output_ids. This blocker has no accepting result and does not change
 // existing Spark consensus indexes.
 HelsingDuplicateSerialCompatibilitySkeletonResult CheckHelsingDuplicateSerialCompatibilitySkeleton(bool sparkSerialUniquenessReviewAvailable, bool duplicateSerialsAllowedAtOutputCreation, bool duplicateSerialIndexReturnsAllOutputIdsAvailable, bool domainSeparatedPayoutOutputClassAvailable);
+// Revised spec sections 13, 21, and 30 require Helsing-eligible Spark outputs
+// to be spendable only through tag-revealing paths and rely on deployed Spark
+// spend soundness and tag-linkability. This blocker has no accepting result and
+// does not inspect or validate real Spark spends.
+HelsingSparkTagLinkabilityCompatibilitySkeletonResult CheckHelsingSparkTagLinkabilityCompatibilitySkeleton(bool sparkTagLinkabilityReviewAvailable, bool sparkSpendSoundnessReviewAvailable, bool eligibleOutputTagRevealTestsAvailable);
 // Revised spec PayoutTx field-completeness only. This does not check canonical
 // encodings, value-domain parameters, registered address, selected stake, j, or payout coin.
 bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx);

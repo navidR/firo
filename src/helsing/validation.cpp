@@ -260,6 +260,21 @@ HelsingDuplicateSerialCompatibilitySkeletonResult CheckHelsingDuplicateSerialCom
     return HelsingDuplicateSerialCompatibilitySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+HelsingSparkTagLinkabilityCompatibilitySkeletonResult CheckHelsingSparkTagLinkabilityCompatibilitySkeleton(bool sparkTagLinkabilityReviewAvailable, bool sparkSpendSoundnessReviewAvailable, bool eligibleOutputTagRevealTestsAvailable)
+{
+    if (!sparkTagLinkabilityReviewAvailable) {
+        return HelsingSparkTagLinkabilityCompatibilitySkeletonResult::SPARK_TAG_LINKABILITY_REVIEW_UNIMPLEMENTED;
+    }
+    if (!sparkSpendSoundnessReviewAvailable) {
+        return HelsingSparkTagLinkabilityCompatibilitySkeletonResult::SPARK_SPEND_SOUNDNESS_REVIEW_UNIMPLEMENTED;
+    }
+    if (!eligibleOutputTagRevealTestsAvailable) {
+        return HelsingSparkTagLinkabilityCompatibilitySkeletonResult::ELIGIBLE_OUTPUT_TAG_REVEAL_TESTS_UNIMPLEMENTED;
+    }
+
+    return HelsingSparkTagLinkabilityCompatibilitySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx)
 {
     return !tx.selected_stake_id.IsNull() &&

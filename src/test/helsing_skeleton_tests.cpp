@@ -2371,6 +2371,35 @@ BOOST_AUTO_TEST_CASE(duplicate_serial_compatibility_skeleton_has_no_accepting_or
     BOOST_CHECK(!state.IsSpentTag(record.T));
 }
 
+BOOST_AUTO_TEST_CASE(spark_tag_linkability_compatibility_skeleton_requires_tag_linkability_review_first)
+{
+    BOOST_CHECK(helsing::CheckHelsingSparkTagLinkabilityCompatibilitySkeleton(false, false, false) == helsing::HelsingSparkTagLinkabilityCompatibilitySkeletonResult::SPARK_TAG_LINKABILITY_REVIEW_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingSparkTagLinkabilityCompatibilitySkeleton(false, true, true) == helsing::HelsingSparkTagLinkabilityCompatibilitySkeletonResult::SPARK_TAG_LINKABILITY_REVIEW_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(spark_tag_linkability_compatibility_skeleton_orders_spend_soundness_before_tag_reveal_tests)
+{
+    BOOST_CHECK(helsing::CheckHelsingSparkTagLinkabilityCompatibilitySkeleton(true, false, false) == helsing::HelsingSparkTagLinkabilityCompatibilitySkeletonResult::SPARK_SPEND_SOUNDNESS_REVIEW_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingSparkTagLinkabilityCompatibilitySkeleton(true, false, true) == helsing::HelsingSparkTagLinkabilityCompatibilitySkeletonResult::SPARK_SPEND_SOUNDNESS_REVIEW_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingSparkTagLinkabilityCompatibilitySkeleton(true, true, false) == helsing::HelsingSparkTagLinkabilityCompatibilitySkeletonResult::ELIGIBLE_OUTPUT_TAG_REVEAL_TESTS_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(spark_tag_linkability_compatibility_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(203, DeterministicPoint(203));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::HelsingSparkTagLinkabilityCompatibilitySkeletonResult result = helsing::CheckHelsingSparkTagLinkabilityCompatibilitySkeleton(true, true, true);
+
+    BOOST_CHECK(result == helsing::HelsingSparkTagLinkabilityCompatibilitySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(extractor_appends_records_for_block_view_accumulation)
 {
     const SparkOutputFixture first = SparkMintOutput(5, 45);
