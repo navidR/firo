@@ -841,6 +841,24 @@ StakeUpdateVerificationSkeletonResult CheckStakeUpdateVerificationSkeleton(const
     return result;
 }
 
+StakeUpdateAuthorizationSkeletonResult CheckStakeUpdateAuthorizationSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool updateSignatureHashingAvailable)
+{
+    if (!prefixResult.tx_complete || prefixResult.stake_result != StakeValidationResult::OK) {
+        return StakeUpdateAuthorizationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED;
+    }
+    if (!updatePublicKeyExtractionAvailable) {
+        return StakeUpdateAuthorizationSkeletonResult::UPDATE_PUBLIC_KEY_EXTRACTION_UNIMPLEMENTED;
+    }
+    if (!canonicalNewContextValidationAvailable) {
+        return StakeUpdateAuthorizationSkeletonResult::CANONICAL_UPDATE_CONTEXT_UNIMPLEMENTED;
+    }
+    if (!updateSignatureHashingAvailable) {
+        return StakeUpdateAuthorizationSkeletonResult::UPDATE_SIGNATURE_HASHING_UNIMPLEMENTED;
+    }
+
+    return StakeUpdateAuthorizationSkeletonResult::UPDATE_SIGNATURE_VERIFICATION_UNIMPLEMENTED;
+}
+
 StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view)
 {
     for (const StakeUpdateTx& tx : update_txs) {

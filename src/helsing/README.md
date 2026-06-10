@@ -56,6 +56,7 @@ Current scope:
 - `ArePayoutIndexesDistinctSkeleton` checks the revised spec section 16 duplicate-`payout_index` rule for a caller-supplied payout set.
 - `CheckStakeUpdateEligibilitySkeleton` performs revised spec `StakeUpdateVerify` steps 1-3 only: stake record lookup, active status, and spent-tag checks.
 - `CheckStakeUpdateVerificationSkeleton` composes `StakeUpdateTx` field presence with revised spec `StakeUpdateVerify` steps 1-3; it deliberately stops before context parsing, `update_pk` extraction, `enc_context(m_new)`, signature verification, and update effective-height rules.
+- `CheckStakeUpdateAuthorizationSkeleton` is an explicit blocker for revised spec `StakeUpdateVerify` steps 4-6. It preserves failed field/eligibility prefixes, then blocks missing `update_pk` extraction, canonical `m_new` validation, update-message hashing, and signature verification; it has no acceptance result.
 - `CheckStakeUpdateBlockSkeleton` performs revised spec `ValidateBlock` step 4 and `StakeUpdateVerify` steps 1-3 only for a caller-supplied update set; it deliberately stops before context parsing, signature verification, effective-height rules, and same-block duplicate-update policy.
 - `CheckBlockValidationPrefixSkeleton` composes the existing stake, stake-update, and payout skeleton prefix checks in revised spec `ValidateBlock` steps 3-5 order; the caller must supply already collected `BlockSpentTags`.
 - `ApplyAcceptedStakesSkeleton` applies already accepted new stakes to in-memory `ActiveTags` and `StakeRecords`; it takes caller-supplied `stake_id` values because canonical stake-id hashing is not implemented.
@@ -87,7 +88,7 @@ Not implemented yet:
 - canonical `chain_id`, `enc_int`, `enc_hash`, and `enc_bytes` encodings for payout-id construction
 - real payout address and payout coin encodings for `PayoutTxSkeleton`
 - canonical stake context grammar, including payout address, update key, node signing material, and rejection of empty or non-canonical contexts
-- full stake update verification, including `update_pk` extraction, canonical `m_new` validation, `enc_context(m_new)`, canonical `sig_update`, update signature verification, and update effective-height rules
+- full stake update verification, including real `update_pk` extraction, canonical `m_new` validation, `enc_context(m_new)`, update-message hashing, canonical `sig_update`, update signature verification, and update effective-height rules
 - consensus wiring for applying accepted stake updates during deterministic block application
 - consensus policy for multiple `StakeUpdate` transactions targeting the same `stake_id` in one block
 - masternode registration/update/payout transaction wiring
