@@ -406,6 +406,27 @@ PayoutAlgorithmSkeletonResult CheckPayoutAlgorithmSkeleton(const PayoutTxSkeleto
     return PayoutAlgorithmSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED;
 }
 
+PayoutAddressParsingSkeletonResult CheckPayoutAddressParsingSkeleton(const PayoutAddressBlob& addr_pk, bool canonicalPayoutAddressEncodingAvailable, bool payoutDiversifierValidationAvailable, bool payoutPublicKeyValidationAvailable, bool encAddrBindingAvailable)
+{
+    if (addr_pk.empty()) {
+        return PayoutAddressParsingSkeletonResult::PAYOUT_ADDRESS_EMPTY;
+    }
+    if (!canonicalPayoutAddressEncodingAvailable) {
+        return PayoutAddressParsingSkeletonResult::CANONICAL_PAYOUT_ADDRESS_ENCODING_UNIMPLEMENTED;
+    }
+    if (!payoutDiversifierValidationAvailable) {
+        return PayoutAddressParsingSkeletonResult::PAYOUT_DIVERSIFIER_VALIDATION_UNIMPLEMENTED;
+    }
+    if (!payoutPublicKeyValidationAvailable) {
+        return PayoutAddressParsingSkeletonResult::PAYOUT_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED;
+    }
+    if (!encAddrBindingAvailable) {
+        return PayoutAddressParsingSkeletonResult::ENC_ADDR_BINDING_UNIMPLEMENTED;
+    }
+
+    return PayoutAddressParsingSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 PayoutCoinFormulaSkeletonResult CheckPayoutCoinFormulaSkeleton(bool payoutAlgorithmInputsAvailable, bool hPayoutDerivationAvailable, bool recoveryKeyDerivationAvailable, bool serialCommitmentDerivationAvailable, bool valueCommitmentDerivationAvailable, bool payoutCoinEncodingAvailable)
 {
     if (!payoutAlgorithmInputsAvailable) {

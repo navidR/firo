@@ -98,6 +98,15 @@ enum class PayoutAlgorithmSkeletonResult {
     PAYOUT_COIN_COMPARISON_UNIMPLEMENTED,
 };
 
+enum class PayoutAddressParsingSkeletonResult {
+    PAYOUT_ADDRESS_EMPTY,
+    CANONICAL_PAYOUT_ADDRESS_ENCODING_UNIMPLEMENTED,
+    PAYOUT_DIVERSIFIER_VALIDATION_UNIMPLEMENTED,
+    PAYOUT_PUBLIC_KEY_VALIDATION_UNIMPLEMENTED,
+    ENC_ADDR_BINDING_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class PayoutCoinFormulaSkeletonResult {
     PAYOUT_ALGORITHM_INPUTS_UNAVAILABLE,
     H_PAYOUT_DERIVATION_UNIMPLEMENTED,
@@ -505,6 +514,10 @@ PayoutIdSourcePolicySkeletonResult CheckPayoutIdSourcePolicySkeleton(const Payou
 // blocked here. The caller supplies implementation-availability flags, not consensus
 // validation results; this helper has no accepting result and does not construct Coin.
 PayoutAlgorithmSkeletonResult CheckPayoutAlgorithmSkeleton(const PayoutTxSkeleton& tx, bool payoutIdentifierAvailable, bool payoutAddressParserAvailable, bool payoutKeyDerivationAvailable, bool payoutCoinConstructionAvailable);
+// Revised spec section 17 requires parsing addr_pk as (d, Q1, Q2), and section
+// 5.1 binds enc_addr(d,Q1,Q2) into H_PAYOUT. This blocker has no accepting result
+// and does not parse or validate payout addresses.
+PayoutAddressParsingSkeletonResult CheckPayoutAddressParsingSkeleton(const PayoutAddressBlob& addr_pk, bool canonicalPayoutAddressEncodingAvailable, bool payoutDiversifierValidationAvailable, bool payoutPublicKeyValidationAvailable, bool encAddrBindingAvailable);
 // Revised spec section 17 defines the deterministic payout coin formula. This
 // blocker has no accepting result and does not compute k, K, S, C, or Coin.
 PayoutCoinFormulaSkeletonResult CheckPayoutCoinFormulaSkeleton(bool payoutAlgorithmInputsAvailable, bool hPayoutDerivationAvailable, bool recoveryKeyDerivationAvailable, bool serialCommitmentDerivationAvailable, bool valueCommitmentDerivationAvailable, bool payoutCoinEncodingAvailable);
