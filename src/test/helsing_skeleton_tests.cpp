@@ -3750,6 +3750,34 @@ BOOST_AUTO_TEST_CASE(stake_update_verification_blocked_skeleton_does_not_mutate_
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(stake_update_effective_height_skeleton_requires_accepted_update_first)
+{
+    BOOST_CHECK(helsing::CheckStakeUpdateEffectiveHeightSkeleton(false, false) == helsing::StakeUpdateEffectiveHeightSkeletonResult::STAKE_UPDATE_VERIFY_NOT_ACCEPTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateEffectiveHeightSkeleton(false, true) == helsing::StakeUpdateEffectiveHeightSkeletonResult::STAKE_UPDATE_VERIFY_NOT_ACCEPTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_effective_height_skeleton_blocks_unimplemented_consensus_rule)
+{
+    BOOST_CHECK(helsing::CheckStakeUpdateEffectiveHeightSkeleton(true, false) == helsing::StakeUpdateEffectiveHeightSkeletonResult::EFFECTIVE_HEIGHT_RULE_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateEffectiveHeightSkeleton(true, true) == helsing::StakeUpdateEffectiveHeightSkeletonResult::EFFECTIVE_HEIGHT_STATE_TRANSITION_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_effective_height_skeleton_does_not_apply_update)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(68, DeterministicPoint(68));
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(helsing::CheckStakeUpdateEffectiveHeightSkeleton(true, true) == helsing::StakeUpdateEffectiveHeightSkeletonResult::EFFECTIVE_HEIGHT_STATE_TRANSITION_UNIMPLEMENTED);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK_EQUAL(stored->nHeight, record.nHeight);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nLastUpdateHeight);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(stake_update_eligibility_accepts_active_stake)
 {
     helsing::CHelsingState state;

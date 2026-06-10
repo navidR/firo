@@ -136,6 +136,12 @@ struct StakeUpdateVerificationBlockedSkeletonResult {
     StakeUpdateAuthorizationSkeletonResult authorization_result{StakeUpdateAuthorizationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED};
 };
 
+enum class StakeUpdateEffectiveHeightSkeletonResult {
+    STAKE_UPDATE_VERIFY_NOT_ACCEPTED,
+    EFFECTIVE_HEIGHT_RULE_UNIMPLEMENTED,
+    EFFECTIVE_HEIGHT_STATE_TRANSITION_UNIMPLEMENTED,
+};
+
 struct StakeVerificationContextSkeletonResult {
     StakeVerificationPrefixSkeletonResult prefix_result{StakeVerificationPrefixSkeletonResult::OK};
     StakeValidationResult tag_result{StakeValidationResult::OK};
@@ -424,6 +430,10 @@ StakeUpdateAuthorizationSkeletonResult CheckStakeUpdateAuthorizationSkeleton(con
 // Revised-spec StakeUpdateVerify steps 1-6 composition with no accepting result.
 // This runs field/eligibility checks, then the authorization blocker.
 StakeUpdateVerificationBlockedSkeletonResult CheckStakeUpdateVerificationBlockedSkeleton(const StakeUpdateTx& tx, const ValidationStateView& view, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool updateSignatureHashingAvailable);
+
+// Revised-spec section 14 leaves the update effective-height rule as a consensus
+// parameter. This blocker has no accepting result and must not be used to apply updates.
+StakeUpdateEffectiveHeightSkeletonResult CheckStakeUpdateEffectiveHeightSkeleton(bool stakeUpdateVerifyAccepted, bool effectiveHeightRuleAvailable);
 
 // Block-level skeleton for revised-spec ValidateBlock step 4 and StakeUpdateVerify steps 1-3 only.
 // This deliberately stops before context parsing, signature verification, effective-height rules,

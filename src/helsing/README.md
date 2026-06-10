@@ -68,6 +68,7 @@ Current scope:
 - `CheckStakeUpdateVerificationSkeleton` composes `StakeUpdateTx` field presence with revised spec `StakeUpdateVerify` steps 1-3; it deliberately stops before context parsing, `update_pk` extraction, `enc_context(m_new)`, signature verification, and update effective-height rules.
 - `CheckStakeUpdateAuthorizationSkeleton` is an explicit blocker for revised spec `StakeUpdateVerify` steps 4-6. It preserves failed field/eligibility prefixes, then blocks missing `update_pk` extraction, canonical `m_new` validation, update-message hashing, and signature verification; it has no acceptance result.
 - `CheckStakeUpdateVerificationBlockedSkeleton` composes revised spec `StakeUpdateVerify` steps 1-6 without an accepting path: it runs field/eligibility checks, then the authorization blocker.
+- `CheckStakeUpdateEffectiveHeightSkeleton` is an explicit blocker for revised spec section 14 effective-height handling after an accepted update. It requires a prior accepted `StakeUpdateVerify` result, then blocks before choosing the consensus effective-height rule or applying an update under that rule.
 - `CheckStakeUpdateBlockSkeleton` performs revised spec `ValidateBlock` step 4 and `StakeUpdateVerify` steps 1-3 only for a caller-supplied update set; it deliberately stops before context parsing, signature verification, effective-height rules, and same-block duplicate-update policy.
 - `CheckBlockValidationPrefixSkeleton` composes the existing stake, stake-update, and payout skeleton prefix checks in revised spec `ValidateBlock` steps 3-5 order; the caller must supply already collected `BlockSpentTags`.
 - `CheckBlockValidationPrefixWithSpentTagsSkeleton` composes revised spec `ValidateBlock` steps 2-5 without mutation: it builds `BlockSpentTags` from caller-supplied valid Spark-spend tags, copies them into a validation view, then runs the existing stake/update/payout prefix checks.
@@ -107,6 +108,7 @@ Not implemented yet:
 - canonical stake context grammar, including payout address, update key, node signing material, and implementation-specific masternode context rules
 - full stake update verification, including real `update_pk` extraction, canonical `m_new` validation, `enc_context(m_new)`, update-message hashing, canonical `sig_update`, update signature verification, and update effective-height rules
 - consensus wiring for applying accepted stake updates during deterministic block application
+- consensus effective-height rule for applying accepted stake updates
 - consensus policy for multiple `StakeUpdate` transactions targeting the same `stake_id` in one block
 - masternode registration/update/payout transaction wiring
 - consensus activation rules

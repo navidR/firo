@@ -1063,6 +1063,18 @@ StakeUpdateVerificationBlockedSkeletonResult CheckStakeUpdateVerificationBlocked
     return result;
 }
 
+StakeUpdateEffectiveHeightSkeletonResult CheckStakeUpdateEffectiveHeightSkeleton(bool stakeUpdateVerifyAccepted, bool effectiveHeightRuleAvailable)
+{
+    if (!stakeUpdateVerifyAccepted) {
+        return StakeUpdateEffectiveHeightSkeletonResult::STAKE_UPDATE_VERIFY_NOT_ACCEPTED;
+    }
+    if (!effectiveHeightRuleAvailable) {
+        return StakeUpdateEffectiveHeightSkeletonResult::EFFECTIVE_HEIGHT_RULE_UNIMPLEMENTED;
+    }
+
+    return StakeUpdateEffectiveHeightSkeletonResult::EFFECTIVE_HEIGHT_STATE_TRANSITION_UNIMPLEMENTED;
+}
+
 StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view)
 {
     for (const StakeUpdateTx& tx : update_txs) {
