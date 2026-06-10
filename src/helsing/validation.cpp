@@ -1450,6 +1450,30 @@ StakeUpdateVerificationSkeletonResult CheckStakeUpdateVerificationSkeleton(const
     return result;
 }
 
+StakeUpdateSignatureMessageSkeletonResult CheckStakeUpdateSignatureMessageSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool encContextHashingAvailable, bool stakeIdBindingAvailable, bool updateMessageHashingAvailable)
+{
+    if (!prefixResult.tx_complete || prefixResult.stake_result != StakeValidationResult::OK) {
+        return StakeUpdateSignatureMessageSkeletonResult::STAKE_UPDATE_PREFIX_FAILED;
+    }
+    if (!updatePublicKeyExtractionAvailable) {
+        return StakeUpdateSignatureMessageSkeletonResult::UPDATE_PUBLIC_KEY_EXTRACTION_UNIMPLEMENTED;
+    }
+    if (!canonicalNewContextValidationAvailable) {
+        return StakeUpdateSignatureMessageSkeletonResult::CANONICAL_UPDATE_CONTEXT_UNIMPLEMENTED;
+    }
+    if (!encContextHashingAvailable) {
+        return StakeUpdateSignatureMessageSkeletonResult::ENC_CONTEXT_HASHING_UNIMPLEMENTED;
+    }
+    if (!stakeIdBindingAvailable) {
+        return StakeUpdateSignatureMessageSkeletonResult::STAKE_ID_BINDING_UNIMPLEMENTED;
+    }
+    if (!updateMessageHashingAvailable) {
+        return StakeUpdateSignatureMessageSkeletonResult::UPDATE_MESSAGE_HASHING_UNIMPLEMENTED;
+    }
+
+    return StakeUpdateSignatureMessageSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeUpdateAuthorizationSkeletonResult CheckStakeUpdateAuthorizationSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool updateSignatureHashingAvailable)
 {
     if (!prefixResult.tx_complete || prefixResult.stake_result != StakeValidationResult::OK) {

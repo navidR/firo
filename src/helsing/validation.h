@@ -273,6 +273,16 @@ enum class StakeUpdateAuthorizationSkeletonResult {
     UPDATE_SIGNATURE_VERIFICATION_UNIMPLEMENTED,
 };
 
+enum class StakeUpdateSignatureMessageSkeletonResult {
+    STAKE_UPDATE_PREFIX_FAILED,
+    UPDATE_PUBLIC_KEY_EXTRACTION_UNIMPLEMENTED,
+    CANONICAL_UPDATE_CONTEXT_UNIMPLEMENTED,
+    ENC_CONTEXT_HASHING_UNIMPLEMENTED,
+    STAKE_ID_BINDING_UNIMPLEMENTED,
+    UPDATE_MESSAGE_HASHING_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 struct StakeUpdateVerificationBlockedSkeletonResult {
     StakeUpdateVerificationSkeletonResult prefix_result;
     StakeUpdateAuthorizationSkeletonResult authorization_result{StakeUpdateAuthorizationSkeletonResult::STAKE_UPDATE_PREFIX_FAILED};
@@ -706,6 +716,11 @@ StakeValidationResult CheckStakeUpdateEligibilitySkeleton(const uint256& stake_i
 // This deliberately stops before context parsing, update_pk extraction, enc_context(m_new),
 // signature verification, and update effective-height rules.
 StakeUpdateVerificationSkeletonResult CheckStakeUpdateVerificationSkeleton(const StakeUpdateTx& tx, const ValidationStateView& view);
+
+// Revised-spec StakeUpdateVerify step 6 signs exactly
+// H("Helsing/update/v1" || stake_id || H(enc_context(m_new))). This blocker
+// has no accepting result and does not hash messages or verify sig_update.
+StakeUpdateSignatureMessageSkeletonResult CheckStakeUpdateSignatureMessageSkeleton(const StakeUpdateVerificationSkeletonResult& prefixResult, bool updatePublicKeyExtractionAvailable, bool canonicalNewContextValidationAvailable, bool encContextHashingAvailable, bool stakeIdBindingAvailable, bool updateMessageHashingAvailable);
 
 // Revised-spec StakeUpdateVerify steps 4-6 are deliberately blocked here. The
 // caller supplies implementation-availability flags, not consensus validation
