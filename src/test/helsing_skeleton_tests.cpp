@@ -523,6 +523,36 @@ BOOST_AUTO_TEST_CASE(stake_algorithm_skeleton_does_not_construct_tx_or_mutate_st
     BOOST_CHECK(!state.IsSpentTag(record.T));
 }
 
+BOOST_AUTO_TEST_CASE(wallet_cover_set_metadata_skeleton_requires_accepted_stake_first)
+{
+    BOOST_CHECK(helsing::CheckHelsingWalletCoverSetMetadataSkeleton(false, false, false, false) == helsing::HelsingWalletCoverSetMetadataSkeletonResult::ACCEPTED_STAKE_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckHelsingWalletCoverSetMetadataSkeleton(false, true, true, true) == helsing::HelsingWalletCoverSetMetadataSkeletonResult::ACCEPTED_STAKE_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(wallet_cover_set_metadata_skeleton_orders_metadata_blockers)
+{
+    BOOST_CHECK(helsing::CheckHelsingWalletCoverSetMetadataSkeleton(true, false, true, true) == helsing::HelsingWalletCoverSetMetadataSkeletonResult::STAKING_COVER_SET_METADATA_PERSISTENCE_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingWalletCoverSetMetadataSkeleton(true, false, false, false) == helsing::HelsingWalletCoverSetMetadataSkeletonResult::STAKING_COVER_SET_METADATA_PERSISTENCE_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingWalletCoverSetMetadataSkeleton(true, true, false, true) == helsing::HelsingWalletCoverSetMetadataSkeletonResult::METADATA_STORAGE_PRIVACY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingWalletCoverSetMetadataSkeleton(true, true, true, false) == helsing::HelsingWalletCoverSetMetadataSkeletonResult::LATER_SPEND_OVERLAP_POLICY_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(wallet_cover_set_metadata_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(201, DeterministicPoint(201));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::HelsingWalletCoverSetMetadataSkeletonResult result = helsing::CheckHelsingWalletCoverSetMetadataSkeleton(true, true, true, true);
+
+    BOOST_CHECK(result == helsing::HelsingWalletCoverSetMetadataSkeletonResult::WALLET_INTEGRATION_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(stake_value_parameter_skeleton_checks_stakeverify_value_domain)
 {
     BOOST_CHECK(helsing::IsStakeValueParameterInRangeSkeleton(0, 1, true));

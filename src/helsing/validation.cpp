@@ -194,6 +194,24 @@ StakeAlgorithmSkeletonResult CheckStakeAlgorithmSkeleton(bool stakeWitnessAvaila
     return StakeAlgorithmSkeletonResult::STAKE_TX_CONSTRUCTION_UNIMPLEMENTED;
 }
 
+HelsingWalletCoverSetMetadataSkeletonResult CheckHelsingWalletCoverSetMetadataSkeleton(bool acceptedStakeAvailable, bool stakingCoverSetMetadataPersistenceAvailable, bool metadataStoragePrivacyAvailable, bool laterSpendOverlapPolicyAvailable)
+{
+    if (!acceptedStakeAvailable) {
+        return HelsingWalletCoverSetMetadataSkeletonResult::ACCEPTED_STAKE_UNAVAILABLE;
+    }
+    if (!stakingCoverSetMetadataPersistenceAvailable) {
+        return HelsingWalletCoverSetMetadataSkeletonResult::STAKING_COVER_SET_METADATA_PERSISTENCE_UNIMPLEMENTED;
+    }
+    if (!metadataStoragePrivacyAvailable) {
+        return HelsingWalletCoverSetMetadataSkeletonResult::METADATA_STORAGE_PRIVACY_UNIMPLEMENTED;
+    }
+    if (!laterSpendOverlapPolicyAvailable) {
+        return HelsingWalletCoverSetMetadataSkeletonResult::LATER_SPEND_OVERLAP_POLICY_UNIMPLEMENTED;
+    }
+
+    return HelsingWalletCoverSetMetadataSkeletonResult::WALLET_INTEGRATION_UNIMPLEMENTED;
+}
+
 bool IsStakeValueParameterInRangeSkeleton(CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder)
 {
     return vMaxLessThanGroupOrder && IsHelsingValueInRange(stakeValue, vMax);

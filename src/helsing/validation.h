@@ -146,6 +146,14 @@ enum class StakeAlgorithmSkeletonResult {
     STAKE_TX_CONSTRUCTION_UNIMPLEMENTED,
 };
 
+enum class HelsingWalletCoverSetMetadataSkeletonResult {
+    ACCEPTED_STAKE_UNAVAILABLE,
+    STAKING_COVER_SET_METADATA_PERSISTENCE_UNIMPLEMENTED,
+    METADATA_STORAGE_PRIVACY_UNIMPLEMENTED,
+    LATER_SPEND_OVERLAP_POLICY_UNIMPLEMENTED,
+    WALLET_INTEGRATION_UNIMPLEMENTED,
+};
+
 enum class PayoutVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -348,6 +356,11 @@ HelsingStakeFeeHandlingSkeletonResult CheckHelsingStakeFeeHandlingSkeleton(bool 
 // coin equations, compute H_SER2/H_VAL2, construct offsets, bind stake_stmt, and
 // generate real proofs before emitting a staking transaction.
 StakeAlgorithmSkeletonResult CheckStakeAlgorithmSkeleton(bool stakeWitnessAvailable, bool sparkCoinEquationValidationAvailable, bool offsetHashingAvailable, bool offsetCommitmentConstructionAvailable, bool stakeStatementBindingAvailable, bool proofGenerationAvailable);
+// Revised spec section 27 privacy analysis and section 28 checklist require wallets
+// to preserve staking cover sets for later overlap-aware spending. This blocker is
+// wallet-side and consensus-inert: it has no accepting result and does not persist
+// metadata, choose spend cover sets, or inspect wallet state.
+HelsingWalletCoverSetMetadataSkeletonResult CheckHelsingWalletCoverSetMetadataSkeleton(bool acceptedStakeAvailable, bool stakingCoverSetMetadataPersistenceAvailable, bool metadataStoragePrivacyAvailable, bool laterSpendOverlapPolicyAvailable);
 // Revised spec StakeVerify step 3 value-domain subset for caller-supplied public values.
 // This does not expose q or perform scalar conversion; the caller supplies V_MAX < q.
 bool IsStakeValueParameterInRangeSkeleton(CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder);
