@@ -203,6 +203,27 @@ PayoutIdConstructionSkeletonResult CheckPayoutIdConstructionSkeleton(const Payou
     return PayoutIdConstructionSkeletonResult::PAYOUT_ID_HASHING_UNIMPLEMENTED;
 }
 
+PayoutAlgorithmSkeletonResult CheckPayoutAlgorithmSkeleton(const PayoutTxSkeleton& tx, bool payoutIdentifierAvailable, bool payoutAddressParserAvailable, bool payoutKeyDerivationAvailable, bool payoutCoinConstructionAvailable)
+{
+    if (!IsCompletePayoutTxSkeleton(tx)) {
+        return PayoutAlgorithmSkeletonResult::PAYOUT_TX_INCOMPLETE;
+    }
+    if (!payoutIdentifierAvailable) {
+        return PayoutAlgorithmSkeletonResult::PAYOUT_IDENTIFIER_UNAVAILABLE;
+    }
+    if (!payoutAddressParserAvailable) {
+        return PayoutAlgorithmSkeletonResult::PAYOUT_ADDRESS_PARSING_UNIMPLEMENTED;
+    }
+    if (!payoutKeyDerivationAvailable) {
+        return PayoutAlgorithmSkeletonResult::PAYOUT_KEY_DERIVATION_UNIMPLEMENTED;
+    }
+    if (!payoutCoinConstructionAvailable) {
+        return PayoutAlgorithmSkeletonResult::PAYOUT_COIN_CONSTRUCTION_UNIMPLEMENTED;
+    }
+
+    return PayoutAlgorithmSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED;
+}
+
 PayoutPublicValidationResult CheckPayoutPublicFieldsSkeleton(
     const PayoutTxSkeleton& tx,
     const PayoutBlockContextSkeleton& context,

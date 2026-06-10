@@ -5441,6 +5441,59 @@ BOOST_AUTO_TEST_CASE(payout_id_construction_skeleton_does_not_construct_identifi
     BOOST_CHECK(helsing::CheckPayoutIdConstructionSkeleton(tx, context, true) == helsing::PayoutIdConstructionSkeletonResult::PAYOUT_ID_HASHING_UNIMPLEMENTED);
 }
 
+BOOST_AUTO_TEST_CASE(payout_algorithm_skeleton_blocks_after_complete_inputs)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(71);
+    tx.payout_index = 22;
+    tx.addr_pk.bytes = {0x61, 0x32};
+    tx.V_PAYOUT = 7;
+    tx.coin.bytes = {0x63, 0x32};
+
+    BOOST_CHECK(helsing::IsCompletePayoutTxSkeleton(tx));
+    BOOST_CHECK(helsing::CheckPayoutAlgorithmSkeleton(tx, true, true, true, true) == helsing::PayoutAlgorithmSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_algorithm_skeleton_checks_tx_before_algorithm_inputs)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(72);
+    tx.payout_index = 23;
+    tx.addr_pk.bytes = {0x61, 0x33};
+
+    BOOST_CHECK(!helsing::IsCompletePayoutTxSkeleton(tx));
+    BOOST_CHECK(helsing::CheckPayoutAlgorithmSkeleton(tx, true, true, true, true) == helsing::PayoutAlgorithmSkeletonResult::PAYOUT_TX_INCOMPLETE);
+}
+
+BOOST_AUTO_TEST_CASE(payout_algorithm_skeleton_orders_algorithm_blockers)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(73);
+    tx.payout_index = 24;
+    tx.addr_pk.bytes = {0x61, 0x34};
+    tx.V_PAYOUT = 8;
+    tx.coin.bytes = {0x63, 0x34};
+
+    BOOST_CHECK(helsing::CheckPayoutAlgorithmSkeleton(tx, false, false, false, false) == helsing::PayoutAlgorithmSkeletonResult::PAYOUT_IDENTIFIER_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckPayoutAlgorithmSkeleton(tx, true, false, true, true) == helsing::PayoutAlgorithmSkeletonResult::PAYOUT_ADDRESS_PARSING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutAlgorithmSkeleton(tx, true, true, false, true) == helsing::PayoutAlgorithmSkeletonResult::PAYOUT_KEY_DERIVATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutAlgorithmSkeleton(tx, true, true, true, false) == helsing::PayoutAlgorithmSkeletonResult::PAYOUT_COIN_CONSTRUCTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutAlgorithmSkeleton(tx, true, true, true, true) == helsing::PayoutAlgorithmSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_algorithm_skeleton_does_not_construct_or_compare_coin)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(74);
+    tx.payout_index = 25;
+    tx.addr_pk.bytes = {0xff, 0x00, 0x61};
+    tx.V_PAYOUT = std::numeric_limits<CAmount>::max();
+    tx.coin.bytes = {0xff, 0x00, 0x63};
+
+    BOOST_CHECK(helsing::IsCompletePayoutTxSkeleton(tx));
+    BOOST_CHECK(helsing::CheckPayoutAlgorithmSkeleton(tx, true, true, true, true) == helsing::PayoutAlgorithmSkeletonResult::PAYOUT_COIN_COMPARISON_UNIMPLEMENTED);
+}
+
 BOOST_AUTO_TEST_CASE(payout_index_skeleton_accepts_empty_single_and_distinct_indexes)
 {
     BOOST_CHECK(helsing::ArePayoutIndexesDistinctSkeleton({}));

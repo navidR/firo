@@ -55,6 +55,15 @@ enum class PayoutIdConstructionSkeletonResult {
     PAYOUT_ID_HASHING_UNIMPLEMENTED,
 };
 
+enum class PayoutAlgorithmSkeletonResult {
+    PAYOUT_TX_INCOMPLETE,
+    PAYOUT_IDENTIFIER_UNAVAILABLE,
+    PAYOUT_ADDRESS_PARSING_UNIMPLEMENTED,
+    PAYOUT_KEY_DERIVATION_UNIMPLEMENTED,
+    PAYOUT_COIN_CONSTRUCTION_UNIMPLEMENTED,
+    PAYOUT_COIN_COMPARISON_UNIMPLEMENTED,
+};
+
 struct PayoutVerificationSkeletonResult {
     StakeValidationResult stake_result{StakeValidationResult::OK};
     PayoutPublicValidationResult public_result{PayoutPublicValidationResult::OK};
@@ -160,6 +169,10 @@ bool ArePayoutIdInputsCompleteSkeleton(const PayoutTxSkeleton& tx, const PayoutB
 // Revised spec section 16 payout-id construction is deliberately unimplemented:
 // canonical chain_id/enc_* grammar and hash construction are required before deriving j.
 PayoutIdConstructionSkeletonResult CheckPayoutIdConstructionSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context, bool canonicalPayoutIdEncodingAvailable);
+// Revised spec section 17 payout algorithm and section 18 steps 11-13 are deliberately
+// blocked here. The caller supplies implementation-availability flags, not consensus
+// validation results; this helper has no accepting result and does not construct Coin.
+PayoutAlgorithmSkeletonResult CheckPayoutAlgorithmSkeleton(const PayoutTxSkeleton& tx, bool payoutIdentifierAvailable, bool payoutAddressParserAvailable, bool payoutKeyDerivationAvailable, bool payoutCoinConstructionAvailable);
 // Revised spec PayoutVerify public-field suffix, using only caller-supplied expected values.
 // This checks steps 8, 9, 10, 11 input availability, and 13 equality in order; it
 // does not parse contexts, select masternodes, compute j, run Payout, or verify proofs.
