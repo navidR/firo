@@ -4401,6 +4401,38 @@ BOOST_AUTO_TEST_CASE(stake_update_same_block_policy_skeleton_does_not_apply_upda
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(stake_update_context_mutation_policy_skeleton_requires_accepted_update_first)
+{
+    BOOST_CHECK(helsing::CheckStakeUpdateContextMutationPolicySkeleton(false, false, false, false) == helsing::StakeUpdateContextMutationPolicySkeletonResult::STAKE_UPDATE_VERIFY_NOT_ACCEPTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateContextMutationPolicySkeleton(false, true, true, true) == helsing::StakeUpdateContextMutationPolicySkeletonResult::STAKE_UPDATE_VERIFY_NOT_ACCEPTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_context_mutation_policy_skeleton_orders_policy_blockers)
+{
+    BOOST_CHECK(helsing::CheckStakeUpdateContextMutationPolicySkeleton(true, false, false, false) == helsing::StakeUpdateContextMutationPolicySkeletonResult::CONTEXT_DIFF_EXTRACTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateContextMutationPolicySkeleton(true, true, false, true) == helsing::StakeUpdateContextMutationPolicySkeletonResult::STAKE_ID_TAG_INVARIANT_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateContextMutationPolicySkeleton(true, true, true, false) == helsing::StakeUpdateContextMutationPolicySkeletonResult::ALLOWED_CONTEXT_FIELD_POLICY_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckStakeUpdateContextMutationPolicySkeleton(true, true, true, true) == helsing::StakeUpdateContextMutationPolicySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(stake_update_context_mutation_policy_skeleton_does_not_apply_update)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(244, DeterministicPoint(244));
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    BOOST_CHECK(helsing::CheckStakeUpdateContextMutationPolicySkeleton(true, true, true, true) == helsing::StakeUpdateContextMutationPolicySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->m.bytes == record.m.bytes);
+    BOOST_CHECK(stored->T == record.T);
+    BOOST_CHECK_EQUAL(stored->nLastUpdateHeight, record.nLastUpdateHeight);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(stake_update_eligibility_accepts_active_stake)
 {
     helsing::CHelsingState state;

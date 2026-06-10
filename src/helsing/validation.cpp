@@ -1398,6 +1398,24 @@ StakeUpdateSameBlockPolicySkeletonResult CheckStakeUpdateSameBlockPolicySkeleton
     return StakeUpdateSameBlockPolicySkeletonResult::STAKE_UPDATE_APPLICATION_ORDER_UNIMPLEMENTED;
 }
 
+StakeUpdateContextMutationPolicySkeletonResult CheckStakeUpdateContextMutationPolicySkeleton(bool stakeUpdateVerifyAccepted, bool contextDiffExtractionAvailable, bool stakeIdTagInvariantAvailable, bool allowedContextFieldPolicyAvailable)
+{
+    if (!stakeUpdateVerifyAccepted) {
+        return StakeUpdateContextMutationPolicySkeletonResult::STAKE_UPDATE_VERIFY_NOT_ACCEPTED;
+    }
+    if (!contextDiffExtractionAvailable) {
+        return StakeUpdateContextMutationPolicySkeletonResult::CONTEXT_DIFF_EXTRACTION_UNIMPLEMENTED;
+    }
+    if (!stakeIdTagInvariantAvailable) {
+        return StakeUpdateContextMutationPolicySkeletonResult::STAKE_ID_TAG_INVARIANT_UNIMPLEMENTED;
+    }
+    if (!allowedContextFieldPolicyAvailable) {
+        return StakeUpdateContextMutationPolicySkeletonResult::ALLOWED_CONTEXT_FIELD_POLICY_UNIMPLEMENTED;
+    }
+
+    return StakeUpdateContextMutationPolicySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdateTx>& update_txs, const ValidationStateView& view)
 {
     for (const StakeUpdateTx& tx : update_txs) {

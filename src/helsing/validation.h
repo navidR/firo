@@ -245,6 +245,14 @@ enum class StakeUpdateSameBlockPolicySkeletonResult {
     STAKE_UPDATE_APPLICATION_ORDER_UNIMPLEMENTED,
 };
 
+enum class StakeUpdateContextMutationPolicySkeletonResult {
+    STAKE_UPDATE_VERIFY_NOT_ACCEPTED,
+    CONTEXT_DIFF_EXTRACTION_UNIMPLEMENTED,
+    STAKE_ID_TAG_INVARIANT_UNIMPLEMENTED,
+    ALLOWED_CONTEXT_FIELD_POLICY_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 struct StakeVerificationContextSkeletonResult {
     StakeVerificationPrefixSkeletonResult prefix_result{StakeVerificationPrefixSkeletonResult::OK};
     StakeValidationResult tag_result{StakeValidationResult::OK};
@@ -652,6 +660,12 @@ StakeUpdateEffectiveHeightSkeletonResult CheckStakeUpdateEffectiveHeightSkeleton
 // for one stake_id in the same block are ordered or rejected. This blocker has
 // no accepting result and must not be used to apply updates.
 StakeUpdateSameBlockPolicySkeletonResult CheckStakeUpdateSameBlockPolicySkeleton(const std::vector<uint256>& acceptedStakeUpdateIds, bool stakeUpdatesAccepted);
+
+// Revised-spec section 14 permits metadata updates only after StakeUpdateVerify
+// accepts, forbids changing stake_id or tag T, and leaves allowed field changes
+// to implementation policy. This blocker has no accepting result and does not
+// parse contexts or apply updates.
+StakeUpdateContextMutationPolicySkeletonResult CheckStakeUpdateContextMutationPolicySkeleton(bool stakeUpdateVerifyAccepted, bool contextDiffExtractionAvailable, bool stakeIdTagInvariantAvailable, bool allowedContextFieldPolicyAvailable);
 
 // Block-level skeleton for revised-spec ValidateBlock step 4 and StakeUpdateVerify steps 1-3 only.
 // This deliberately stops before context parsing, signature verification, effective-height rules,
