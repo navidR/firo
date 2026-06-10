@@ -1504,6 +1504,41 @@ BOOST_AUTO_TEST_CASE(helsing_transaction_wiring_skeleton_does_not_parse_payload_
     BOOST_CHECK(helsing::CheckHelsingTransactionWiringSkeleton(true, true, true, true) == helsing::HelsingTransactionWiringSkeletonResult::BLOCK_INTEGRATION_UNIMPLEMENTED);
 }
 
+BOOST_AUTO_TEST_CASE(masternode_lifecycle_skeleton_requires_accepted_stake_first)
+{
+    BOOST_CHECK(helsing::CheckHelsingMasternodeLifecycleSkeleton(false, false, false, false, false) == helsing::HelsingMasternodeLifecycleSkeletonResult::ACCEPTED_STAKE_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckHelsingMasternodeLifecycleSkeleton(false, true, true, true, true) == helsing::HelsingMasternodeLifecycleSkeletonResult::ACCEPTED_STAKE_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(masternode_lifecycle_skeleton_blocks_context_before_registration)
+{
+    BOOST_CHECK(helsing::CheckHelsingMasternodeLifecycleSkeleton(true, false, true, true, true) == helsing::HelsingMasternodeLifecycleSkeletonResult::MASTERNODE_CONTEXT_EXTRACTION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingMasternodeLifecycleSkeleton(true, false, false, false, false) == helsing::HelsingMasternodeLifecycleSkeletonResult::MASTERNODE_CONTEXT_EXTRACTION_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(masternode_lifecycle_skeleton_orders_registration_update_and_payout_blockers)
+{
+    BOOST_CHECK(helsing::CheckHelsingMasternodeLifecycleSkeleton(true, true, false, true, true) == helsing::HelsingMasternodeLifecycleSkeletonResult::MASTERNODE_REGISTRATION_INTEGRATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingMasternodeLifecycleSkeleton(true, true, true, false, true) == helsing::HelsingMasternodeLifecycleSkeletonResult::STAKE_UPDATE_LIFECYCLE_INTEGRATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingMasternodeLifecycleSkeleton(true, true, true, true, false) == helsing::HelsingMasternodeLifecycleSkeletonResult::PAYOUT_SELECTION_INTEGRATION_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(masternode_lifecycle_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(198, DeterministicPoint(198));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::HelsingMasternodeLifecycleSkeletonResult result = helsing::CheckHelsingMasternodeLifecycleSkeleton(true, true, true, true, true);
+
+    BOOST_CHECK(result == helsing::HelsingMasternodeLifecycleSkeletonResult::MASTERNODE_PAYMENT_INTEGRATION_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(payout_address_match_skeleton_compares_extracted_registered_address)
 {
     helsing::PayoutTxSkeleton tx;

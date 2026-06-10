@@ -95,6 +95,15 @@ enum class HelsingConsensusActivationSkeletonResult {
     ACTIVATION_ENFORCEMENT_UNIMPLEMENTED,
 };
 
+enum class HelsingMasternodeLifecycleSkeletonResult {
+    ACCEPTED_STAKE_UNAVAILABLE,
+    MASTERNODE_CONTEXT_EXTRACTION_UNIMPLEMENTED,
+    MASTERNODE_REGISTRATION_INTEGRATION_UNIMPLEMENTED,
+    STAKE_UPDATE_LIFECYCLE_INTEGRATION_UNIMPLEMENTED,
+    PAYOUT_SELECTION_INTEGRATION_UNIMPLEMENTED,
+    MASTERNODE_PAYMENT_INTEGRATION_UNIMPLEMENTED,
+};
+
 enum class PayoutVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -347,6 +356,11 @@ HelsingTransactionWiringSkeletonResult CheckHelsingTransactionWiringSkeleton(boo
 // bootstrap rule. This blocker has no accepting result and must not be used to
 // decide whether Helsing consensus rules are active.
 HelsingConsensusActivationSkeletonResult CheckHelsingConsensusActivationSkeleton(bool sparkCompatibilityReviewAvailable, bool activationParametersAvailable, bool chainparamsDeploymentWiringAvailable, bool historicalStateBootstrapAvailable);
+// Revised spec sections 7, 9, 11, 14, and 18 require public masternode
+// registration metadata, stake updates, and deterministic payout selection,
+// but do not define how these map into Firo deterministic masternode lifecycle
+// state. This blocker has no accepting result and does not touch evo state.
+HelsingMasternodeLifecycleSkeletonResult CheckHelsingMasternodeLifecycleSkeleton(bool acceptedStakeAvailable, bool masternodeContextExtractionAvailable, bool masternodeRegistrationIntegrationAvailable, bool stakeUpdateLifecycleIntegrationAvailable, bool payoutSelectionIntegrationAvailable);
 // Revised spec StakeVerify steps 1-3 only. The caller supplies the result of
 // canonical-encoding validation because the consensus grammar is not implemented here.
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid);

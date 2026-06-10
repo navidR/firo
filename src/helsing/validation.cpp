@@ -335,6 +335,27 @@ HelsingConsensusActivationSkeletonResult CheckHelsingConsensusActivationSkeleton
     return HelsingConsensusActivationSkeletonResult::ACTIVATION_ENFORCEMENT_UNIMPLEMENTED;
 }
 
+HelsingMasternodeLifecycleSkeletonResult CheckHelsingMasternodeLifecycleSkeleton(bool acceptedStakeAvailable, bool masternodeContextExtractionAvailable, bool masternodeRegistrationIntegrationAvailable, bool stakeUpdateLifecycleIntegrationAvailable, bool payoutSelectionIntegrationAvailable)
+{
+    if (!acceptedStakeAvailable) {
+        return HelsingMasternodeLifecycleSkeletonResult::ACCEPTED_STAKE_UNAVAILABLE;
+    }
+    if (!masternodeContextExtractionAvailable) {
+        return HelsingMasternodeLifecycleSkeletonResult::MASTERNODE_CONTEXT_EXTRACTION_UNIMPLEMENTED;
+    }
+    if (!masternodeRegistrationIntegrationAvailable) {
+        return HelsingMasternodeLifecycleSkeletonResult::MASTERNODE_REGISTRATION_INTEGRATION_UNIMPLEMENTED;
+    }
+    if (!stakeUpdateLifecycleIntegrationAvailable) {
+        return HelsingMasternodeLifecycleSkeletonResult::STAKE_UPDATE_LIFECYCLE_INTEGRATION_UNIMPLEMENTED;
+    }
+    if (!payoutSelectionIntegrationAvailable) {
+        return HelsingMasternodeLifecycleSkeletonResult::PAYOUT_SELECTION_INTEGRATION_UNIMPLEMENTED;
+    }
+
+    return HelsingMasternodeLifecycleSkeletonResult::MASTERNODE_PAYMENT_INTEGRATION_UNIMPLEMENTED;
+}
+
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid)
 {
     if (!IsCompleteStakeTxSkeleton(tx)) {

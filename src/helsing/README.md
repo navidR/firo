@@ -11,6 +11,7 @@ Current scope:
 - `PayoutTxSkeleton` models the revised spec fields `{selected_stake_id, payout_index, addr_pk, V_PAYOUT, Coin}` as a byte-carrying data structure only.
 - `CheckHelsingTransactionWiringSkeleton` is an explicit blocker for wiring the section 9, 14, and 15 payloads into real Firo consensus transactions and section 12 block extraction. It has no accepting result and does not parse `CTransaction`.
 - `CheckHelsingConsensusActivationSkeleton` is an explicit blocker for real Firo deployment activation. Section 30 lists Spark compatibility questions, but the revised spec does not define activation parameters, chainparams/versionbits wiring, historical-state bootstrap, or enforcement points; this helper has no accepting result.
+- `CheckHelsingMasternodeLifecycleSkeleton` is an explicit blocker for integrating accepted Helsing stakes, updates, and payouts with Firo deterministic masternode lifecycle state. The revised spec defines public staking context and selected-stake checks, but not Firo masternode-list registration, update propagation, or payment wiring; this helper has no accepting result.
 - `PayoutBlockContextSkeleton` models the revised spec section 16 payout-id input fields `{chain_id, block_height, prev_block_hash, payout_index, selected_stake_id}` without defining or computing `j`.
 - `IsCompletePayoutBlockContextSkeleton` checks that caller-supplied section 16 payout-id input fields are populated before any future `j` construction; it does not define canonical `chain_id` or `enc_*` grammar.
 - `DoesPayoutContextMatchTxSkeleton` checks that caller-supplied payout tx and block-context skeletons agree on `payout_index` and `selected_stake_id`; it does not construct `j`.
@@ -115,7 +116,7 @@ Not implemented yet:
 - consensus wiring for applying accepted stake updates during deterministic block application
 - consensus effective-height rule for applying accepted stake updates
 - consensus policy for multiple `StakeUpdate` transactions targeting the same `stake_id` in one block
-- masternode registration/update/payout transaction wiring
+- masternode lifecycle integration for registration, update propagation, deterministic selection, and payment wiring
 - real consensus activation height/versionbits/chainparams wiring, Spark-compatibility gates, historical-state bootstrap, and activation enforcement
 
 The important implementation decision left open by the revised spec is how to migrate Spark output identity from the current serialized `spark::Coin` state key toward `(txid, vout)` without changing existing Spark behavior accidentally.
