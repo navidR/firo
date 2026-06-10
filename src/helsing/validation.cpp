@@ -154,6 +154,18 @@ bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx)
            !tx.coin.empty();
 }
 
+PayoutVerificationPrefixSkeletonResult CheckPayoutVerificationPrefixSkeleton(const PayoutTxSkeleton& tx, bool canonicalEncodingsValid)
+{
+    if (!IsCompletePayoutTxSkeleton(tx)) {
+        return PayoutVerificationPrefixSkeletonResult::TX_INCOMPLETE;
+    }
+    if (!canonicalEncodingsValid) {
+        return PayoutVerificationPrefixSkeletonResult::MALFORMED_OR_NONCANONICAL;
+    }
+
+    return PayoutVerificationPrefixSkeletonResult::OK;
+}
+
 bool DoesPayoutAddressMatchRegisteredSkeleton(const PayoutTxSkeleton& tx, const PayoutAddressBlob& registeredAddress)
 {
     return !tx.addr_pk.empty() && !registeredAddress.empty() && tx.addr_pk.bytes == registeredAddress.bytes;

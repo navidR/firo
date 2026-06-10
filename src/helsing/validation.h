@@ -64,6 +64,12 @@ enum class PayoutAlgorithmSkeletonResult {
     PAYOUT_COIN_COMPARISON_UNIMPLEMENTED,
 };
 
+enum class PayoutVerificationPrefixSkeletonResult {
+    OK,
+    TX_INCOMPLETE,
+    MALFORMED_OR_NONCANONICAL,
+};
+
 struct PayoutVerificationSkeletonResult {
     StakeValidationResult stake_result{StakeValidationResult::OK};
     PayoutPublicValidationResult public_result{PayoutPublicValidationResult::OK};
@@ -148,6 +154,9 @@ bool IsPayoutValueParameterInRangeSkeleton(CAmount payoutValue, CAmount expected
 // Revised spec PayoutTx field-completeness only. This does not check canonical
 // encodings, value-domain parameters, registered address, selected stake, j, or payout coin.
 bool IsCompletePayoutTxSkeleton(const PayoutTxSkeleton& tx);
+// Revised spec PayoutVerify steps 1-2 only. The caller supplies the result of
+// canonical-encoding validation because the consensus grammar is not implemented here.
+PayoutVerificationPrefixSkeletonResult CheckPayoutVerificationPrefixSkeleton(const PayoutTxSkeleton& tx, bool canonicalEncodingsValid);
 // Revised spec PayoutVerify step 8 subset: compare the transaction address with the
 // caller-supplied, already extracted registered address. This does not parse context m.
 bool DoesPayoutAddressMatchRegisteredSkeleton(const PayoutTxSkeleton& tx, const PayoutAddressBlob& registeredAddress);

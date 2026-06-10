@@ -1058,6 +1058,52 @@ BOOST_AUTO_TEST_CASE(payout_tx_completeness_skeleton_does_not_define_blob_gramma
     BOOST_CHECK(helsing::IsCompletePayoutTxSkeleton(tx));
 }
 
+BOOST_AUTO_TEST_CASE(payout_verification_prefix_skeleton_accepts_complete_canonical_tx)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(75);
+    tx.payout_index = 26;
+    tx.addr_pk.bytes = {0x61, 0x35};
+    tx.V_PAYOUT = 9;
+    tx.coin.bytes = {0x63, 0x35};
+
+    BOOST_CHECK(helsing::CheckPayoutVerificationPrefixSkeleton(tx, true) == helsing::PayoutVerificationPrefixSkeletonResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(payout_verification_prefix_skeleton_checks_completeness_before_canonical)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(76);
+    tx.payout_index = 27;
+    tx.addr_pk.bytes = {0x61, 0x36};
+
+    BOOST_CHECK(helsing::CheckPayoutVerificationPrefixSkeleton(tx, false) == helsing::PayoutVerificationPrefixSkeletonResult::TX_INCOMPLETE);
+}
+
+BOOST_AUTO_TEST_CASE(payout_verification_prefix_skeleton_reports_noncanonical_after_completeness)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(77);
+    tx.payout_index = 28;
+    tx.addr_pk.bytes = {0x61, 0x37};
+    tx.V_PAYOUT = 10;
+    tx.coin.bytes = {0x63, 0x37};
+
+    BOOST_CHECK(helsing::CheckPayoutVerificationPrefixSkeleton(tx, false) == helsing::PayoutVerificationPrefixSkeletonResult::MALFORMED_OR_NONCANONICAL);
+}
+
+BOOST_AUTO_TEST_CASE(payout_verification_prefix_skeleton_does_not_define_payout_grammar)
+{
+    helsing::PayoutTxSkeleton tx;
+    tx.selected_stake_id = DeterministicHash(78);
+    tx.payout_index = 29;
+    tx.addr_pk.bytes = {0xff, 0x00, 0x61};
+    tx.V_PAYOUT = std::numeric_limits<CAmount>::max();
+    tx.coin.bytes = {0xff, 0x00, 0x63};
+
+    BOOST_CHECK(helsing::CheckPayoutVerificationPrefixSkeleton(tx, true) == helsing::PayoutVerificationPrefixSkeletonResult::OK);
+}
+
 BOOST_AUTO_TEST_CASE(stake_update_completeness_skeleton_accepts_populated_fields)
 {
     helsing::StakeUpdateTx tx;
