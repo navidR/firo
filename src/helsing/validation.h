@@ -172,6 +172,15 @@ enum class StakeStatusLifecycleSkeletonResult {
     CONSENSUS_WIRING_UNIMPLEMENTED,
 };
 
+enum class CollateralMovementStatusPolicySkeletonResult {
+    BLOCK_SPENT_TAGS_UNAVAILABLE,
+    SPENT_TAG_PERSISTENCE_UNIMPLEMENTED,
+    ACTIVE_STAKE_LOOKUP_UNIMPLEMENTED,
+    SPENT_DEACTIVATED_STATUS_MAPPING_UNIMPLEMENTED,
+    ACTIVE_TAG_REMOVAL_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class HelsingCanonicalTranscriptSkeletonResult {
     CANONICAL_ENCODING_GRAMMAR_UNIMPLEMENTED,
     HASH_TO_FIELD_METHOD_UNIMPLEMENTED,
@@ -622,6 +631,10 @@ HelsingMasternodeLifecycleSkeletonResult CheckHelsingMasternodeLifecycleSkeleton
 // expired, and deactivated, and ActiveTags contains exactly active backing tags.
 // This blocker has no accepting result and does not define status transitions.
 StakeStatusLifecycleSkeletonResult CheckStakeStatusLifecycleSkeleton(bool stakeRecordStateAvailable, bool canonicalStatusEncodingAvailable, bool expirationRuleAvailable, bool deactivationRuleAvailable, bool activeTagConsistencyAvailable);
+// Revised spec section 12 step 6 marks moved collateral records "spent", while
+// sections 13 and 24 describe the same collateral movement as deactivation.
+// This blocker has no accepting result and does not choose that status mapping.
+CollateralMovementStatusPolicySkeletonResult CheckCollateralMovementStatusPolicySkeleton(bool blockSpentTagsAvailable, bool spentTagPersistenceAvailable, bool activeStakeLookupAvailable, bool spentDeactivatedStatusMappingAvailable, bool activeTagRemovalAvailable);
 // Revised spec section 5 and 5.1 require canonical encodings, a consensus
 // hash-to-field method, domain-separated hashes, and independent proof transcript
 // labels before proof paths can be consensus-valid. This blocker has no accepting

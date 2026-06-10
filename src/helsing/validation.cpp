@@ -592,6 +592,27 @@ StakeStatusLifecycleSkeletonResult CheckStakeStatusLifecycleSkeleton(bool stakeR
     return StakeStatusLifecycleSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
 }
 
+CollateralMovementStatusPolicySkeletonResult CheckCollateralMovementStatusPolicySkeleton(bool blockSpentTagsAvailable, bool spentTagPersistenceAvailable, bool activeStakeLookupAvailable, bool spentDeactivatedStatusMappingAvailable, bool activeTagRemovalAvailable)
+{
+    if (!blockSpentTagsAvailable) {
+        return CollateralMovementStatusPolicySkeletonResult::BLOCK_SPENT_TAGS_UNAVAILABLE;
+    }
+    if (!spentTagPersistenceAvailable) {
+        return CollateralMovementStatusPolicySkeletonResult::SPENT_TAG_PERSISTENCE_UNIMPLEMENTED;
+    }
+    if (!activeStakeLookupAvailable) {
+        return CollateralMovementStatusPolicySkeletonResult::ACTIVE_STAKE_LOOKUP_UNIMPLEMENTED;
+    }
+    if (!spentDeactivatedStatusMappingAvailable) {
+        return CollateralMovementStatusPolicySkeletonResult::SPENT_DEACTIVATED_STATUS_MAPPING_UNIMPLEMENTED;
+    }
+    if (!activeTagRemovalAvailable) {
+        return CollateralMovementStatusPolicySkeletonResult::ACTIVE_TAG_REMOVAL_UNIMPLEMENTED;
+    }
+
+    return CollateralMovementStatusPolicySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 HelsingCanonicalTranscriptSkeletonResult CheckHelsingCanonicalTranscriptSkeleton(bool canonicalEncodingGrammarAvailable, bool hashToFieldMethodAvailable, bool domainSeparationStringsAvailable, bool proofTranscriptLabelsAvailable)
 {
     if (!canonicalEncodingGrammarAvailable) {

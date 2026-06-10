@@ -1924,6 +1924,41 @@ BOOST_AUTO_TEST_CASE(stake_status_lifecycle_skeleton_has_no_accepting_or_mutatin
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
+BOOST_AUTO_TEST_CASE(collateral_movement_status_policy_skeleton_requires_block_spent_tags_first)
+{
+    BOOST_CHECK(helsing::CheckCollateralMovementStatusPolicySkeleton(false, false, false, false, false) == helsing::CollateralMovementStatusPolicySkeletonResult::BLOCK_SPENT_TAGS_UNAVAILABLE);
+    BOOST_CHECK(helsing::CheckCollateralMovementStatusPolicySkeleton(false, true, true, true, true) == helsing::CollateralMovementStatusPolicySkeletonResult::BLOCK_SPENT_TAGS_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(collateral_movement_status_policy_skeleton_orders_section_12_blockers)
+{
+    BOOST_CHECK(helsing::CheckCollateralMovementStatusPolicySkeleton(true, false, true, true, true) == helsing::CollateralMovementStatusPolicySkeletonResult::SPENT_TAG_PERSISTENCE_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckCollateralMovementStatusPolicySkeleton(true, false, false, false, false) == helsing::CollateralMovementStatusPolicySkeletonResult::SPENT_TAG_PERSISTENCE_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckCollateralMovementStatusPolicySkeleton(true, true, false, true, true) == helsing::CollateralMovementStatusPolicySkeletonResult::ACTIVE_STAKE_LOOKUP_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckCollateralMovementStatusPolicySkeleton(true, true, true, false, true) == helsing::CollateralMovementStatusPolicySkeletonResult::SPENT_DEACTIVATED_STATUS_MAPPING_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckCollateralMovementStatusPolicySkeleton(true, true, true, true, false) == helsing::CollateralMovementStatusPolicySkeletonResult::ACTIVE_TAG_REMOVAL_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckCollateralMovementStatusPolicySkeleton(true, true, true, true, true) == helsing::CollateralMovementStatusPolicySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(collateral_movement_status_policy_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(245, DeterministicPoint(245));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::CollateralMovementStatusPolicySkeletonResult result = helsing::CheckCollateralMovementStatusPolicySkeleton(true, true, true, true, true);
+
+    BOOST_CHECK(result == helsing::CollateralMovementStatusPolicySkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(canonical_transcript_skeleton_requires_encoding_grammar_first)
 {
     BOOST_CHECK(helsing::CheckHelsingCanonicalTranscriptSkeleton(false, false, false, false) == helsing::HelsingCanonicalTranscriptSkeletonResult::CANONICAL_ENCODING_GRAMMAR_UNIMPLEMENTED);
