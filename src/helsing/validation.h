@@ -146,6 +146,11 @@ struct StakeVerificationBlockedSkeletonResult {
     StakeProofVerificationSkeletonResult proof_result{StakeProofVerificationSkeletonResult::STAKE_PREFIX_FAILED};
 };
 
+struct BlockValidationPrefixWithSpentTagsSkeletonResult {
+    StakeValidationResult block_spent_result{StakeValidationResult::OK};
+    StakeValidationResult validation_result{StakeValidationResult::OK};
+};
+
 enum class StakeIdConstructionSkeletonResult {
     STAKE_VERIFY_NOT_ACCEPTED,
     CANONICAL_TX_ENCODING_UNIMPLEMENTED,
@@ -350,6 +355,10 @@ StakeValidationResult CheckStakeUpdateBlockSkeleton(const std::vector<StakeUpdat
 // stake, update, and payout prefix helpers. The caller must supply already collected
 // BlockSpentTags in view and this does not perform Spark spend validation or state mutation.
 StakeValidationResult CheckBlockValidationPrefixSkeleton(const std::vector<StakeTx>& stake_txs, const std::vector<StakeUpdateTx>& update_txs, const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& view, int currentHeight, int stakeMaturity);
+// Block-level skeleton for revised-spec ValidateBlock steps 2-5. The caller supplies
+// tags revealed by already valid Spark spends; this builds BlockSpentTags in a copied
+// view, then runs the existing non-mutating stake/update/payout prefix checks.
+BlockValidationPrefixWithSpentTagsSkeletonResult CheckBlockValidationPrefixWithSpentTagsSkeleton(const std::vector<GroupElement>& sparkSpendTags, const std::vector<StakeTx>& stake_txs, const std::vector<StakeUpdateTx>& update_txs, const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& parentView, int currentHeight, int stakeMaturity);
 
 } // namespace helsing
 

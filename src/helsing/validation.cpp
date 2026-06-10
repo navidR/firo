@@ -986,4 +986,26 @@ StakeValidationResult CheckBlockValidationPrefixSkeleton(
     return CheckPayoutBlockEligibilitySkeleton(payout_txs, view, currentHeight, stakeMaturity);
 }
 
+BlockValidationPrefixWithSpentTagsSkeletonResult CheckBlockValidationPrefixWithSpentTagsSkeleton(
+    const std::vector<GroupElement>& sparkSpendTags,
+    const std::vector<StakeTx>& stake_txs,
+    const std::vector<StakeUpdateTx>& update_txs,
+    const std::vector<PayoutTxSkeleton>& payout_txs,
+    const ValidationStateView& parentView,
+    int currentHeight,
+    int stakeMaturity)
+{
+    BlockValidationPrefixWithSpentTagsSkeletonResult result;
+    std::unordered_set<GroupElement, spark::CLTagHash> blockSpentTags;
+    result.block_spent_result = BuildBlockSpentTagsSkeleton(sparkSpendTags, parentView.helsingState, blockSpentTags);
+    if (result.block_spent_result != StakeValidationResult::OK) {
+        return result;
+    }
+
+    ValidationStateView view(parentView);
+    view.blockSpentTags = std::move(blockSpentTags);
+    result.validation_result = CheckBlockValidationPrefixSkeleton(stake_txs, update_txs, payout_txs, view, currentHeight, stakeMaturity);
+    return result;
+}
+
 } // namespace helsing

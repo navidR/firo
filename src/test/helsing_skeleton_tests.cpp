@@ -3748,6 +3748,123 @@ BOOST_AUTO_TEST_CASE(block_validation_prefix_skeleton_reports_payout_after_prior
     BOOST_CHECK(helsing::CheckBlockValidationPrefixSkeleton({}, {update}, {payout}, view, 300, 0) == helsing::StakeValidationResult::STAKE_RECORD_NOT_FOUND);
 }
 
+BOOST_AUTO_TEST_CASE(block_validation_prefix_with_spent_tags_skeleton_accepts_valid_phase_inputs)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    helsing::StakeTx stake = ValidStakeTx();
+    const helsing::StakeRecord updateRecord = ActiveRecord(179, DeterministicPoint(179));
+    const helsing::StakeRecord payoutRecord = ActiveRecord(180, DeterministicPoint(180));
+    helsing::StakeUpdateTx update;
+    helsing::PayoutTxSkeleton payout;
+    update.stake_id = updateRecord.stake_id;
+    update.m_new.bytes = {0x75, 0x70, 0x64};
+    update.sig_update.bytes = {0x73, 0x69, 0x67};
+    payout.selected_stake_id = payoutRecord.stake_id;
+    payout.payout_index = 1;
+    payout.V_PAYOUT = 1;
+
+    AddOutputs(view, stake, 45);
+    BOOST_CHECK(state.AddActiveStake(updateRecord));
+    BOOST_CHECK(state.AddActiveStake(payoutRecord));
+
+    const helsing::BlockValidationPrefixWithSpentTagsSkeletonResult result = helsing::CheckBlockValidationPrefixWithSpentTagsSkeleton({}, {stake}, {update}, {payout}, view, payoutRecord.nHeight + 10, 10);
+
+    BOOST_CHECK(result.block_spent_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.validation_result == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(block_validation_prefix_with_spent_tags_skeleton_checks_block_spends_before_stakes)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    helsing::StakeTx stake = ValidStakeTx();
+    const GroupElement spentTag = DeterministicPoint(181);
+    std::vector<GroupElement> sparkSpendTags{spentTag, spentTag};
+
+    view.blockSpentTags.insert(stake.T);
+    const helsing::BlockValidationPrefixWithSpentTagsSkeletonResult result = helsing::CheckBlockValidationPrefixWithSpentTagsSkeleton(sparkSpendTags, {stake}, {}, {}, view, 300, 0);
+
+    BOOST_CHECK(result.block_spent_result == helsing::StakeValidationResult::DUPLICATE_SPENT_TAG_IN_BLOCK);
+    BOOST_CHECK(result.validation_result == helsing::StakeValidationResult::OK);
+}
+
+BOOST_AUTO_TEST_CASE(block_validation_prefix_with_spent_tags_skeleton_makes_tags_visible_to_stakes)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    helsing::StakeTx stake = ValidStakeTx();
+    AddOutputs(view, stake, 50);
+
+    const helsing::BlockValidationPrefixWithSpentTagsSkeletonResult result = helsing::CheckBlockValidationPrefixWithSpentTagsSkeleton({stake.T}, {stake}, {}, {}, view, 300, 0);
+
+    BOOST_CHECK(result.block_spent_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.validation_result == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(block_validation_prefix_with_spent_tags_skeleton_makes_tags_visible_to_updates)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(182, DeterministicPoint(182));
+    helsing::StakeUpdateTx update;
+    update.stake_id = record.stake_id;
+    update.m_new.bytes = {0x75, 0x70, 0x64};
+    update.sig_update.bytes = {0x73, 0x69, 0x67};
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::BlockValidationPrefixWithSpentTagsSkeletonResult result = helsing::CheckBlockValidationPrefixWithSpentTagsSkeleton({record.T}, {}, {update}, {}, view, 300, 0);
+
+    BOOST_CHECK(result.block_spent_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.validation_result == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(block_validation_prefix_with_spent_tags_skeleton_makes_tags_visible_to_payouts)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(183, DeterministicPoint(183));
+    helsing::PayoutTxSkeleton payout;
+    payout.selected_stake_id = record.stake_id;
+    payout.payout_index = 2;
+    payout.V_PAYOUT = 1;
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::BlockValidationPrefixWithSpentTagsSkeletonResult result = helsing::CheckBlockValidationPrefixWithSpentTagsSkeleton({record.T}, {}, {}, {payout}, view, record.nHeight + 10, 10);
+
+    BOOST_CHECK(result.block_spent_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.validation_result == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+}
+
+BOOST_AUTO_TEST_CASE(block_validation_prefix_with_spent_tags_skeleton_does_not_mutate_state_or_view)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(184, DeterministicPoint(184));
+    helsing::PayoutTxSkeleton payout;
+    payout.selected_stake_id = record.stake_id;
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::BlockValidationPrefixWithSpentTagsSkeletonResult result = helsing::CheckBlockValidationPrefixWithSpentTagsSkeleton({record.T}, {}, {}, {payout}, view, record.nHeight + 10, 10);
+
+    BOOST_CHECK(result.validation_result == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+    BOOST_CHECK_EQUAL(view.blockSpentTags.size(), 0U);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+    const helsing::StakeRecord* stored = state.GetStakeRecord(record.stake_id);
+    BOOST_REQUIRE(stored != nullptr);
+    BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
+}
+
 BOOST_AUTO_TEST_CASE(state_rejects_default_tag)
 {
     helsing::CHelsingState state;
