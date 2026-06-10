@@ -1539,6 +1539,36 @@ BOOST_AUTO_TEST_CASE(masternode_lifecycle_skeleton_has_no_accepting_or_mutating_
     BOOST_CHECK(!state.IsSpentTag(record.T));
 }
 
+BOOST_AUTO_TEST_CASE(canonical_transcript_skeleton_requires_encoding_grammar_first)
+{
+    BOOST_CHECK(helsing::CheckHelsingCanonicalTranscriptSkeleton(false, false, false, false) == helsing::HelsingCanonicalTranscriptSkeletonResult::CANONICAL_ENCODING_GRAMMAR_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingCanonicalTranscriptSkeleton(false, true, true, true) == helsing::HelsingCanonicalTranscriptSkeletonResult::CANONICAL_ENCODING_GRAMMAR_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(canonical_transcript_skeleton_orders_hash_domain_and_label_blockers)
+{
+    BOOST_CHECK(helsing::CheckHelsingCanonicalTranscriptSkeleton(true, false, true, true) == helsing::HelsingCanonicalTranscriptSkeletonResult::HASH_TO_FIELD_METHOD_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingCanonicalTranscriptSkeleton(true, false, false, false) == helsing::HelsingCanonicalTranscriptSkeletonResult::HASH_TO_FIELD_METHOD_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingCanonicalTranscriptSkeleton(true, true, false, true) == helsing::HelsingCanonicalTranscriptSkeletonResult::DOMAIN_SEPARATION_STRINGS_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckHelsingCanonicalTranscriptSkeleton(true, true, true, false) == helsing::HelsingCanonicalTranscriptSkeletonResult::PROOF_TRANSCRIPT_LABELS_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(canonical_transcript_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(200, DeterministicPoint(200));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    const helsing::HelsingCanonicalTranscriptSkeletonResult result = helsing::CheckHelsingCanonicalTranscriptSkeleton(true, true, true, true);
+
+    BOOST_CHECK(result == helsing::HelsingCanonicalTranscriptSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(payout_address_match_skeleton_compares_extracted_registered_address)
 {
     helsing::PayoutTxSkeleton tx;

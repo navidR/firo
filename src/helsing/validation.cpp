@@ -356,6 +356,24 @@ HelsingMasternodeLifecycleSkeletonResult CheckHelsingMasternodeLifecycleSkeleton
     return HelsingMasternodeLifecycleSkeletonResult::MASTERNODE_PAYMENT_INTEGRATION_UNIMPLEMENTED;
 }
 
+HelsingCanonicalTranscriptSkeletonResult CheckHelsingCanonicalTranscriptSkeleton(bool canonicalEncodingGrammarAvailable, bool hashToFieldMethodAvailable, bool domainSeparationStringsAvailable, bool proofTranscriptLabelsAvailable)
+{
+    if (!canonicalEncodingGrammarAvailable) {
+        return HelsingCanonicalTranscriptSkeletonResult::CANONICAL_ENCODING_GRAMMAR_UNIMPLEMENTED;
+    }
+    if (!hashToFieldMethodAvailable) {
+        return HelsingCanonicalTranscriptSkeletonResult::HASH_TO_FIELD_METHOD_UNIMPLEMENTED;
+    }
+    if (!domainSeparationStringsAvailable) {
+        return HelsingCanonicalTranscriptSkeletonResult::DOMAIN_SEPARATION_STRINGS_UNIMPLEMENTED;
+    }
+    if (!proofTranscriptLabelsAvailable) {
+        return HelsingCanonicalTranscriptSkeletonResult::PROOF_TRANSCRIPT_LABELS_UNIMPLEMENTED;
+    }
+
+    return HelsingCanonicalTranscriptSkeletonResult::CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid)
 {
     if (!IsCompleteStakeTxSkeleton(tx)) {

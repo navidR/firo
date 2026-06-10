@@ -112,6 +112,14 @@ enum class HelsingMasternodeLifecycleSkeletonResult {
     MASTERNODE_PAYMENT_INTEGRATION_UNIMPLEMENTED,
 };
 
+enum class HelsingCanonicalTranscriptSkeletonResult {
+    CANONICAL_ENCODING_GRAMMAR_UNIMPLEMENTED,
+    HASH_TO_FIELD_METHOD_UNIMPLEMENTED,
+    DOMAIN_SEPARATION_STRINGS_UNIMPLEMENTED,
+    PROOF_TRANSCRIPT_LABELS_UNIMPLEMENTED,
+    CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class PayoutVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -369,6 +377,11 @@ HelsingConsensusActivationSkeletonResult CheckHelsingConsensusActivationSkeleton
 // but do not define how these map into Firo deterministic masternode lifecycle
 // state. This blocker has no accepting result and does not touch evo state.
 HelsingMasternodeLifecycleSkeletonResult CheckHelsingMasternodeLifecycleSkeleton(bool acceptedStakeAvailable, bool masternodeContextExtractionAvailable, bool masternodeRegistrationIntegrationAvailable, bool stakeUpdateLifecycleIntegrationAvailable, bool payoutSelectionIntegrationAvailable);
+// Revised spec section 5 and 5.1 require canonical encodings, a consensus
+// hash-to-field method, domain-separated hashes, and independent proof transcript
+// labels before proof paths can be consensus-valid. This blocker has no accepting
+// result and does not hash or verify transcripts.
+HelsingCanonicalTranscriptSkeletonResult CheckHelsingCanonicalTranscriptSkeleton(bool canonicalEncodingGrammarAvailable, bool hashToFieldMethodAvailable, bool domainSeparationStringsAvailable, bool proofTranscriptLabelsAvailable);
 // Revised spec StakeVerify steps 1-3 only. The caller supplies the result of
 // canonical-encoding validation because the consensus grammar is not implemented here.
 StakeVerificationPrefixSkeletonResult CheckStakeVerificationPrefixSkeleton(const StakeTx& tx, CAmount stakeValue, CAmount vMax, bool vMaxLessThanGroupOrder, bool canonicalEncodingsValid);

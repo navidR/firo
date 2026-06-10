@@ -12,6 +12,7 @@ Current scope:
 - `CheckHelsingTransactionWiringSkeleton` is an explicit blocker for wiring the section 9, 14, and 15 payloads into real Firo consensus transactions and section 12 block extraction. It has no accepting result and does not parse `CTransaction`.
 - `CheckHelsingConsensusActivationSkeleton` is an explicit blocker for real Firo deployment activation. Section 30 lists Spark compatibility questions, but the revised spec does not define activation parameters, chainparams/versionbits wiring, historical-state bootstrap, or enforcement points; this helper has no accepting result.
 - `CheckHelsingMasternodeLifecycleSkeleton` is an explicit blocker for integrating accepted Helsing stakes, updates, and payouts with Firo deterministic masternode lifecycle state. The revised spec defines public staking context and selected-stake checks, but not Firo masternode-list registration, update propagation, or payment wiring; this helper has no accepting result.
+- `CheckHelsingCanonicalTranscriptSkeleton` is an explicit blocker for the revised spec section 5/5.1 canonical transcript setup. It blocks before canonical encoding grammar, consensus hash-to-field method, domain-separation strings, proof transcript labels, and consensus wiring; it has no accepting result and does not hash transcripts.
 - `PayoutBlockContextSkeleton` models the revised spec section 16 payout-id input fields `{chain_id, block_height, prev_block_hash, payout_index, selected_stake_id}` without defining or computing `j`.
 - `IsCompletePayoutBlockContextSkeleton` checks that caller-supplied section 16 payout-id input fields are populated before any future `j` construction; it does not define canonical `chain_id` or `enc_*` grammar.
 - `DoesPayoutContextMatchTxSkeleton` checks that caller-supplied payout tx and block-context skeletons agree on `payout_index` and `selected_stake_id`; it does not construct `j`.
@@ -91,6 +92,7 @@ Current scope:
 Not implemented yet:
 
 - canonical `stake_stmt`, `incoins_root`, context hashing, and any accepting `StakeVerify` proof path
+- global canonical encoding grammar, hash-to-field method, domain strings, proof transcript labels, and transcript consensus wiring
 - canonical `stake_id = H("Helsing/stake-id/v1" || canonical(tx))` construction
 - final `StakeVerify` steps 8-12 after statement hashes and proof verification are implemented
 - replacing caller-supplied Spark maturity/cover-set facts with concrete Spark consensus checks without changing the step-1-through-7 helper into a full verifier
