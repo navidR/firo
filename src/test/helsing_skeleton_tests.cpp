@@ -3157,6 +3157,59 @@ BOOST_AUTO_TEST_CASE(payout_block_eligibility_skeleton_leaves_index_policy_to_se
     BOOST_CHECK(!helsing::ArePayoutIndexesDistinctSkeleton({firstPayout, secondPayout}));
 }
 
+BOOST_AUTO_TEST_CASE(payout_ordinal_selection_skeleton_requires_payout_set_first)
+{
+    helsing::PayoutTxSkeleton firstPayout;
+    helsing::PayoutTxSkeleton secondPayout;
+    firstPayout.payout_index = 3;
+    secondPayout.payout_index = 3;
+
+    BOOST_CHECK(helsing::CheckPayoutOrdinalSelectionSkeleton({firstPayout, secondPayout}, false, true, true) == helsing::PayoutOrdinalSelectionSkeletonResult::PAYOUT_SET_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(payout_ordinal_selection_skeleton_checks_distinct_indexes_before_rule)
+{
+    helsing::PayoutTxSkeleton firstPayout;
+    helsing::PayoutTxSkeleton secondPayout;
+    firstPayout.payout_index = 4;
+    secondPayout.payout_index = 4;
+
+    BOOST_CHECK(helsing::CheckPayoutOrdinalSelectionSkeleton({firstPayout, secondPayout}, true, false, false) == helsing::PayoutOrdinalSelectionSkeletonResult::PAYOUT_INDEXES_NOT_DISTINCT);
+    BOOST_CHECK(helsing::CheckPayoutOrdinalSelectionSkeleton({firstPayout, secondPayout}, true, true, true) == helsing::PayoutOrdinalSelectionSkeletonResult::PAYOUT_INDEXES_NOT_DISTINCT);
+}
+
+BOOST_AUTO_TEST_CASE(payout_ordinal_selection_skeleton_orders_rule_position_and_wiring_blockers)
+{
+    helsing::PayoutTxSkeleton firstPayout;
+    helsing::PayoutTxSkeleton secondPayout;
+    firstPayout.payout_index = 0;
+    secondPayout.payout_index = 1;
+
+    BOOST_CHECK(helsing::CheckPayoutOrdinalSelectionSkeleton({firstPayout, secondPayout}, true, false, false) == helsing::PayoutOrdinalSelectionSkeletonResult::DETERMINISTIC_PAYOUT_ORDINAL_RULE_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutOrdinalSelectionSkeleton({firstPayout, secondPayout}, true, true, false) == helsing::PayoutOrdinalSelectionSkeletonResult::PAYOUT_POSITION_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckPayoutOrdinalSelectionSkeleton({firstPayout, secondPayout}, true, true, true) == helsing::PayoutOrdinalSelectionSkeletonResult::PAYOUT_ORDINAL_CONSENSUS_WIRING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_ordinal_selection_skeleton_has_no_accepting_or_mutating_path)
+{
+    helsing::CHelsingState state;
+    const helsing::StakeRecord record = ActiveRecord(199, DeterministicPoint(199));
+    BOOST_CHECK(state.AddActiveStake(record));
+
+    helsing::PayoutTxSkeleton payout;
+    payout.selected_stake_id = record.stake_id;
+    payout.payout_index = 0;
+
+    const helsing::PayoutOrdinalSelectionSkeletonResult result = helsing::CheckPayoutOrdinalSelectionSkeleton({payout}, true, true, true);
+
+    BOOST_CHECK(result == helsing::PayoutOrdinalSelectionSkeletonResult::PAYOUT_ORDINAL_CONSENSUS_WIRING_UNIMPLEMENTED);
+    BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);
+    BOOST_CHECK_EQUAL(state.GetSpentTagCount(), 0U);
+    BOOST_CHECK(state.IsActiveTag(record.T));
+    BOOST_CHECK(!state.IsSpentTag(record.T));
+}
+
 BOOST_AUTO_TEST_CASE(payout_block_eligibility_skeleton_rejects_missing_state_or_record)
 {
     helsing::PayoutTxSkeleton payout;

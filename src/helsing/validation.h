@@ -63,6 +63,14 @@ enum class PayoutIdConstructionSkeletonResult {
     PAYOUT_ID_HASHING_UNIMPLEMENTED,
 };
 
+enum class PayoutOrdinalSelectionSkeletonResult {
+    PAYOUT_SET_UNAVAILABLE,
+    PAYOUT_INDEXES_NOT_DISTINCT,
+    DETERMINISTIC_PAYOUT_ORDINAL_RULE_UNIMPLEMENTED,
+    PAYOUT_POSITION_VALIDATION_UNIMPLEMENTED,
+    PAYOUT_ORDINAL_CONSENSUS_WIRING_UNIMPLEMENTED,
+};
+
 enum class PayoutAlgorithmSkeletonResult {
     PAYOUT_TX_INCOMPLETE,
     PAYOUT_IDENTIFIER_UNAVAILABLE,
@@ -483,6 +491,10 @@ PayoutVerificationSkeletonResult CheckPayoutVerificationSkeleton(const PayoutTxS
 // Revised-spec section 16 requires distinct payout_index values when a block
 // contains more than one masternode payout.
 bool ArePayoutIndexesDistinctSkeleton(const std::vector<PayoutTxSkeleton>& payout_txs);
+// Revised-spec section 16 requires payout_index to be the deterministic payout
+// ordinal inside the block, but does not define Firo's ordinal-selection rule.
+// This blocker has no accepting result and must not be used to select payouts.
+PayoutOrdinalSelectionSkeletonResult CheckPayoutOrdinalSelectionSkeleton(const std::vector<PayoutTxSkeleton>& payout_txs, bool payoutSetAvailable, bool deterministicPayoutOrdinalRuleAvailable, bool payoutPositionValidationAvailable);
 
 // Structural skeleton for revised-spec StakeUpdateVerify steps 1-3 only.
 StakeValidationResult CheckStakeUpdateEligibilitySkeleton(const uint256& stake_id, const ValidationStateView& view);

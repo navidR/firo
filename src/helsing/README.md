@@ -69,6 +69,7 @@ Current scope:
 - `CheckPayoutVerificationBlockedSkeleton` composes revised spec `PayoutVerify` steps 1-13 without an accepting path: it runs the step-1-through-7 eligibility checks, then the step-8-through-13 suffix blocker.
 - `CheckPayoutVerificationSkeleton` composes revised spec `PayoutVerify` steps 3-13 using existing eligibility checks and caller-supplied expected public values; it deliberately does not parse contexts, select masternodes, compute `j`, run `Payout`, or verify payout coins.
 - `ArePayoutIndexesDistinctSkeleton` checks the revised spec section 16 duplicate-`payout_index` rule for a caller-supplied payout set.
+- `CheckPayoutOrdinalSelectionSkeleton` is an explicit blocker for the revised spec section 16 deterministic `payout_index` ordinal rule. It preserves duplicate-index rejection, then blocks before Firo ordinal selection, payout-position validation, and consensus wiring; it has no accepting result.
 - `CheckStakeUpdateEligibilitySkeleton` performs revised spec `StakeUpdateVerify` steps 1-3 only: stake record lookup, active status, and spent-tag checks.
 - `CheckStakeUpdateVerificationSkeleton` composes `StakeUpdateTx` field presence with revised spec `StakeUpdateVerify` steps 1-3; it deliberately stops before context parsing, `update_pk` extraction, `enc_context(m_new)`, signature verification, and update effective-height rules.
 - `CheckStakeUpdateAuthorizationSkeleton` is an explicit blocker for revised spec `StakeUpdateVerify` steps 4-6. It preserves failed field/eligibility prefixes, then blocks missing `update_pk` extraction, canonical `m_new` validation, update-message hashing, and signature verification; it has no acceptance result.
@@ -108,7 +109,7 @@ Not implemented yet:
 - any full block-acceptance path before real `StakeVerify`, `StakeUpdateVerify`, and `PayoutVerify` exist
 - full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, payout address parsing, deterministic Spark payout coin construction, and payout coin comparison
 - real payout-output extraction from accepted payout transactions after `PayoutVerify`
-- deterministic payout ordinal selection and payout identifier `j` construction
+- real deterministic payout ordinal selection and payout identifier `j` construction
 - canonical `chain_id`, `enc_int`, `enc_hash`, and `enc_bytes` encodings for payout-id construction
 - real payout address and payout coin encodings for `PayoutTxSkeleton`
 - canonical stake context grammar, including payout address, update key, node signing material, and implementation-specific masternode context rules

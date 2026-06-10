@@ -1096,6 +1096,24 @@ bool ArePayoutIndexesDistinctSkeleton(const std::vector<PayoutTxSkeleton>& payou
     return true;
 }
 
+PayoutOrdinalSelectionSkeletonResult CheckPayoutOrdinalSelectionSkeleton(const std::vector<PayoutTxSkeleton>& payout_txs, bool payoutSetAvailable, bool deterministicPayoutOrdinalRuleAvailable, bool payoutPositionValidationAvailable)
+{
+    if (!payoutSetAvailable) {
+        return PayoutOrdinalSelectionSkeletonResult::PAYOUT_SET_UNAVAILABLE;
+    }
+    if (!ArePayoutIndexesDistinctSkeleton(payout_txs)) {
+        return PayoutOrdinalSelectionSkeletonResult::PAYOUT_INDEXES_NOT_DISTINCT;
+    }
+    if (!deterministicPayoutOrdinalRuleAvailable) {
+        return PayoutOrdinalSelectionSkeletonResult::DETERMINISTIC_PAYOUT_ORDINAL_RULE_UNIMPLEMENTED;
+    }
+    if (!payoutPositionValidationAvailable) {
+        return PayoutOrdinalSelectionSkeletonResult::PAYOUT_POSITION_VALIDATION_UNIMPLEMENTED;
+    }
+
+    return PayoutOrdinalSelectionSkeletonResult::PAYOUT_ORDINAL_CONSENSUS_WIRING_UNIMPLEMENTED;
+}
+
 StakeValidationResult CheckStakeUpdateEligibilitySkeleton(const uint256& stake_id, const ValidationStateView& view)
 {
     if (view.helsingState == nullptr) {
