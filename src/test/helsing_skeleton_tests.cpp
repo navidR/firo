@@ -3987,7 +3987,13 @@ BOOST_AUTO_TEST_CASE(block_validation_prefix_with_spent_tags_skeleton_does_not_m
     BOOST_CHECK(stored->status == helsing::StakeStatus::ACTIVE);
 }
 
-BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_reports_verification_blocker_after_prefix)
+BOOST_AUTO_TEST_CASE(block_validation_spark_prepass_skeleton_blocks_tag_extraction_after_spark_validation)
+{
+    BOOST_CHECK(helsing::CheckBlockValidationSparkPrepassSkeleton(false) == helsing::BlockValidationSparkPrepassSkeletonResult::ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(helsing::CheckBlockValidationSparkPrepassSkeleton(true) == helsing::BlockValidationSparkPrepassSkeletonResult::SPARK_SPEND_TAG_EXTRACTION_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_reports_spark_prepass_before_prefix)
 {
     helsing::CHelsingState state;
     helsing::ValidationStateView view;
@@ -4010,12 +4016,13 @@ BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_reports_verification_bloc
 
     const helsing::BlockValidationBlockedSkeletonResult result = helsing::CheckBlockValidationBlockedSkeleton({}, {stake}, {update}, {payout}, view, payoutRecord.nHeight + 10, 10);
 
+    BOOST_CHECK(result.spark_prepass_result == helsing::BlockValidationSparkPrepassSkeletonResult::ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED);
     BOOST_CHECK(result.prefix_result.block_spent_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.prefix_result.validation_result == helsing::StakeValidationResult::OK);
-    BOOST_CHECK(result.suffix_result == helsing::BlockValidationSuffixSkeletonResult::FULL_TRANSACTION_VERIFICATION_UNIMPLEMENTED);
+    BOOST_CHECK(result.suffix_result == helsing::BlockValidationSuffixSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED);
 }
 
-BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_checks_block_spends_before_verifier_blocker)
+BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_checks_spark_prepass_before_block_spends)
 {
     helsing::ValidationStateView view;
     const GroupElement spentTag = DeterministicPoint(187);
@@ -4023,12 +4030,13 @@ BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_checks_block_spends_befor
 
     const helsing::BlockValidationBlockedSkeletonResult result = helsing::CheckBlockValidationBlockedSkeleton({spentTag, spentTag}, {stake}, {}, {}, view, 300, 0);
 
-    BOOST_CHECK(result.prefix_result.block_spent_result == helsing::StakeValidationResult::DUPLICATE_SPENT_TAG_IN_BLOCK);
+    BOOST_CHECK(result.spark_prepass_result == helsing::BlockValidationSparkPrepassSkeletonResult::ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(result.prefix_result.block_spent_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.prefix_result.validation_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.suffix_result == helsing::BlockValidationSuffixSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED);
 }
 
-BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_checks_stake_update_payout_prefix_before_verifier_blocker)
+BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_checks_spark_prepass_before_stake_update_payout_prefix)
 {
     helsing::CHelsingState state;
     helsing::ValidationStateView view;
@@ -4037,8 +4045,9 @@ BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_checks_stake_update_payou
     AddOutputs(view, stake, 60);
 
     helsing::BlockValidationBlockedSkeletonResult result = helsing::CheckBlockValidationBlockedSkeleton({stake.T}, {stake}, {}, {}, view, 300, 0);
+    BOOST_CHECK(result.spark_prepass_result == helsing::BlockValidationSparkPrepassSkeletonResult::ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED);
     BOOST_CHECK(result.prefix_result.block_spent_result == helsing::StakeValidationResult::OK);
-    BOOST_CHECK(result.prefix_result.validation_result == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+    BOOST_CHECK(result.prefix_result.validation_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.suffix_result == helsing::BlockValidationSuffixSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED);
 
     const helsing::StakeRecord updateRecord = ActiveRecord(188, DeterministicPoint(188));
@@ -4046,13 +4055,15 @@ BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_checks_stake_update_payou
     update.stake_id = updateRecord.stake_id;
     BOOST_CHECK(state.AddActiveStake(updateRecord));
     result = helsing::CheckBlockValidationBlockedSkeleton({updateRecord.T}, {}, {update}, {}, view, 300, 0);
-    BOOST_CHECK(result.prefix_result.validation_result == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
+    BOOST_CHECK(result.spark_prepass_result == helsing::BlockValidationSparkPrepassSkeletonResult::ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(result.prefix_result.validation_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.suffix_result == helsing::BlockValidationSuffixSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED);
 
     helsing::PayoutTxSkeleton payout;
     payout.selected_stake_id = DeterministicHash(189);
     result = helsing::CheckBlockValidationBlockedSkeleton({}, {}, {}, {payout}, view, 300, 0);
-    BOOST_CHECK(result.prefix_result.validation_result == helsing::StakeValidationResult::STAKE_RECORD_NOT_FOUND);
+    BOOST_CHECK(result.spark_prepass_result == helsing::BlockValidationSparkPrepassSkeletonResult::ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED);
+    BOOST_CHECK(result.prefix_result.validation_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.suffix_result == helsing::BlockValidationSuffixSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED);
 }
 
@@ -4070,8 +4081,9 @@ BOOST_AUTO_TEST_CASE(block_validation_blocked_skeleton_does_not_mutate_state_or_
     BOOST_CHECK(state.AddActiveStake(record));
     const helsing::BlockValidationBlockedSkeletonResult result = helsing::CheckBlockValidationBlockedSkeleton({}, {}, {}, {payout}, view, record.nHeight + 10, 10);
 
+    BOOST_CHECK(result.spark_prepass_result == helsing::BlockValidationSparkPrepassSkeletonResult::ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED);
     BOOST_CHECK(result.prefix_result.validation_result == helsing::StakeValidationResult::OK);
-    BOOST_CHECK(result.suffix_result == helsing::BlockValidationSuffixSkeletonResult::FULL_TRANSACTION_VERIFICATION_UNIMPLEMENTED);
+    BOOST_CHECK(result.suffix_result == helsing::BlockValidationSuffixSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED);
     BOOST_CHECK_EQUAL(view.blockSpentTags.size(), 0U);
     BOOST_CHECK_EQUAL(state.GetStakeRecordCount(), 1U);
     BOOST_CHECK_EQUAL(state.GetActiveTagCount(), 1U);

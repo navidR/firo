@@ -1052,6 +1052,15 @@ BlockValidationPrefixWithSpentTagsSkeletonResult CheckBlockValidationPrefixWithS
     return result;
 }
 
+BlockValidationSparkPrepassSkeletonResult CheckBlockValidationSparkPrepassSkeleton(bool ordinarySparkSpendValidationAvailable)
+{
+    if (!ordinarySparkSpendValidationAvailable) {
+        return BlockValidationSparkPrepassSkeletonResult::ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED;
+    }
+
+    return BlockValidationSparkPrepassSkeletonResult::SPARK_SPEND_TAG_EXTRACTION_UNIMPLEMENTED;
+}
+
 BlockValidationBlockedSkeletonResult CheckBlockValidationBlockedSkeleton(
     const std::vector<GroupElement>& sparkSpendTags,
     const std::vector<StakeTx>& stake_txs,
@@ -1061,14 +1070,16 @@ BlockValidationBlockedSkeletonResult CheckBlockValidationBlockedSkeleton(
     int currentHeight,
     int stakeMaturity)
 {
-    BlockValidationBlockedSkeletonResult result;
-    result.prefix_result = CheckBlockValidationPrefixWithSpentTagsSkeleton(sparkSpendTags, stake_txs, update_txs, payout_txs, parentView, currentHeight, stakeMaturity);
-    if (result.prefix_result.block_spent_result != StakeValidationResult::OK ||
-        result.prefix_result.validation_result != StakeValidationResult::OK) {
-        return result;
-    }
+    (void)sparkSpendTags;
+    (void)stake_txs;
+    (void)update_txs;
+    (void)payout_txs;
+    (void)parentView;
+    (void)currentHeight;
+    (void)stakeMaturity;
 
-    result.suffix_result = BlockValidationSuffixSkeletonResult::FULL_TRANSACTION_VERIFICATION_UNIMPLEMENTED;
+    BlockValidationBlockedSkeletonResult result;
+    result.spark_prepass_result = CheckBlockValidationSparkPrepassSkeleton(false);
     return result;
 }
 

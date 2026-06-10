@@ -169,12 +169,18 @@ struct BlockValidationPrefixWithSpentTagsSkeletonResult {
     StakeValidationResult validation_result{StakeValidationResult::OK};
 };
 
+enum class BlockValidationSparkPrepassSkeletonResult {
+    ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED,
+    SPARK_SPEND_TAG_EXTRACTION_UNIMPLEMENTED,
+};
+
 enum class BlockValidationSuffixSkeletonResult {
     BLOCK_VALIDATION_PREFIX_FAILED,
     FULL_TRANSACTION_VERIFICATION_UNIMPLEMENTED,
 };
 
 struct BlockValidationBlockedSkeletonResult {
+    BlockValidationSparkPrepassSkeletonResult spark_prepass_result{BlockValidationSparkPrepassSkeletonResult::ORDINARY_SPARK_SPEND_VALIDATION_UNIMPLEMENTED};
     BlockValidationPrefixWithSpentTagsSkeletonResult prefix_result;
     BlockValidationSuffixSkeletonResult suffix_result{BlockValidationSuffixSkeletonResult::BLOCK_VALIDATION_PREFIX_FAILED};
 };
@@ -396,8 +402,13 @@ StakeValidationResult CheckBlockValidationPrefixSkeleton(const std::vector<Stake
 // tags revealed by already valid Spark spends; this builds BlockSpentTags in a copied
 // view, then runs the existing non-mutating stake/update/payout prefix checks.
 BlockValidationPrefixWithSpentTagsSkeletonResult CheckBlockValidationPrefixWithSpentTagsSkeleton(const std::vector<GroupElement>& sparkSpendTags, const std::vector<StakeTx>& stake_txs, const std::vector<StakeUpdateTx>& update_txs, const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& parentView, int currentHeight, int stakeMaturity);
-// Full block validation remains deliberately blocked after the section 12 prefix:
-// real StakeVerify, StakeUpdateVerify, PayoutVerify, persistence, and undo data are required.
+// Revised spec ValidateBlock step 1 is deliberately blocked here. Real ordinary
+// Spark spend validation must run before revealed tags can be collected into
+// BlockSpentTags.
+BlockValidationSparkPrepassSkeletonResult CheckBlockValidationSparkPrepassSkeleton(bool ordinarySparkSpendValidationAvailable);
+// Full block validation remains deliberately blocked at section 12 step 1:
+// real Spark spend validation/tag extraction, StakeVerify, StakeUpdateVerify,
+// PayoutVerify, persistence, and undo data are required.
 BlockValidationBlockedSkeletonResult CheckBlockValidationBlockedSkeleton(const std::vector<GroupElement>& sparkSpendTags, const std::vector<StakeTx>& stake_txs, const std::vector<StakeUpdateTx>& update_txs, const std::vector<PayoutTxSkeleton>& payout_txs, const ValidationStateView& parentView, int currentHeight, int stakeMaturity);
 
 } // namespace helsing
