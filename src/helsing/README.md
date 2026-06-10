@@ -79,7 +79,7 @@ Current scope:
 - `DoesPayoutAddressMatchRegisteredSkeleton` checks revised spec `PayoutVerify` step 8 byte equality against a caller-supplied, already extracted registered payout address.
 - `DoesPayoutStakeMatchExpectedSkeleton` checks revised spec `PayoutVerify` step 9 equality against a caller-supplied, already recomputed deterministic selected stake.
 - `DoesPayoutCoinMatchExpectedSkeleton` checks revised spec `PayoutVerify` step 13 byte equality against a caller-supplied, already recomputed payout coin.
-- `CheckPayoutPublicFieldsSkeleton` composes caller-supplied payout public-field checks in revised spec `PayoutVerify` step 8, 9, 10, 11, and 13 order; it does not compute deterministic selection, `j`, or payout coins.
+- `CheckPayoutPublicFieldsSkeleton` composes caller-supplied payout public-field checks in revised spec `PayoutVerify` step 8, 9, 10, 11, and 13 order, including the caller-supplied `V_MAX < q` fact required by sections 18 and 20; it does not compute deterministic selection, `j`, or payout coins.
 - `IsHelsingStakeValueWithMarginInRangeSkeleton` checks the revised spec optional collateral-margin integer sum rule for caller-supplied `V_STAKE`, `margin`, and `V_MAX`.
 - `CHelsingState` models `SpentTags`, `ActiveTags`, and `StakeRecords`.
 - `IsActiveTagIndexConsistentSkeleton` checks the revised spec section 6 invariant that `ActiveTags` contains exactly the tags backing active `StakeRecords`, with at most one active stake per tag, over caller-supplied snapshots only.

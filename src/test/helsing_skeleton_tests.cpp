@@ -2409,7 +2409,7 @@ BOOST_AUTO_TEST_CASE(payout_public_field_skeleton_accepts_caller_supplied_expect
     helsing::PayoutCoinBlob expectedCoin;
     expectedCoin.bytes = tx.coin.bytes;
 
-    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, expectedCoin) == helsing::PayoutPublicValidationResult::OK);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, true, expectedCoin) == helsing::PayoutPublicValidationResult::OK);
 }
 
 BOOST_AUTO_TEST_CASE(payout_public_field_skeleton_reports_each_ordered_failure)
@@ -2435,18 +2435,19 @@ BOOST_AUTO_TEST_CASE(payout_public_field_skeleton_reports_each_ordered_failure)
 
     helsing::PayoutAddressBlob wrongAddress = registeredAddress;
     wrongAddress.bytes = {0x62};
-    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, wrongAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, expectedCoin) == helsing::PayoutPublicValidationResult::ADDRESS_MISMATCH);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, wrongAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, true, expectedCoin) == helsing::PayoutPublicValidationResult::ADDRESS_MISMATCH);
 
-    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, DeterministicHash(44), tx.V_PAYOUT, tx.V_PAYOUT + 1, expectedCoin) == helsing::PayoutPublicValidationResult::SELECTED_STAKE_MISMATCH);
-    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT + 1, tx.V_PAYOUT + 2, expectedCoin) == helsing::PayoutPublicValidationResult::INVALID_PAYOUT_AMOUNT);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, DeterministicHash(44), tx.V_PAYOUT, tx.V_PAYOUT + 1, true, expectedCoin) == helsing::PayoutPublicValidationResult::SELECTED_STAKE_MISMATCH);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT + 1, tx.V_PAYOUT + 2, true, expectedCoin) == helsing::PayoutPublicValidationResult::INVALID_PAYOUT_AMOUNT);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, false, expectedCoin) == helsing::PayoutPublicValidationResult::INVALID_PAYOUT_AMOUNT);
 
     helsing::PayoutBlockContextSkeleton wrongContext = context;
     ++wrongContext.payout_index;
-    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, wrongContext, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, expectedCoin) == helsing::PayoutPublicValidationResult::INVALID_PAYOUT_ID_INPUTS);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, wrongContext, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, true, expectedCoin) == helsing::PayoutPublicValidationResult::INVALID_PAYOUT_ID_INPUTS);
 
     helsing::PayoutCoinBlob wrongCoin = expectedCoin;
     wrongCoin.bytes = {0x64};
-    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, wrongCoin) == helsing::PayoutPublicValidationResult::PAYOUT_COIN_MISMATCH);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, true, wrongCoin) == helsing::PayoutPublicValidationResult::PAYOUT_COIN_MISMATCH);
 }
 
 BOOST_AUTO_TEST_CASE(payout_public_field_skeleton_preserves_section_eighteen_precedence)
@@ -2477,10 +2478,10 @@ BOOST_AUTO_TEST_CASE(payout_public_field_skeleton_preserves_section_eighteen_pre
     helsing::PayoutCoinBlob wrongCoin = expectedCoin;
     wrongCoin.bytes = {0x64};
 
-    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, wrongContext, wrongAddress, DeterministicHash(47), tx.V_PAYOUT + 1, tx.V_PAYOUT, wrongCoin) == helsing::PayoutPublicValidationResult::ADDRESS_MISMATCH);
-    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, wrongContext, registeredAddress, DeterministicHash(47), tx.V_PAYOUT + 1, tx.V_PAYOUT, wrongCoin) == helsing::PayoutPublicValidationResult::SELECTED_STAKE_MISMATCH);
-    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, wrongContext, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT + 1, tx.V_PAYOUT, wrongCoin) == helsing::PayoutPublicValidationResult::INVALID_PAYOUT_AMOUNT);
-    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, wrongContext, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, wrongCoin) == helsing::PayoutPublicValidationResult::INVALID_PAYOUT_ID_INPUTS);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, wrongContext, wrongAddress, DeterministicHash(47), tx.V_PAYOUT + 1, tx.V_PAYOUT, false, wrongCoin) == helsing::PayoutPublicValidationResult::ADDRESS_MISMATCH);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, wrongContext, registeredAddress, DeterministicHash(47), tx.V_PAYOUT + 1, tx.V_PAYOUT, false, wrongCoin) == helsing::PayoutPublicValidationResult::SELECTED_STAKE_MISMATCH);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, wrongContext, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT + 1, tx.V_PAYOUT, false, wrongCoin) == helsing::PayoutPublicValidationResult::INVALID_PAYOUT_AMOUNT);
+    BOOST_CHECK(helsing::CheckPayoutPublicFieldsSkeleton(tx, wrongContext, registeredAddress, tx.selected_stake_id, tx.V_PAYOUT, tx.V_PAYOUT + 1, true, wrongCoin) == helsing::PayoutPublicValidationResult::INVALID_PAYOUT_ID_INPUTS);
 }
 
 BOOST_AUTO_TEST_CASE(stake_margin_helper_checks_integer_sum_before_scalar_conversion)
@@ -4159,7 +4160,7 @@ BOOST_AUTO_TEST_CASE(payout_verification_skeleton_accepts_eligible_payout_with_e
     expectedCoin.bytes = payout.coin.bytes;
 
     BOOST_CHECK(state.AddActiveStake(record));
-    const helsing::PayoutVerificationSkeletonResult result = helsing::CheckPayoutVerificationSkeleton(payout, view, record.nHeight + 10, 10, context, registeredAddress, record.stake_id, payout.V_PAYOUT, payout.V_PAYOUT + 1, expectedCoin);
+    const helsing::PayoutVerificationSkeletonResult result = helsing::CheckPayoutVerificationSkeleton(payout, view, record.nHeight + 10, 10, context, registeredAddress, record.stake_id, payout.V_PAYOUT, payout.V_PAYOUT + 1, true, expectedCoin);
 
     BOOST_CHECK(result.stake_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.public_result == helsing::PayoutPublicValidationResult::OK);
@@ -4476,7 +4477,7 @@ BOOST_AUTO_TEST_CASE(payout_verification_skeleton_checks_eligibility_before_publ
 
     BOOST_CHECK(state.AddActiveStake(record));
     view.blockSpentTags.insert(record.T);
-    const helsing::PayoutVerificationSkeletonResult result = helsing::CheckPayoutVerificationSkeleton(payout, view, record.nHeight - 1, 10, wrongContext, wrongAddress, DeterministicHash(51), payout.V_PAYOUT + 1, payout.V_PAYOUT, wrongCoin);
+    const helsing::PayoutVerificationSkeletonResult result = helsing::CheckPayoutVerificationSkeleton(payout, view, record.nHeight - 1, 10, wrongContext, wrongAddress, DeterministicHash(51), payout.V_PAYOUT + 1, payout.V_PAYOUT, false, wrongCoin);
 
     BOOST_CHECK(result.stake_result == helsing::StakeValidationResult::TAG_SPENT_IN_BLOCK);
     BOOST_CHECK(result.public_result == helsing::PayoutPublicValidationResult::OK);
@@ -4508,10 +4509,42 @@ BOOST_AUTO_TEST_CASE(payout_verification_skeleton_reports_public_failure_after_e
     expectedCoin.bytes = payout.coin.bytes;
 
     BOOST_CHECK(state.AddActiveStake(record));
-    const helsing::PayoutVerificationSkeletonResult result = helsing::CheckPayoutVerificationSkeleton(payout, view, record.nHeight + 10, 10, context, wrongAddress, record.stake_id, payout.V_PAYOUT, payout.V_PAYOUT + 1, expectedCoin);
+    const helsing::PayoutVerificationSkeletonResult result = helsing::CheckPayoutVerificationSkeleton(payout, view, record.nHeight + 10, 10, context, wrongAddress, record.stake_id, payout.V_PAYOUT, payout.V_PAYOUT + 1, false, expectedCoin);
 
     BOOST_CHECK(result.stake_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.public_result == helsing::PayoutPublicValidationResult::ADDRESS_MISMATCH);
+}
+
+BOOST_AUTO_TEST_CASE(payout_verification_skeleton_rejects_missing_payout_scalar_order_bound)
+{
+    helsing::CHelsingState state;
+    helsing::ValidationStateView view;
+    view.helsingState = &state;
+    const helsing::StakeRecord record = ActiveRecord(121, DeterministicPoint(121));
+    helsing::PayoutTxSkeleton payout;
+    payout.selected_stake_id = record.stake_id;
+    payout.payout_index = 43;
+    payout.addr_pk.bytes = {0x61};
+    payout.V_PAYOUT = 65;
+    payout.coin.bytes = {0x63};
+
+    helsing::PayoutBlockContextSkeleton context;
+    context.chain_id = {0x66};
+    context.block_height = 607;
+    context.prev_block_hash = DeterministicHash(121);
+    context.payout_index = payout.payout_index;
+    context.selected_stake_id = payout.selected_stake_id;
+
+    helsing::PayoutAddressBlob registeredAddress;
+    registeredAddress.bytes = payout.addr_pk.bytes;
+    helsing::PayoutCoinBlob expectedCoin;
+    expectedCoin.bytes = payout.coin.bytes;
+
+    BOOST_CHECK(state.AddActiveStake(record));
+    const helsing::PayoutVerificationSkeletonResult result = helsing::CheckPayoutVerificationSkeleton(payout, view, record.nHeight + 10, 10, context, registeredAddress, record.stake_id, payout.V_PAYOUT, payout.V_PAYOUT + 1, false, expectedCoin);
+
+    BOOST_CHECK(result.stake_result == helsing::StakeValidationResult::OK);
+    BOOST_CHECK(result.public_result == helsing::PayoutPublicValidationResult::INVALID_PAYOUT_AMOUNT);
 }
 
 BOOST_AUTO_TEST_CASE(payout_verification_skeleton_does_not_mutate_state)
@@ -4540,7 +4573,7 @@ BOOST_AUTO_TEST_CASE(payout_verification_skeleton_does_not_mutate_state)
     expectedCoin.bytes = payout.coin.bytes;
 
     BOOST_CHECK(state.AddActiveStake(record));
-    const helsing::PayoutVerificationSkeletonResult result = helsing::CheckPayoutVerificationSkeleton(payout, view, record.nHeight + 10, 10, context, registeredAddress, record.stake_id, payout.V_PAYOUT, payout.V_PAYOUT + 1, expectedCoin);
+    const helsing::PayoutVerificationSkeletonResult result = helsing::CheckPayoutVerificationSkeleton(payout, view, record.nHeight + 10, 10, context, registeredAddress, record.stake_id, payout.V_PAYOUT, payout.V_PAYOUT + 1, true, expectedCoin);
 
     BOOST_CHECK(result.stake_result == helsing::StakeValidationResult::OK);
     BOOST_CHECK(result.public_result == helsing::PayoutPublicValidationResult::OK);

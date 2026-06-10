@@ -640,9 +640,10 @@ PayoutRegisteredAddressExtractionSkeletonResult CheckPayoutRegisteredAddressExtr
 // no accepting result and does not iterate or select active stakes.
 PayoutDeterministicSelectionSkeletonResult CheckPayoutDeterministicSelectionSkeleton(bool payoutAddressCheckAccepted, bool activeStakeSetSnapshotAvailable, bool deterministicSelectionRuleAvailable, bool payoutPositionBindingAvailable, bool selectedStakeComparisonAvailable);
 // Revised spec PayoutVerify public-field suffix, using only caller-supplied expected values.
-// This checks steps 8, 9, 10, 11 input availability, and 13 equality in order; it
-// does not parse contexts, select masternodes, compute j, run Payout, or verify proofs.
-PayoutPublicValidationResult CheckPayoutPublicFieldsSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context, const PayoutAddressBlob& registeredAddress, const uint256& expectedStakeId, CAmount expectedAmount, CAmount vMax, const PayoutCoinBlob& expectedCoin);
+// This checks steps 8, 9, 10 including the caller-supplied V_MAX < q fact,
+// step 11 input availability, and step 13 equality in order; it does not parse
+// contexts, select masternodes, compute j, run Payout, or verify proofs.
+PayoutPublicValidationResult CheckPayoutPublicFieldsSkeleton(const PayoutTxSkeleton& tx, const PayoutBlockContextSkeleton& context, const PayoutAddressBlob& registeredAddress, const uint256& expectedStakeId, CAmount expectedAmount, CAmount vMax, bool vMaxLessThanGroupOrder, const PayoutCoinBlob& expectedCoin);
 // Revised spec StakeUpdateTx field-completeness only. This does not parse contexts,
 // extract update_pk, define enc_context(m_new), or verify sig_update.
 bool IsCompleteStakeUpdateTxSkeleton(const StakeUpdateTx& tx);
@@ -834,9 +835,10 @@ PayoutVerificationSuffixSkeletonResult CheckPayoutVerificationSuffixSkeleton(con
 // runs the step-1-through-7 eligibility checks, then the step-8-through-13 blocker.
 PayoutVerificationBlockedSkeletonResult CheckPayoutVerificationBlockedSkeleton(const PayoutTxSkeleton& tx, const ValidationStateView& view, int currentHeight, int stakeMaturity, bool canonicalEncodingsValid, bool registeredPayoutAddressExtractionAvailable, bool deterministicSelectionAvailable, bool expectedPayoutAmountAvailable, bool payoutIdConstructionAvailable, bool payoutAlgorithmAvailable);
 // Structural skeleton for revised-spec PayoutVerify steps 3-13 using caller-supplied
-// expected public values for steps that are not implemented yet. This does not parse
-// contexts, select masternodes, compute j, run Payout, or verify payout coins.
-PayoutVerificationSkeletonResult CheckPayoutVerificationSkeleton(const PayoutTxSkeleton& tx, const ValidationStateView& view, int currentHeight, int stakeMaturity, const PayoutBlockContextSkeleton& context, const PayoutAddressBlob& registeredAddress, const uint256& expectedStakeId, CAmount expectedAmount, CAmount vMax, const PayoutCoinBlob& expectedCoin);
+// expected public values and V_MAX < q fact for steps that are not implemented
+// yet. This does not parse contexts, select masternodes, compute j, run Payout,
+// or verify payout coins.
+PayoutVerificationSkeletonResult CheckPayoutVerificationSkeleton(const PayoutTxSkeleton& tx, const ValidationStateView& view, int currentHeight, int stakeMaturity, const PayoutBlockContextSkeleton& context, const PayoutAddressBlob& registeredAddress, const uint256& expectedStakeId, CAmount expectedAmount, CAmount vMax, bool vMaxLessThanGroupOrder, const PayoutCoinBlob& expectedCoin);
 
 // Revised-spec section 16 requires distinct payout_index values when a block
 // contains more than one masternode payout.

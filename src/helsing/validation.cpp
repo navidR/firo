@@ -477,6 +477,7 @@ PayoutPublicValidationResult CheckPayoutPublicFieldsSkeleton(
     const uint256& expectedStakeId,
     CAmount expectedAmount,
     CAmount vMax,
+    bool vMaxLessThanGroupOrder,
     const PayoutCoinBlob& expectedCoin)
 {
     if (!DoesPayoutAddressMatchRegisteredSkeleton(tx, registeredAddress)) {
@@ -485,7 +486,7 @@ PayoutPublicValidationResult CheckPayoutPublicFieldsSkeleton(
     if (!DoesPayoutStakeMatchExpectedSkeleton(tx, expectedStakeId)) {
         return PayoutPublicValidationResult::SELECTED_STAKE_MISMATCH;
     }
-    if (!IsExpectedPayoutAmountInRangeSkeleton(tx.V_PAYOUT, expectedAmount, vMax)) {
+    if (!IsPayoutValueParameterInRangeSkeleton(tx.V_PAYOUT, expectedAmount, vMax, vMaxLessThanGroupOrder)) {
         return PayoutPublicValidationResult::INVALID_PAYOUT_AMOUNT;
     }
     if (!ArePayoutIdInputsCompleteSkeleton(tx, context)) {
@@ -1632,6 +1633,7 @@ PayoutVerificationSkeletonResult CheckPayoutVerificationSkeleton(
     const uint256& expectedStakeId,
     CAmount expectedAmount,
     CAmount vMax,
+    bool vMaxLessThanGroupOrder,
     const PayoutCoinBlob& expectedCoin)
 {
     PayoutVerificationSkeletonResult result;
@@ -1640,7 +1642,7 @@ PayoutVerificationSkeletonResult CheckPayoutVerificationSkeleton(
         return result;
     }
 
-    result.public_result = CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, expectedStakeId, expectedAmount, vMax, expectedCoin);
+    result.public_result = CheckPayoutPublicFieldsSkeleton(tx, context, registeredAddress, expectedStakeId, expectedAmount, vMax, vMaxLessThanGroupOrder, expectedCoin);
     return result;
 }
 
