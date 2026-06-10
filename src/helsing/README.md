@@ -21,6 +21,7 @@ Current scope:
 - `ExtractSparkOutputRecords` builds a consensus-inert `(txid, vout) -> SparkOutputRecord` view from valid Spark mint and spend-created output scripts.
 - `IsHelsingEligibleOutputCandidateSkeleton` checks the revised spec section 13 rule that outputs with any non-tag-revealing spend path must not be marked `helsing_eligible`; the caller supplies spend-path analysis.
 - `MarkHelsingEligibleOutputCandidatesSkeleton` marks caller-selected in-memory `SparkOutputs` entries as `helsing_eligible` only after the section 13 candidate predicate passes.
+- `CheckPayoutOutputRecordConstructionSkeleton` is an explicit blocker for constructing revised spec step 9 `SparkOutputs` records from accepted payout transactions. It requires a real `(txid, vout)` output identifier and blocks before parsing payout coin blobs into Spark fields.
 - `ApplyAcceptedPayoutOutputRecordsSkeleton` applies already accepted payout output records to `SparkOutputs` by `(txid, vout)` only; it does not recompute payout coins or decide Helsing eligibility.
 - `ApplyAcceptedBlockWithPayoutOutputsSkeleton` applies revised spec section 12 steps 6-9 to in-memory Helsing state and `SparkOutputs` atomically for already accepted block data.
 - `IsValidCoverSetCardinality` checks the revised spec formula `len(InCoinIDs) = N = n^m` for caller-supplied public parameters.
@@ -93,7 +94,7 @@ Not implemented yet:
 - consensus wiring for applying accepted new stakes during deterministic block application
 - any full block-acceptance path before real `StakeVerify`, `StakeUpdateVerify`, and `PayoutVerify` exist
 - full payout verification, including registered payout address extraction, stake selection, payout amount, payout identifier, payout address parsing, deterministic Spark payout coin construction, and payout coin comparison
-- payout-output extraction from accepted payout transactions after `PayoutVerify`
+- real payout-output extraction from accepted payout transactions after `PayoutVerify`
 - deterministic payout ordinal selection and payout identifier `j` construction
 - canonical `chain_id`, `enc_int`, `enc_hash`, and `enc_bytes` encodings for payout-id construction
 - real payout address and payout coin encodings for `PayoutTxSkeleton`

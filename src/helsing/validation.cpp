@@ -542,6 +542,21 @@ bool MarkHelsingEligibleOutputCandidatesSkeleton(const std::vector<std::pair<Out
     return true;
 }
 
+PayoutOutputRecordConstructionSkeletonResult CheckPayoutOutputRecordConstructionSkeleton(bool payoutVerifyAccepted, const OutputId& output_id, bool payoutCoinParsingAvailable)
+{
+    if (!payoutVerifyAccepted) {
+        return PayoutOutputRecordConstructionSkeletonResult::PAYOUT_VERIFY_NOT_ACCEPTED;
+    }
+    if (!IsValidOutputId(output_id)) {
+        return PayoutOutputRecordConstructionSkeletonResult::OUTPUT_ID_UNAVAILABLE;
+    }
+    if (!payoutCoinParsingAvailable) {
+        return PayoutOutputRecordConstructionSkeletonResult::PAYOUT_COIN_PARSING_UNIMPLEMENTED;
+    }
+
+    return PayoutOutputRecordConstructionSkeletonResult::PAYOUT_OUTPUT_RECORD_CONSTRUCTION_UNIMPLEMENTED;
+}
+
 StakeValidationResult BuildBlockSpentTagsSkeleton(const std::vector<GroupElement>& spentTags, const CHelsingState* helsingState, std::unordered_set<GroupElement, spark::CLTagHash>& blockSpentTags)
 {
     std::unordered_set<GroupElement, spark::CLTagHash> collected;

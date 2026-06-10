@@ -64,6 +64,13 @@ enum class PayoutAlgorithmSkeletonResult {
     PAYOUT_COIN_COMPARISON_UNIMPLEMENTED,
 };
 
+enum class PayoutOutputRecordConstructionSkeletonResult {
+    PAYOUT_VERIFY_NOT_ACCEPTED,
+    OUTPUT_ID_UNAVAILABLE,
+    PAYOUT_COIN_PARSING_UNIMPLEMENTED,
+    PAYOUT_OUTPUT_RECORD_CONSTRUCTION_UNIMPLEMENTED,
+};
+
 enum class PayoutVerificationPrefixSkeletonResult {
     OK,
     TX_INCOMPLETE,
@@ -285,6 +292,10 @@ bool IsHelsingEligibleOutputCandidateSkeleton(const SparkOutputRecord& output, b
 // candidate predicate passes. This is in-memory only and does not decide spend-path
 // policy, persist state, or provide undo data.
 bool MarkHelsingEligibleOutputCandidatesSkeleton(const std::vector<std::pair<OutputId, bool>>& candidates, std::map<OutputId, SparkOutputRecord>& outputs);
+// Revised spec ValidateBlock step 9 payout-output record construction is deliberately
+// blocked here. Real code must use the payout transaction's (txid, vout) output_id and
+// parse the verified payout Coin into Spark output fields before inserting SparkOutputs.
+PayoutOutputRecordConstructionSkeletonResult CheckPayoutOutputRecordConstructionSkeleton(bool payoutVerifyAccepted, const OutputId& output_id, bool payoutCoinParsingAvailable);
 
 // Models revised spec ValidateBlock step 2 after ordinary Spark spend validation.
 // The caller supplies tags revealed by valid Spark spends; this only checks

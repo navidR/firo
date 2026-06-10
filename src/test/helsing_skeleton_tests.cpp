@@ -1926,6 +1926,33 @@ BOOST_AUTO_TEST_CASE(extractor_ignores_non_spark_transactions_and_rejects_negati
     BOOST_CHECK(outputs.count(existing) == 1);
 }
 
+BOOST_AUTO_TEST_CASE(payout_output_record_construction_skeleton_requires_payout_verify_acceptance)
+{
+    const helsing::OutputId outputId = Output(11, 1);
+
+    BOOST_CHECK(helsing::CheckPayoutOutputRecordConstructionSkeleton(false, outputId, true) == helsing::PayoutOutputRecordConstructionSkeletonResult::PAYOUT_VERIFY_NOT_ACCEPTED);
+    BOOST_CHECK(helsing::CheckPayoutOutputRecordConstructionSkeleton(false, helsing::OutputId(), false) == helsing::PayoutOutputRecordConstructionSkeletonResult::PAYOUT_VERIFY_NOT_ACCEPTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_output_record_construction_skeleton_requires_real_output_id_after_acceptance)
+{
+    BOOST_CHECK(helsing::CheckPayoutOutputRecordConstructionSkeleton(true, helsing::OutputId(), true) == helsing::PayoutOutputRecordConstructionSkeletonResult::OUTPUT_ID_UNAVAILABLE);
+}
+
+BOOST_AUTO_TEST_CASE(payout_output_record_construction_skeleton_blocks_coin_parsing_before_record_construction)
+{
+    const helsing::OutputId outputId = Output(11, 2);
+
+    BOOST_CHECK(helsing::CheckPayoutOutputRecordConstructionSkeleton(true, outputId, false) == helsing::PayoutOutputRecordConstructionSkeletonResult::PAYOUT_COIN_PARSING_UNIMPLEMENTED);
+}
+
+BOOST_AUTO_TEST_CASE(payout_output_record_construction_skeleton_does_not_construct_record)
+{
+    const helsing::OutputId outputId = Output(11, 3);
+
+    BOOST_CHECK(helsing::CheckPayoutOutputRecordConstructionSkeleton(true, outputId, true) == helsing::PayoutOutputRecordConstructionSkeletonResult::PAYOUT_OUTPUT_RECORD_CONSTRUCTION_UNIMPLEMENTED);
+}
+
 BOOST_AUTO_TEST_CASE(apply_accepted_payout_output_records_skeleton_inserts_records_atomically)
 {
     std::map<helsing::OutputId, helsing::SparkOutputRecord> outputs;
