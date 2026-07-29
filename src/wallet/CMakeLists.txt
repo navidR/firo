@@ -40,5 +40,7 @@ target_link_libraries(firo_wallet
     warn_interface
 )
 
-# Firo only supports BDB for wallet storage.
 target_link_libraries(firo_wallet PUBLIC BerkeleyDB::BerkeleyDB)
+if(ENABLE_SQLITE_WALLET)
+  target_link_libraries(firo_wallet PRIVATE SQLite3::SQLite3)
+endif()
