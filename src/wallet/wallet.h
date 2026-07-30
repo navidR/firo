@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <atomic>
 #include <map>
+#include <memory>
 #include <set>
 #include <stdexcept>
 #include <stdint.h>
@@ -653,6 +654,8 @@ private:
 
     static std::atomic<bool> fFlushThreadRunning;
 
+    std::unique_ptr<BerkeleyDatabase> m_database;
+
     /**
      * Select a set of coins such that nValueRet >= nTargetValue and at least
      * all coins from coinControl are selected; Never select unconfirmed coins
@@ -660,7 +663,7 @@ private:
      */
     bool SelectCoins(const std::vector<COutput>& vAvailableCoins, const CAmount& nTargetValue, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl *coinControl = NULL, bool fForUseInInstantSend = true) const;
 
-    CWalletDB *pwalletdbEncryption;
+    std::unique_ptr<CWalletDB> pwalletdbEncryption;
 
     //! the current wallet version: clients below this version are not able to load the wallet
     int nWalletVersion;
@@ -731,6 +734,18 @@ public:
 
     const std::string strWalletFile;
 
+    BerkeleyDatabase& GetDatabase()
+    {
+        assert(m_database);
+        return *m_database;
+    }
+
+    BerkeleyDatabase& GetDatabase() const
+    {
+        assert(m_database);
+        return *m_database;
+    }
+
     void LoadKeyPool(int nIndex, const CKeyPool &keypool)
     {
         setKeyPool.insert(nIndex);
@@ -759,20 +774,25 @@ public:
     std::atomic<bool> fUnlockRequested;
 
     CWallet()
+        : m_database(std::make_unique<BerkeleyDatabase>()),
+          strWalletFile("")
     {
         SetNull();
     }
 
-    CWallet(const std::string& strWalletFileIn) : strWalletFile(strWalletFileIn)
+    explicit CWallet(std::unique_ptr<BerkeleyDatabase> database)
+        : m_database(std::move(database)),
+          strWalletFile(m_database ? m_database->Filename() : std::string())
     {
+        if (!m_database) {
+            throw std::invalid_argument("CWallet requires a database identity");
+        }
         SetNull();
         fFileBacked = true;
     }
 
     ~CWallet()
     {
-        delete pwalletdbEncryption;
-        pwalletdbEncryption = NULL;
     }
 
     void SetNull()
@@ -781,7 +801,7 @@ public:
         nWalletMaxVersion = FEATURE_BASE;
         fFileBacked = false;
         nMasterKeyMaxID = 0;
-        pwalletdbEncryption = NULL;
+        pwalletdbEncryption.reset();
         nOrderPosNext = 0;
         nNextResend = 0;
         nLastResend = 0;

@@ -238,8 +238,7 @@ CPubKey SparkTestingSetup::GenerateAddress() {
 std::vector<CSparkMintMeta> SparkTestingSetup::GenerateMints(
     std::vector<CAmount> const &amounts,
     std::vector<CMutableTransaction> &txs) {
-
-    CWalletDB walletdb(pwalletMain->strWalletFile);
+    CWalletDB walletdb(pwalletMain->GetDatabase());
     std::vector<CSparkMintMeta> mints;
     // Parameters
     FIRO_UNUSED const spark::Params* params;
