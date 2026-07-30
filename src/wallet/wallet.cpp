@@ -4,41 +4,41 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "wallet.h"
-#include "boost/filesystem/operations.hpp"
-#include "libspark/keys.h"
-#include "serialize.h"
-#include "support/allocators/secure.h"
-#include "sync.h"
-#include "walletexcept.h"
 #include "amount.h"
 #include "base58.h"
-#include "checkpoints.h"
+#include "boost/filesystem/operations.hpp"
 #include "chain.h"
-#include "wallet/coincontrol.h"
+#include "checkpoints.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
+#include "init.h"
 #include "key.h"
 #include "keystore.h"
-#include "validation.h"
-#include "llmq/quorums_instantsend.h"
+#include "libspark/keys.h"
 #include "llmq/quorums_chainlocks.h"
+#include "llmq/quorums_instantsend.h"
+#include "masternode-sync.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
+#include "random.h"
+#include "rpc/protocol.h"
 #include "script/script.h"
 #include "script/sign.h"
+#include "serialize.h"
+#include "support/allocators/secure.h"
+#include "sync.h"
 #include "timedata.h"
 #include "txmempool.h"
-#include "util.h"
 #include "ui_interface.h"
+#include "util.h"
 #include "utilmoneystr.h"
 #include "validation.h"
-#include "masternode-sync.h"
-#include "random.h"
-#include "init.h"
-#include "rpc/protocol.h"
 #include "wallet/bip39.h"
+#include "wallet/coincontrol.h"
+#include "wallet/db.h"
+#include "walletexcept.h"
 
 #include "crypto/hmac_sha512.h"
 #include "crypto/aes.h"
@@ -67,6 +67,13 @@ bool fWalletRbf = DEFAULT_WALLET_RBF;
 
 const char * DEFAULT_WALLET_DAT = "wallet.dat";
 boost::signals2::signal<void (CWallet *wallet)> UnlockWallet;
+
+CWallet::CWallet()
+    : m_database(MakeDummyWalletDatabase()),
+      strWalletFile("")
+{
+    SetNull();
+}
 
 /**
  * Fees smaller than this (in satoshi) are considered zero fee (for transaction creation)
@@ -1318,7 +1325,7 @@ bool CWallet::MarkReplaced(const uint256& originalHash, const uint256& newHash)
 
     wtx.mapValue["replaced_by_txid"] = newHash.ToString();
 
-    CWalletDB walletdb(GetDatabase(), "r+");
+    CWalletDB walletdb(GetDatabase());
 
     bool success = true;
     if (!walletdb.WriteTx(wtx)) {
@@ -1335,7 +1342,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFlushOnClose)
 {
     LOCK(cs_wallet);
 
-    CWalletDB walletdb(GetDatabase(), "r+", fFlushOnClose);
+    CWalletDB walletdb(GetDatabase(), {DatabaseBatchMode::READ_WRITE, fFlushOnClose});
 
     uint256 hash = wtxIn.GetHash();
 
@@ -1565,7 +1572,7 @@ bool CWallet::AbandonTransaction(const uint256& hashTx)
 {
     LOCK2(cs_main, cs_wallet);
 
-    CWalletDB walletdb(GetDatabase(), "r+");
+    CWalletDB walletdb(GetDatabase());
 
     std::set<uint256> todo;
     std::set<uint256> done;
@@ -1656,7 +1663,7 @@ void CWallet::MarkConflicted(const uint256& hashBlock, const uint256& hashTx)
         return;
 
     // Do not flush the wallet here for performance reasons
-    CWalletDB walletdb(GetDatabase(), "r+", false);
+    CWalletDB walletdb(GetDatabase(), {DatabaseBatchMode::READ_WRITE, false});
 
     std::set<uint256> todo;
     std::set<uint256> done;
@@ -4189,7 +4196,7 @@ DBErrors CWallet::LoadWallet(bool& fFirstRunRet)
     if (!fFileBacked)
         return DB_LOAD_OK;
     fFirstRunRet = false;
-    DBErrors nLoadWalletRet = CWalletDB(GetDatabase(), "cr+").LoadWallet(this);
+    DBErrors nLoadWalletRet = CWalletDB(GetDatabase(), {DatabaseBatchMode::READ_WRITE_CREATE}).LoadWallet(this);
     if (nLoadWalletRet == DB_NEED_REWRITE)
     {
         if (GetDatabase().Rewrite("\x04pool")) {
@@ -4242,7 +4249,7 @@ DBErrors CWallet::ZapSelectTx(std::vector<uint256>& vHashIn, std::vector<uint256
 {
     if (!fFileBacked)
         return DB_LOAD_OK;
-    DBErrors nZapSelectTxRet = CWalletDB(GetDatabase(), "cr+").ZapSelectTx(this, vHashIn, vHashOut);
+    DBErrors nZapSelectTxRet = CWalletDB(GetDatabase(), {DatabaseBatchMode::READ_WRITE_CREATE}).ZapSelectTx(this, vHashIn, vHashOut);
     if (nZapSelectTxRet == DB_NEED_REWRITE)
     {
         if (GetDatabase().Rewrite("\x04pool")) {
@@ -4268,7 +4275,7 @@ DBErrors CWallet::ZapWalletTx(std::vector<CWalletTx>& vWtx)
 {
     if (!fFileBacked)
         return DB_LOAD_OK;
-    DBErrors nZapWalletTxRet = CWalletDB(GetDatabase(), "cr+").ZapWalletTx(this, vWtx);
+    DBErrors nZapWalletTxRet = CWalletDB(GetDatabase(), {DatabaseBatchMode::READ_WRITE_CREATE}).ZapWalletTx(this, vWtx);
     if (nZapWalletTxRet == DB_NEED_REWRITE)
     {
         if (GetDatabase().Rewrite("\x04pool")) {
@@ -4290,7 +4297,7 @@ DBErrors CWallet::ZapWalletTx(std::vector<CWalletTx>& vWtx)
 DBErrors CWallet::ZapSparkMints() {
     if (!fFileBacked)
         return DB_LOAD_OK;
-    DBErrors nZapSparkMintRet = CWalletDB(GetDatabase(), "cr+").ZapSparkMints(this);
+    DBErrors nZapSparkMintRet = CWalletDB(GetDatabase(), {DatabaseBatchMode::READ_WRITE_CREATE}).ZapSparkMints(this);
     if (nZapSparkMintRet != DB_LOAD_OK){
         LogPrintf("Failed to remove spark mints from CWalletDB");
         return nZapSparkMintRet;
@@ -5029,7 +5036,7 @@ CWallet* CWallet::CreateWalletFromFile(const std::string walletFile)
     if (GetBoolArg("-zapwalletmints", false)) {
         uiInterface.InitMessage(_("Zapping all Sigma mints from wallet..."));
 
-        auto tempWallet = std::make_unique<CWallet>(std::make_unique<BerkeleyDatabase>(bitdb, walletFile));
+        auto tempWallet = std::make_unique<CWallet>(MakeBerkeleyDatabase(bitdb, walletFile));
         DBErrors nZapSparkMintRet = tempWallet->ZapSparkMints();
         if (nZapSparkMintRet != DB_LOAD_OK) {
             InitError(strprintf(_("Error loading %s: Wallet corrupted"), walletFile));
@@ -5043,7 +5050,7 @@ CWallet* CWallet::CreateWalletFromFile(const std::string walletFile)
     if (GetBoolArg("-zapwallettxes", false)) {
         uiInterface.InitMessage(_("Zapping all transactions from wallet..."));
 
-        auto tempWallet = std::make_unique<CWallet>(std::make_unique<BerkeleyDatabase>(bitdb, walletFile));
+        auto tempWallet = std::make_unique<CWallet>(MakeBerkeleyDatabase(bitdb, walletFile));
         DBErrors nZapWalletRet = tempWallet->ZapWalletTx(vWtx);
         if (nZapWalletRet != DB_LOAD_OK) {
             InitError(strprintf(_("Error loading %s: Wallet corrupted"), walletFile));
@@ -5056,7 +5063,7 @@ CWallet* CWallet::CreateWalletFromFile(const std::string walletFile)
     int64_t nStart = GetTimeMillis();
     bool fFirstRun = true;
     bool fRecoverMnemonic = false;
-    auto walletInstance = std::make_unique<CWallet>(std::make_unique<BerkeleyDatabase>(bitdb, walletFile));
+    auto walletInstance = std::make_unique<CWallet>(MakeBerkeleyDatabase(bitdb, walletFile));
     boost::signals2::scoped_connection progressConnection(
         walletInstance->ShowProgress.connect([](const std::string& title, int progress) {
             uiInterface.ShowProgress(title, progress);
@@ -5494,7 +5501,7 @@ void CWallet::SetNotificationTxId(bip47::CPaymentCode const & theirPcode, uint25
 }
 
 namespace {
-CBitcoinAddress HandleTheirNextAddress(bip47::CWallet& wallet, BerkeleyDatabase& database, bip47::CPaymentCode const& theirPcode, bool storeNextAddress)
+CBitcoinAddress HandleTheirNextAddress(bip47::CWallet& wallet, WalletDatabase& database, bip47::CPaymentCode const& theirPcode, bool storeNextAddress)
 {
     boost::optional<bip47::CAccountSender*> existingAcc;
     wallet.enumerateSenders(
