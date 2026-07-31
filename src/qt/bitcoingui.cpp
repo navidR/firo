@@ -612,6 +612,9 @@ bool BitcoinGUI::addWallet(const QString& name, WalletModel *walletModel)
         return false;
     setWalletActionsEnabled(true);
     const bool walletAdded = walletFrame->addWallet(name, walletModel);
+    if (walletAdded) {
+        rpcConsole->setWalletDatabaseInfo(walletModel->getWallet());
+    }
     if (walletAdded && clientModel && !sparkAddressbookUpdated) {
         sparkAddressbookUpdated = walletFrame->updateAddressbook();
     }
@@ -634,6 +637,7 @@ void BitcoinGUI::removeAllWallets()
     if(!walletFrame)
         return;
     setWalletActionsEnabled(false);
+    rpcConsole->setWalletDatabaseInfo(nullptr);
     walletFrame->removeAllWallets();
 }
 #endif // ENABLE_WALLET

@@ -28,6 +28,8 @@
 #include <univalue.h>
 
 #ifdef ENABLE_WALLET
+#include "wallet/wallet.h"
+
 #include <db_cxx.h>
 #endif
 
@@ -450,13 +452,9 @@ RPCConsole::RPCConsole(const PlatformStyle *_platformStyle, QWidget *parent) :
     connect(ui->fontSmallerButton, &QPushButton::clicked, this, &RPCConsole::fontSmaller);
     connect(ui->btnClearTrafficGraph, &QPushButton::clicked, ui->trafficGraph, &TrafficGraphWidget::clear);
 
-    // set library version labels
-#ifdef ENABLE_WALLET
-    ui->berkeleyDBVersion->setText(DbEnv::version(0, 0, 0));
-#else
     ui->label_berkeleyDBVersion->hide();
     ui->berkeleyDBVersion->hide();
-#endif
+
     // Register RPC timer interface
     rpcTimerInterface = new QtRPCTimerInterface();
     // avoid accidentally overwriting an existing, non QTThread
@@ -471,6 +469,27 @@ RPCConsole::RPCConsole(const PlatformStyle *_platformStyle, QWidget *parent) :
     consoleFontSize = settings.value(fontSizeSettingsKey, QFontInfo(QFont()).pointSize()).toInt();
     clear();
 }
+
+#ifdef ENABLE_WALLET
+void RPCConsole::setWalletDatabaseInfo(const CWallet* wallet)
+{
+    if (!wallet) {
+        ui->label_berkeleyDBVersion->hide();
+        ui->berkeleyDBVersion->hide();
+        return;
+    }
+
+    if (wallet->GetDatabase().Format() == DatabaseFormat::BERKELEY) {
+        ui->berkeleyDBVersion->setText(
+            tr("BerkeleyDB %1").arg(DbEnv::version(0, 0, 0)));
+    } else {
+        ui->berkeleyDBVersion->setText(
+            tr("SQLite"));
+    }
+    ui->label_berkeleyDBVersion->show();
+    ui->berkeleyDBVersion->show();
+}
+#endif
 
 RPCConsole::~RPCConsole()
 {
