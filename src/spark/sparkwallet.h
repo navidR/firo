@@ -162,6 +162,10 @@ public:
     mutable CCriticalSection cs_spark_wallet;
 
 private:
+    spark::SpendKey generateSpendKey(
+        const spark::Params* params,
+        CWallet& wallet);
+
     CWallet& m_wallet;
     WalletDatabase& m_database;
     // this is latest used diversifier

@@ -36,38 +36,18 @@
 
 #include <boost/foreach.hpp>
 
-WalletModel::WalletModel(const PlatformStyle* platformStyle, CWallet* _wallet, OptionsModel* _optionsModel, QObject* parent, Initialization initialization)
-    : QObject(parent),
-      wallet(_wallet),
-      fHaveWatchOnly(false),
-      fForceCheckBalanceChanged(false),
-      optionsModel(_optionsModel),
-      _client_model(0),
-      addressTableModel(0),
-      pcodeAddressTableModel(0),
-      sparkModel(0),
-      transactionTableModel(0),
-      recentRequestsTableModel(0),
-      cachedBalance(0),
-      cachedUnconfirmedBalance(0),
-      cachedImmatureBalance(0),
-      cachedWatchOnlyBalance(0),
-      cachedWatchUnconfBalance(0),
-      cachedWatchImmatureBalance(0),
-      cachedAnonymizableBalance(0),
-      cachedPrivateBalance(0),
-      cachedUnconfirmedPrivateBalance(0),
-      cachedEncryptionStatus(Unencrypted),
-      cachedNumBlocks(0),
-      pollTimer(0),
-      cachedNumISLocks(0),
-      subscribedToCoreSignals(false)
+WalletModel::WalletModel(const PlatformStyle *platformStyle, CWallet *_wallet, OptionsModel *_optionsModel, QObject *parent) :
+    QObject(parent), wallet(_wallet), optionsModel(_optionsModel), _client_model(0),
+    addressTableModel(0), pcodeAddressTableModel(0), sparkModel(0),
+    transactionTableModel(0),
+    recentRequestsTableModel(0),
+    cachedBalance(0), cachedUnconfirmedBalance(0), cachedImmatureBalance(0),
+    cachedEncryptionStatus(Unencrypted),
+    cachedNumBlocks(0),
+    cachedNumISLocks(0)
 {
-    if (initialization == Initialization::UNLOCK_ONLY) {
-        return;
-    }
-
     fHaveWatchOnly = wallet->HaveWatchOnly();
+    fForceCheckBalanceChanged = false;
 
     addressTableModel = new AddressTableModel(wallet, this);
     pcodeAddressTableModel = new PcodeAddressTableModel(wallet, this);
@@ -81,14 +61,11 @@ WalletModel::WalletModel(const PlatformStyle* platformStyle, CWallet* _wallet, O
     pollTimer->start(MODEL_UPDATE_DELAY);
 
     subscribeToCoreSignals();
-    subscribedToCoreSignals = true;
 }
 
 WalletModel::~WalletModel()
 {
-    if (subscribedToCoreSignals) {
-        unsubscribeFromCoreSignals();
-    }
+    unsubscribeFromCoreSignals();
 }
 
 CAmount WalletModel::getBalance(const CCoinControl *coinControl, bool fExcludeLocked) const
@@ -552,13 +529,19 @@ void WalletModel::lockWalletDelayed(int seconds)
     QTimer::singleShot(seconds * 1000, this, &WalletModel::lockWallet);
 }
 
-bool WalletModel::changePassphrase(const SecureString &oldPass, const SecureString &newPass)
+bool WalletModel::changePassphrase(
+    const SecureString& oldPass,
+    const SecureString& newPass,
+    bool* indeterminate)
 {
     bool retval;
     {
         LOCK(wallet->cs_wallet);
         wallet->Lock(); // Make sure wallet is locked before attempting pass change
-        retval = wallet->ChangeWalletPassphrase(oldPass, newPass);
+        retval = wallet->ChangeWalletPassphrase(
+            oldPass,
+            newPass,
+            indeterminate);
     }
     return retval;
 }
@@ -574,6 +557,12 @@ bool WalletModel::backupWallet(
     const QString& filename,
     QString& error)
 {
+    if (wallet->GetDatabase().Format() == DatabaseFormat::BERKELEY) {
+        error.clear();
+        return wallet->BackupWallet(
+            filename.toLocal8Bit().data());
+    }
+
     std::string backupError;
     const bool success = wallet->BackupWallet(
         filename.toLocal8Bit().data(),
