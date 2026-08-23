@@ -17,26 +17,14 @@
 namespace llmq
 {
 
-CDKGPendingMessages::CDKGPendingMessages(size_t _maxMessagesPerNode) :
-    maxMessagesPerNode(_maxMessagesPerNode)
+CDKGPendingMessages::CDKGPendingMessages(size_t _maxMessagesPerProTx) : maxMessagesPerProTx(_maxMessagesPerProTx)
 {
 }
 
-void CDKGPendingMessages::PushPendingMessage(NodeId from, CDataStream& vRecv)
+void CDKGPendingMessages::PushPendingMessage(NodeId from, const uint256& senderProTxHash, CDataStream& vRecv)
 {
     // this will also consume the data, even if we bail out early
     auto pm = std::make_shared<CDataStream>(std::move(vRecv));
-
-    {
-        LOCK(cs);
-
-        if (messagesPerNode[from] >= maxMessagesPerNode) {
-            // TODO ban?
-            LogPrintf("CDKGPendingMessages::%s -- too many messages, peer=%d\n", __func__, from);
-            return;
-        }
-        messagesPerNode[from]++;
-    }
 
     CHashWriter hw(SER_GETHASH, 0);
     hw.write(pm->data(), pm->size());
@@ -44,13 +32,29 @@ void CDKGPendingMessages::PushPendingMessage(NodeId from, CDataStream& vRecv)
 
     LOCK2(cs_main, cs);
 
-    if (!seenMessages.emplace(hash).second) {
-        LogPrint("llmq-dkg", "CDKGPendingMessages::%s -- already seen %s, peer=%d", __func__, from);
+    // Check duplicates before charging the cumulative identity quota.
+    if (seenMessages.count(hash)) {
+        LogPrint("llmq-dkg", "CDKGPendingMessages::%s -- already seen %s, peer=%d\n", __func__, hash.ToString(), from);
         return;
     }
 
+    if (senderProTxHash.IsNull()) {
+        LogPrintf("CDKGPendingMessages::%s -- missing sender identity, peer=%d\n", __func__, from);
+        return;
+    }
+
+    auto countRet = messagesPerProTx.emplace(senderProTxHash, 0);
+    if (countRet.first->second >= maxMessagesPerProTx) {
+        // TODO ban?
+        LogPrintf("CDKGPendingMessages::%s -- too many messages from %s, peer=%d\n",
+            __func__, senderProTxHash.ToString(), from);
+        return;
+    }
+    ++countRet.first->second;
+
     g_connman->RemoveAskFor(hash);
 
+    seenMessages.emplace(hash);
     pendingMessages.emplace_back(std::make_pair(from, std::move(pm)));
 }
 
@@ -77,7 +81,7 @@ void CDKGPendingMessages::Clear()
 {
     LOCK(cs);
     pendingMessages.clear();
-    messagesPerNode.clear();
+    messagesPerProTx.clear();
     seenMessages.clear();
 }
 
@@ -125,17 +129,33 @@ void CDKGSessionHandler::UpdatedBlockTip(const CBlockIndex* pindexNew)
     }
 }
 
-void CDKGSessionHandler::ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, CConnman& connman)
+void CDKGSessionHandler::ProcessMessage(CNode* pfrom, const uint256& senderProTxHash, const uint256& messageQuorumHash, const std::string& strCommand, CDataStream& vRecv, CConnman& connman)
 {
+    const auto phaseAndQuorumHash = GetPhaseAndQuorumHash();
+    bool validPhase = false;
+    if (strCommand == NetMsgType::QCONTRIB) {
+        validPhase = phaseAndQuorumHash.first >= QuorumPhase_Initialized && phaseAndQuorumHash.first <= QuorumPhase_Contribute;
+    } else if (strCommand == NetMsgType::QCOMPLAINT) {
+        validPhase = phaseAndQuorumHash.first >= QuorumPhase_Contribute && phaseAndQuorumHash.first <= QuorumPhase_Complain;
+    } else if (strCommand == NetMsgType::QJUSTIFICATION) {
+        validPhase = phaseAndQuorumHash.first >= QuorumPhase_Complain && phaseAndQuorumHash.first <= QuorumPhase_Justify;
+    } else if (strCommand == NetMsgType::QPCOMMITMENT) {
+        validPhase = phaseAndQuorumHash.first >= QuorumPhase_Justify && phaseAndQuorumHash.first <= QuorumPhase_Commit;
+    }
+    if (!validPhase || messageQuorumHash != phaseAndQuorumHash.second) {
+        LogPrint("llmq-dkg", "CDKGSessionHandler::%s -- dropping out-of-round message, peer=%d\n", __func__, pfrom->id);
+        return;
+    }
+
     // We don't handle messages in the calling thread as deserialization/processing of these would block everything
     if (strCommand == NetMsgType::QCONTRIB) {
-        pendingContributions.PushPendingMessage(pfrom->id, vRecv);
+        pendingContributions.PushPendingMessage(pfrom->id, senderProTxHash, vRecv);
     } else if (strCommand == NetMsgType::QCOMPLAINT) {
-        pendingComplaints.PushPendingMessage(pfrom->id, vRecv);
+        pendingComplaints.PushPendingMessage(pfrom->id, senderProTxHash, vRecv);
     } else if (strCommand == NetMsgType::QJUSTIFICATION) {
-        pendingJustifications.PushPendingMessage(pfrom->id, vRecv);
+        pendingJustifications.PushPendingMessage(pfrom->id, senderProTxHash, vRecv);
     } else if (strCommand == NetMsgType::QPCOMMITMENT) {
-        pendingPrematureCommitments.PushPendingMessage(pfrom->id, vRecv);
+        pendingPrematureCommitments.PushPendingMessage(pfrom->id, senderProTxHash, vRecv);
     }
 }
 

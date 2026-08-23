@@ -40,25 +40,26 @@ public:
 
 private:
     mutable CCriticalSection cs;
-    size_t maxMessagesPerNode;
+    size_t maxMessagesPerProTx;
     std::list<BinaryMessage> pendingMessages;
-    std::map<NodeId, size_t> messagesPerNode;
+    // Cumulative for the round and keyed by the MNAUTH identity, so reconnecting does not reset the quota.
+    std::map<uint256, size_t> messagesPerProTx;
     std::set<uint256> seenMessages;
 
 public:
-    CDKGPendingMessages(size_t _maxMessagesPerNode);
+    CDKGPendingMessages(size_t _maxMessagesPerProTx);
 
-    void PushPendingMessage(NodeId from, CDataStream& vRecv);
+    void PushPendingMessage(NodeId from, const uint256& senderProTxHash, CDataStream& vRecv);
     std::list<BinaryMessage> PopPendingMessages(size_t maxCount);
     bool HasSeen(const uint256& hash) const;
     void Clear();
 
-    template<typename Message>
-    void PushPendingMessage(NodeId from, Message& msg)
+    template <typename Message>
+    void PushPendingMessage(NodeId from, const uint256& senderProTxHash, Message& msg)
     {
         CDataStream ds(SER_NETWORK, PROTOCOL_VERSION);
         ds << msg;
-        PushPendingMessage(from, ds);
+        PushPendingMessage(from, senderProTxHash, ds);
     }
 
     // Might return nullptr messages, which indicates that deserialization failed for some reason
@@ -122,7 +123,7 @@ public:
     ~CDKGSessionHandler();
 
     void UpdatedBlockTip(const CBlockIndex *pindexNew);
-    void ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, CConnman& connman);
+    void ProcessMessage(CNode* pfrom, const uint256& senderProTxHash, const uint256& messageQuorumHash, const std::string& strCommand, CDataStream& vRecv, CConnman& connman);
 
 private:
     bool InitNewQuorum(const CBlockIndex* pindexQuorum);

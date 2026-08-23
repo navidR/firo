@@ -20,6 +20,82 @@ CDKGSessionManager* quorumDKGSessionManager;
 static const std::string DB_VVEC = "qdkg_V";
 static const std::string DB_SKCONTRIB = "qdkg_S";
 
+namespace
+{
+
+// Bound well-formed messages from quorum parameters before deserialization or retention.
+size_t MaxDKGMessageSize(const std::string& strCommand, const Consensus::LLMQParams& params)
+{
+    constexpr size_t COMPACT_SIZE = 5;
+    constexpr size_t PREFIX_SIZE = 1 + 32 + 32;
+    constexpr size_t PUBLIC_KEY_SIZE = BLS_CURVE_PUBKEY_SIZE;
+    constexpr size_t SIGNATURE_SIZE = BLS_CURVE_SIG_SIZE;
+    constexpr size_t SECRET_KEY_SIZE = BLS_CURVE_SECKEY_SIZE;
+    constexpr size_t ENCRYPTED_BLOB_SIZE = COMPACT_SIZE + 128;
+    constexpr size_t SLACK_SIZE = 1024;
+    constexpr size_t HARD_CEILING = size_t{1} << 20;
+
+    const size_t quorumSize = params.size > 0 ? static_cast<size_t>(params.size) : 0;
+    const size_t threshold = params.threshold > 0 ? static_cast<size_t>(params.threshold) : 0;
+
+    size_t cap;
+    if (strCommand == NetMsgType::QCONTRIB) {
+        cap = PREFIX_SIZE + COMPACT_SIZE + threshold * PUBLIC_KEY_SIZE + PUBLIC_KEY_SIZE + 32 + COMPACT_SIZE + quorumSize * ENCRYPTED_BLOB_SIZE + SIGNATURE_SIZE;
+    } else if (strCommand == NetMsgType::QJUSTIFICATION) {
+        cap = PREFIX_SIZE + COMPACT_SIZE + quorumSize * (4 + SECRET_KEY_SIZE) + SIGNATURE_SIZE;
+    } else if (strCommand == NetMsgType::QCOMPLAINT) {
+        cap = PREFIX_SIZE + 2 * (COMPACT_SIZE + (quorumSize + 7) / 8) + SIGNATURE_SIZE;
+    } else if (strCommand == NetMsgType::QPCOMMITMENT) {
+        cap = PREFIX_SIZE + COMPACT_SIZE + (quorumSize + 7) / 8 + PUBLIC_KEY_SIZE + 32 + 2 * SIGNATURE_SIZE;
+    } else {
+        return HARD_CEILING;
+    }
+
+    cap += SLACK_SIZE;
+    return cap < HARD_CEILING ? cap : HARD_CEILING;
+}
+
+// Deserialize a copy and check only parameter-derived shape; signature verification remains on the DKG worker.
+bool CheckDKGMessageStructure(const std::string& strCommand, const CDataStream& vRecv, const Consensus::LLMQParams& params, uint256& quorumHashRet)
+{
+    const size_t quorumSize = params.size > 0 ? static_cast<size_t>(params.size) : 0;
+    const size_t minQuorumSize = params.minSize > 0 ? static_cast<size_t>(params.minSize) : 0;
+    const size_t threshold = params.threshold > 0 ? static_cast<size_t>(params.threshold) : 0;
+
+    try {
+        CDataStream copy(vRecv.begin(), vRecv.end(), vRecv.GetType(), vRecv.GetVersion());
+        if (strCommand == NetMsgType::QCONTRIB) {
+            CDKGContribution contribution;
+            copy >> contribution;
+            quorumHashRet = contribution.quorumHash;
+            return contribution.vvec && contribution.vvec->size() == threshold && contribution.contributions && contribution.contributions->blobs.size() >= minQuorumSize && contribution.contributions->blobs.size() <= quorumSize;
+        }
+        if (strCommand == NetMsgType::QCOMPLAINT) {
+            CDKGComplaint complaint;
+            copy >> complaint;
+            quorumHashRet = complaint.quorumHash;
+            return complaint.badMembers.size() == quorumSize && complaint.complainForMembers.size() == quorumSize;
+        }
+        if (strCommand == NetMsgType::QJUSTIFICATION) {
+            CDKGJustification justification;
+            copy >> justification;
+            quorumHashRet = justification.quorumHash;
+            return justification.contributions.size() <= quorumSize;
+        }
+        if (strCommand == NetMsgType::QPCOMMITMENT) {
+            CDKGPrematureCommitment commitment;
+            copy >> commitment;
+            quorumHashRet = commitment.quorumHash;
+            return commitment.validMembers.size() == quorumSize;
+        }
+    } catch (const std::exception&) {
+    }
+
+    return false;
+}
+
+} // namespace
+
 CDKGSessionManager::CDKGSessionManager(CDBWrapper& _llmqDb, CBLSWorker& _blsWorker) :
     llmqDb(_llmqDb),
     blsWorker(_blsWorker)
@@ -81,6 +157,17 @@ void CDKGSessionManager::ProcessMessage(CNode* pfrom, const std::string& strComm
         return;
     }
 
+    uint256 senderProTxHash;
+    {
+        LOCK(pfrom->cs_mnauth);
+        senderProTxHash = pfrom->verifiedProRegTxHash;
+    }
+    if (senderProTxHash.IsNull()) {
+        LOCK(cs_main);
+        Misbehaving(pfrom->id, 10);
+        return;
+    }
+
     if (vRecv.size() < 1) {
         LOCK(cs_main);
         Misbehaving(pfrom->id, 100);
@@ -95,7 +182,22 @@ void CDKGSessionManager::ProcessMessage(CNode* pfrom, const std::string& strComm
         return;
     }
 
-    dkgSessionHandlers.at(llmqType).ProcessMessage(pfrom, strCommand, vRecv, connman);
+    const auto& params = Params().GetConsensus().llmqs.at(llmqType);
+    if (vRecv.size() > MaxDKGMessageSize(strCommand, params)) {
+        LOCK(cs_main);
+        Misbehaving(pfrom->id, 100);
+        return;
+    }
+
+    uint256 messageQuorumHash;
+    if (!CheckDKGMessageStructure(strCommand, vRecv, params, messageQuorumHash)) {
+        LOCK(cs_main);
+        Misbehaving(pfrom->id, 100);
+        return;
+    }
+
+    dkgSessionHandlers.at(llmqType).ProcessMessage(
+        pfrom, senderProTxHash, messageQuorumHash, strCommand, vRecv, connman);
 }
 
 bool CDKGSessionManager::AlreadyHave(const CInv& inv) const
