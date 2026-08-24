@@ -22,6 +22,8 @@ class CConnman;
 namespace llmq
 {
 
+struct CQuorumBlockProcessorTestAccess;
+
 class CQuorumBlockProcessor
 {
 private:
@@ -34,6 +36,8 @@ private:
 
     std::unordered_map<std::pair<Consensus::LLMQType, uint256>, bool, StaticSaltedHasher> hasMinedCommitmentCache;
 
+    friend struct CQuorumBlockProcessorTestAccess;
+
 public:
     CQuorumBlockProcessor(CEvoDB& _evoDb) : evoDb(_evoDb) {}
 
@@ -41,7 +45,11 @@ public:
 
     void ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, CConnman& connman);
 
-    bool ProcessBlock(const CBlock& block, const CBlockIndex* pindex, CValidationState& state);
+    bool ProcessBlock(const CBlock& block, const CBlockIndex* pindex, CValidationState& state, bool fJustCheck);
+    // Call only after ConnectBlock succeeds and its EvoDB transaction commits.
+    void RemoveMinableCommitments(const CBlock& block);
+    // Call only after DisconnectBlock succeeds and its EvoDB transaction commits.
+    void AddMinableCommitments(const CBlock& block, const CBlockIndex* pindex);
     bool UndoBlock(const CBlock& block, const CBlockIndex* pindex);
 
     void AddMinableCommitment(const CFinalCommitment& fqc);
@@ -57,8 +65,9 @@ public:
     std::map<Consensus::LLMQType, std::vector<const CBlockIndex*>> GetMinedAndActiveCommitmentsUntilBlock(const CBlockIndex* pindex);
 
 private:
+    void RemoveMinableCommitment(const CFinalCommitment& qc);
     bool GetCommitmentsFromBlock(const CBlock& block, const CBlockIndex* pindex, std::map<Consensus::LLMQType, CFinalCommitment>& ret, CValidationState& state);
-    bool ProcessCommitment(int nHeight, const uint256& blockHash, const CFinalCommitment& qc, CValidationState& state);
+    bool ProcessCommitment(int nHeight, const uint256& blockHash, const CFinalCommitment& qc, CValidationState& state, bool fJustCheck);
     bool IsMiningPhase(Consensus::LLMQType llmqType, int nHeight);
     bool IsCommitmentRequired(Consensus::LLMQType llmqType, int nHeight);
     uint256 GetQuorumBlockHash(Consensus::LLMQType llmqType, int nHeight);

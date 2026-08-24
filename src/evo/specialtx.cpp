@@ -134,7 +134,7 @@ bool ProcessSpecialTxsInBlock(const CBlock& block, const CBlockIndex* pindex, CV
     int64_t nTime2 = GetTimeMicros(); nTimeLoop += nTime2 - nTime1;
     LogPrint("bench", "        - Loop: %.2fms [%.2fs]\n", 0.001 * (nTime2 - nTime1), nTimeLoop * 0.000001);
 
-    if (!llmq::quorumBlockProcessor->ProcessBlock(block, pindex, state)) {
+    if (!llmq::quorumBlockProcessor->ProcessBlock(block, pindex, state, fJustCheck)) {
         return false;
     }
 

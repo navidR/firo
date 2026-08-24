@@ -64,8 +64,9 @@
 #include "evo/cbtx.h"
 #include "evo/spork.h"
 
-#include "llmq/quorums_instantsend.h"
+#include "llmq/quorums_blockprocessor.h"
 #include "llmq/quorums_chainlocks.h"
+#include "llmq/quorums_instantsend.h"
 
 #include <atomic>
 #include <sstream>
@@ -3261,6 +3262,7 @@ bool static DisconnectTip(CValidationState& state, const CChainParams& chainpara
         bool flushed = view.Flush();
         assert(flushed);
         dbTx->Commit();
+        llmq::quorumBlockProcessor->AddMinableCommitments(block, pindexDelete);
     }
     LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
 
@@ -3399,6 +3401,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         bool flushed = view.Flush();
         assert(flushed);
         dbTx->Commit();
+        llmq::quorumBlockProcessor->RemoveMinableCommitments(blockConnecting);
     }
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
     LogPrint("bench", "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
