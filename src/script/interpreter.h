@@ -6,12 +6,16 @@
 #ifndef BITCOIN_SCRIPT_INTERPRETER_H
 #define BITCOIN_SCRIPT_INTERPRETER_H
 
-#include "script_error.h"
+#include "hash.h"
 #include "primitives/transaction.h"
+#include "script_error.h"
 
-#include <vector>
 #include <stdint.h>
+
+#include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 class CPubKey;
 class CScript;
@@ -123,7 +127,21 @@ enum SigVersion
     SIGVERSION_WITNESS_V0 = 1,
 };
 
-uint256 SignatureHash(const CScript &scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType, const CAmount& amount, SigVersion sigversion, const PrecomputedTransactionData* cache = NULL);
+/** Cache for the six legacy ECDSA signature hash serialization modes. */
+class SigHashCache
+{
+private:
+    /** For each sighash mode, store a scriptCode and the SHA256 midstate immediately before the hash type. */
+    std::optional<std::pair<CScript, CHashWriter> > cacheEntries[6];
+
+    int CacheIndex(int nHashType) const noexcept;
+
+public:
+    std::optional<CHashWriter> Load(int nHashType, const CScript& scriptCode) const noexcept;
+    void Store(int nHashType, const CScript& scriptCode, const CHashWriter& writer) noexcept;
+};
+
+uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType, const CAmount& amount, SigVersion sigversion, const PrecomputedTransactionData* cache = NULL, SigHashCache* sighashCache = NULL);
 
 class BaseSignatureChecker
 {
@@ -153,6 +171,7 @@ private:
     unsigned int nIn;
     const CAmount amount;
     const PrecomputedTransactionData* txdata;
+    mutable SigHashCache sighashCache;
 
 protected:
     virtual bool VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& vchPubKey, const uint256& sighash) const;

@@ -17,6 +17,7 @@
 #include "version.h"
 
 #include <iostream>
+#include <limits>
 
 #include <boost/test/unit_test.hpp>
 
@@ -211,4 +212,82 @@ BOOST_AUTO_TEST_CASE(sighash_from_data)
         BOOST_CHECK_MESSAGE(sh.GetHex() == sigHashHex, strTest);
     }
 }
+
+BOOST_AUTO_TEST_CASE(sighash_caching)
+{
+    seed_insecure_rand(false);
+
+    CScript scriptCode;
+    RandomScript(scriptCode);
+    CScript differentScriptCode(scriptCode);
+    differentScriptCode << OP_1;
+
+    CMutableTransaction mutableTx;
+    RandomTransaction(mutableTx, false);
+    const CTransaction tx(mutableTx);
+    const unsigned int inputIndex = insecure_rand() % tx.vin.size();
+
+    std::vector<int> hashTypes{
+        SIGHASH_ALL,
+        SIGHASH_SINGLE,
+        SIGHASH_NONE,
+        SIGHASH_ALL | SIGHASH_ANYONECANPAY,
+        SIGHASH_SINGLE | SIGHASH_ANYONECANPAY,
+        SIGHASH_NONE | SIGHASH_ANYONECANPAY,
+        SIGHASH_ANYONECANPAY,
+        0,
+        std::numeric_limits<int>::max(),
+    };
+    for (int i = 0; i < 10; ++i) {
+        hashTypes.push_back(insecure_rand());
+    }
+
+    SigHashCache cache;
+    for (int hashType : hashTypes) {
+        const bool expectOne = (hashType & 0x1f) == SIGHASH_SINGLE && inputIndex >= tx.vout.size();
+
+        const uint256 sighashWithCache = SignatureHash(scriptCode, tx, inputIndex, hashType, 0, SIGVERSION_BASE, NULL, &cache);
+        const uint256 sighashWithoutCache = SignatureHash(scriptCode, tx, inputIndex, hashType, 0, SIGVERSION_BASE);
+        BOOST_CHECK(sighashWithCache == sighashWithoutCache);
+        BOOST_CHECK(sighashWithCache == SignatureHash(scriptCode, tx, inputIndex, hashType, 0, SIGVERSION_BASE, NULL, &cache));
+        BOOST_CHECK(sighashWithCache == SignatureHashOld(scriptCode, tx, inputIndex, hashType));
+
+        const uint256 differentSighashWithCache = SignatureHash(differentScriptCode, tx, inputIndex, hashType, 0, SIGVERSION_BASE, NULL, &cache);
+        const uint256 differentSighashWithoutCache = SignatureHash(differentScriptCode, tx, inputIndex, hashType, 0, SIGVERSION_BASE);
+        BOOST_CHECK(differentSighashWithCache == differentSighashWithoutCache);
+        if (expectOne) {
+            BOOST_CHECK(sighashWithCache == differentSighashWithCache);
+        } else {
+            BOOST_CHECK(sighashWithCache != differentSighashWithCache);
+        }
+        BOOST_CHECK(differentSighashWithCache == SignatureHash(differentScriptCode, tx, inputIndex, hashType, 0, SIGVERSION_BASE, NULL, &cache));
+
+        CHashWriter writer(SER_GETHASH, 0);
+        writer << 42;
+        cache.Store(hashType, scriptCode, writer);
+
+        CHashWriter storedWriter(writer);
+        const uint256 storedHash = storedWriter.GetHash();
+        std::optional<CHashWriter> loadedWriter = cache.Load(hashType, scriptCode);
+        BOOST_REQUIRE(loadedWriter.has_value());
+        BOOST_CHECK(storedHash == loadedWriter->GetHash());
+
+        const uint256 mutatedSighash = SignatureHash(scriptCode, tx, inputIndex, hashType, 0, SIGVERSION_BASE, NULL, &cache);
+        if (expectOne) {
+            BOOST_CHECK(mutatedSighash == sighashWithCache);
+        } else {
+            BOOST_CHECK(mutatedSighash != sighashWithCache);
+            std::optional<CHashWriter> mutatedWriter = cache.Load(hashType, scriptCode);
+            BOOST_REQUIRE(mutatedWriter.has_value());
+            *mutatedWriter << hashType;
+            BOOST_CHECK(mutatedSighash == mutatedWriter->GetHash());
+        }
+
+        CHashWriter dummy(SER_GETHASH, 0);
+        cache.Store(hashType, differentScriptCode, dummy);
+        (void)SignatureHash(scriptCode, tx, inputIndex, hashType, 0, SIGVERSION_BASE, NULL, &cache);
+        BOOST_CHECK(cache.Load(hashType, scriptCode).has_value() || expectOne);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

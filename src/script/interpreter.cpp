@@ -1190,7 +1190,28 @@ PrecomputedTransactionData::PrecomputedTransactionData(const CTransaction& txTo)
     hashOutputs = GetOutputsHash(txTo);
 }
 
-uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType, const CAmount& amount, SigVersion sigversion, const PrecomputedTransactionData* cache)
+int SigHashCache::CacheIndex(int nHashType) const noexcept
+{
+    return 3 * !!(nHashType & SIGHASH_ANYONECANPAY) +
+           2 * ((nHashType & 0x1f) == SIGHASH_SINGLE) +
+           1 * ((nHashType & 0x1f) == SIGHASH_NONE);
+}
+
+std::optional<CHashWriter> SigHashCache::Load(int nHashType, const CScript& scriptCode) const noexcept
+{
+    const auto& entry = cacheEntries[CacheIndex(nHashType)];
+    if (entry.has_value() && scriptCode == entry->first) {
+        return entry->second;
+    }
+    return std::nullopt;
+}
+
+void SigHashCache::Store(int nHashType, const CScript& scriptCode, const CHashWriter& writer) noexcept
+{
+    cacheEntries[CacheIndex(nHashType)].emplace(scriptCode, writer);
+}
+
+uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType, const CAmount& amount, SigVersion sigversion, const PrecomputedTransactionData* cache, SigHashCache* sighashCache)
 {
     if (sigversion == SIGVERSION_WITNESS_V0) {
         uint256 hashPrevouts;
@@ -1251,12 +1272,24 @@ uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsig
         }
     }
 
+    if (sighashCache != NULL) {
+        std::optional<CHashWriter> cachedWriter = sighashCache->Load(nHashType, scriptCode);
+        if (cachedWriter.has_value()) {
+            *cachedWriter << nHashType;
+            return cachedWriter->GetHash();
+        }
+    }
+
     // Wrapper to serialize only the necessary parts of the transaction being signed
     CTransactionSignatureSerializer txTmp(txTo, scriptCode, nIn, nHashType);
 
     // Serialize and hash
     CHashWriter ss(SER_GETHASH, 0);
-    ss << txTmp << nHashType;
+    ss << txTmp;
+    if (sighashCache != NULL) {
+        sighashCache->Store(nHashType, scriptCode, ss);
+    }
+    ss << nHashType;
     return ss.GetHash();
 }
 
@@ -1278,7 +1311,7 @@ bool TransactionSignatureChecker::CheckSig(const std::vector<unsigned char>& vch
     int nHashType = vchSig.back();
     vchSig.pop_back();
 
-    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, sigversion, this->txdata);
+    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, sigversion, this->txdata, &sighashCache);
 
     if (!VerifySignature(vchSig, pubkey, sighash))
         return false;
