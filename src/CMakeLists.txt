@@ -344,6 +344,7 @@ add_library(firo_node STATIC EXCLUDE_FROM_ALL
   ${CMAKE_CURRENT_SOURCE_DIR}/timedata.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/torcontrol.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/txdb.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/txrequest.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/txmempool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ui_interface.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/validation.cpp

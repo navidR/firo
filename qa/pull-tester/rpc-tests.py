@@ -154,6 +154,7 @@ testScripts = [
     # 'blockchain.py',
     'disablewallet.py',
     'keypool.py',
+    'p2p-tx-request.py',
     'p2p-mempool.py',
     # 'prioritise_transaction.py',
     'invalidblockrequest.py',

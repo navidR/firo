@@ -24,6 +24,7 @@
 #include "random.h"
 #include "tinyformat.h"
 #include "txmempool.h"
+#include "txrequest.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -46,6 +47,8 @@
 #include "llmq/quorums_signing_shares.h"
 
 #include <boost/thread.hpp>
+
+#include <chrono>
 
 #if defined(NDEBUG)
 # error "Bitcoin cannot be compiled without assertions."
@@ -79,6 +82,19 @@ static const uint64_t RANDOMIZER_ID_ADDRESS_RELAY = 0x3cac0035b5866b90ULL; // SH
 
 // Internal stuff
 namespace {
+    /** Maximum in-flight transaction requests before an additional announcement delay applies. */
+    static constexpr int32_t MAX_PEER_TX_REQUEST_IN_FLIGHT = 100;
+    /** Maximum tracked transaction announcements per untrusted peer. */
+    static constexpr int32_t MAX_PEER_TX_ANNOUNCEMENTS = 5000;
+    /** Delay for transaction announcements from non-preferred peers. */
+    static constexpr std::chrono::microseconds NONPREF_PEER_TX_DELAY{std::chrono::seconds{2}};
+    /** Delay for transaction announcements from overloaded peers. */
+    static constexpr std::chrono::microseconds OVERLOADED_PEER_TX_DELAY{std::chrono::seconds{2}};
+    /** Time before an unanswered transaction request can fail over to another peer. */
+    static constexpr std::chrono::microseconds GETDATA_TX_INTERVAL{std::chrono::seconds{60}};
+    /** Limit to avoid sending large GETDATA packets. */
+    static constexpr size_t MAX_GETDATA_SZ = 1000;
+
     /** Number of nodes with fSyncStarted. */
     int nSyncStarted = 0;
 
@@ -113,6 +129,9 @@ namespace {
      */
     std::unique_ptr<CRollingBloomFilter> recentRejects;
     uint256 hashRecentRejectsChainTip;
+
+    /** Transaction announcements and request-source selection. Protected by cs_main. */
+    TxRequestTracker g_txrequest;
 
     /** Blocks that are in flight, and that are in the queue to be downloaded. Protected by cs_main. */
     struct QueuedBlock {
@@ -257,6 +276,34 @@ void UpdatePreferredDownload(CNode* node, CNodeState* state)
     nPreferredDownload += state->fPreferredDownload;
 }
 
+void AddTxAnnouncement(const CNode& node, const uint256& txhash, std::chrono::microseconds currentTime)
+    EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+{
+    AssertLockHeld(cs_main);
+
+    const NodeId nodeId = node.GetId();
+    const CNodeState* state = State(nodeId);
+    if (state == nullptr) {
+        return;
+    }
+
+    if (!node.fWhitelisted && g_txrequest.Count(nodeId) >= MAX_PEER_TX_ANNOUNCEMENTS) {
+        return;
+    }
+
+    std::chrono::microseconds delay{0};
+    const bool preferred = state->fPreferredDownload;
+    if (!preferred) {
+        delay += NONPREF_PEER_TX_DELAY;
+    }
+    if (!node.fWhitelisted && g_txrequest.CountInFlight(nodeId) >= MAX_PEER_TX_REQUEST_IN_FLIGHT) {
+        delay += OVERLOADED_PEER_TX_DELAY;
+    }
+
+    // Firo does not negotiate BIP339 wtxid relay; transaction announcements identify txids.
+    g_txrequest.ReceivedInv(nodeId, GenTxid{/* is_wtxid=*/false, txhash}, preferred, currentTime + delay);
+}
+
 void PushNodeVersion(CNode *pnode, CConnman& connman, int64_t nTime)
 {
     ServiceFlags nLocalNodeServices = pnode->GetLocalServices();
@@ -291,6 +338,7 @@ void InitializeNode(CNode *pnode, CConnman& connman) {
     {
         LOCK(cs_main);
         mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(nodeid), std::forward_as_tuple(addr, std::move(addrName)));
+        assert(g_txrequest.Count(nodeid) == 0);
     }
     if(!pnode->fInbound)
         PushNodeVersion(pnode, connman, GetTime());
@@ -312,6 +360,7 @@ void FinalizeNode(NodeId nodeid, bool& fUpdateConnectionTime) {
         mapBlocksInFlight.erase(entry.hash);
     }
     EraseOrphansFor(nodeid);
+    g_txrequest.DisconnectedPeer(nodeid);
     nPreferredDownload -= state->fPreferredDownload;
     nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
     assert(nPeersWithValidatedDownloads >= 0);
@@ -323,6 +372,7 @@ void FinalizeNode(NodeId nodeid, bool& fUpdateConnectionTime) {
         assert(mapBlocksInFlight.empty());
         assert(nPreferredDownload == 0);
         assert(nPeersWithValidatedDownloads == 0);
+        assert(g_txrequest.Size() == 0);
     }
 }
 
@@ -779,10 +829,17 @@ PeerLogicValidation::PeerLogicValidation(CConnman* connmanIn) : connman(connmanI
 }
 
 void PeerLogicValidation::SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex, int nPosInBlock) {
-    if (nPosInBlock == CMainSignals::SYNC_TRANSACTION_NOT_IN_BLOCK)
-        return;
-
     LOCK(cs_main);
+
+    if (nPosInBlock == CMainSignals::SYNC_TRANSACTION_NOT_IN_BLOCK) {
+        // This signal also reports removals. Forget announcements only when the transaction was accepted.
+        if (mempool.exists(tx.GetHash())) {
+            g_txrequest.ForgetTxHash(tx.GetHash());
+        }
+        return;
+    }
+
+    g_txrequest.ForgetTxHash(tx.GetHash());
 
     std::vector<uint256> vOrphanErase;
     // Which orphan pool entries must we evict?
@@ -1882,6 +1939,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         LOCK(cs_main);
 
         uint32_t nFetchFlags = GetFetchFlags(pfrom, chainActive.Tip(), chainparams.GetConsensus());
+        const auto currentTime = std::chrono::microseconds{GetMockableTimeMicros()};
 
         std::vector<CInv> vToFetch;
 
@@ -1938,9 +1996,12 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 if (fBlocksOnly)
                     LogPrint("net", "transaction (%s) inv sent in violation of protocol peer=%d\n", inv.hash.ToString(), pfrom->id);
                 else if (!fAlreadyHave && !fImporting && !fReindex && !IsInitialBlockDownload()) {
-                    int64_t doubleRequestDelay = 2 * 60 * 1000000;
-                    // some messages need to be re-requested faster when the first announcing peer did not answer to GETDATA
-                    switch (inv.type) {
+                    if (inv.type == MSG_TX || inv.type == MSG_WITNESS_TX) {
+                        AddTxAnnouncement(*pfrom, inv.hash, currentTime);
+                    } else {
+                        int64_t doubleRequestDelay = 2 * 60 * 1000000;
+                        // some messages need to be re-requested faster when the first announcing peer did not answer to GETDATA
+                        switch (inv.type) {
                         case MSG_QUORUM_RECOVERED_SIG:
                             doubleRequestDelay = 15 * 1000000;
                             break;
@@ -1950,8 +2011,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                         case MSG_ISLOCK:
                             doubleRequestDelay = 10 * 1000000;
                             break;
+                        }
+                        pfrom->AskFor(inv, doubleRequestDelay);
                     }
-                    pfrom->AskFor(inv, doubleRequestDelay);
                 }
             }
         }
@@ -2184,6 +2246,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
         pfrom->setAskFor.erase(inv.hash);
         mapAlreadyAskedFor.erase(inv.hash);
+        g_txrequest.ReceivedResponse(pfrom->GetId(), inv.hash);
 
         std::list<CTransactionRef> lRemovedTxn;
 
@@ -2289,6 +2352,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                             // See https://github.com/bitcoin/bitcoin/issues/8279 for details.
                             assert(recentRejects);
                             recentRejects->insert(orphanHash);
+                            g_txrequest.ForgetTxHash(orphanHash);
                         }
                     }
                     mempool.check(pcoinsTip);
@@ -2309,10 +2373,11 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             }
             if (!fRejectedParents) {
                 uint32_t nFetchFlags = GetFetchFlags(pfrom, chainActive.Tip(), chainparams.GetConsensus());
+                const auto currentTime = std::chrono::microseconds{GetMockableTimeMicros()};
                 BOOST_FOREACH(const CTxIn& txin, tx.vin) {
                     CInv _inv(MSG_TX | nFetchFlags, txin.prevout.hash);
                     pfrom->AddInventoryKnown(_inv);
-                    if (!AlreadyHave(_inv)) pfrom->AskFor(_inv);
+                    if (!AlreadyHave(_inv)) AddTxAnnouncement(*pfrom, _inv.hash, currentTime);
                 }
                 AddOrphanTx(ptx, pfrom->GetId());
 
@@ -2375,6 +2440,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             if (nDoS > 0) {
                 Misbehaving(pfrom->GetId(), nDoS);
             }
+        }
+
+        if (AlreadyHave(inv)) {
+            g_txrequest.ForgetTxHash(inv.hash);
         }
     }
 
@@ -3117,8 +3186,16 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
     }
 
     else if (strCommand == NetMsgType::NOTFOUND) {
-        // We do not care about the NOTFOUND message, but logging an Unknown Command
-        // message would be undesirable as we transmit it ourselves.
+        std::vector<CInv> vInv;
+        vRecv >> vInv;
+        if (vInv.size() <= MAX_PEER_TX_ANNOUNCEMENTS + MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+            LOCK(cs_main);
+            for (const CInv& inv : vInv) {
+                if (inv.type == MSG_TX || inv.type == MSG_WITNESS_TX) {
+                    g_txrequest.ReceivedResponse(pfrom->GetId(), inv.hash);
+                }
+            }
+        }
     }
 
     else {
@@ -3821,6 +3898,31 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
         //
         // Message: getdata (non-blocks)
         //
+        const auto currentTime = std::chrono::microseconds{GetMockableTimeMicros()};
+        std::vector<std::pair<NodeId, GenTxid> > expired;
+        const auto requestable = g_txrequest.GetRequestable(pto->GetId(), currentTime, &expired);
+        for (const auto& entry : expired) {
+            LogPrint("net", "timeout of inflight transaction %s from peer=%d\n",
+                entry.second.GetHash().ToString(), entry.first);
+        }
+        for (const GenTxid& gtxid : requestable) {
+            CInv inv(MSG_TX | GetFetchFlags(pto, chainActive.Tip(), consensusParams), gtxid.GetHash());
+            if (!AlreadyHave(inv)) {
+                LogPrint("net", "SendMessages -- GETDATA -- requesting transaction %s peer=%d\n",
+                    inv.hash.ToString(), pto->id);
+                vGetData.push_back(inv);
+                if (vGetData.size() >= MAX_GETDATA_SZ) {
+                    connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+                    LogPrint("net", "SendMessages -- GETDATA -- pushed size = %lu peer=%d\n", vGetData.size(), pto->id);
+                    vGetData.clear();
+                }
+                g_txrequest.RequestedTx(pto->GetId(), gtxid.GetHash(), currentTime + GETDATA_TX_INTERVAL);
+            } else {
+                g_txrequest.ForgetTxHash(gtxid.GetHash());
+            }
+        }
+
+        // Firo-specific and Dandelion inventory retains the legacy type-specific scheduler.
         std::sort(pto->vecAskFor.begin(), pto->vecAskFor.end());
         auto it = pto->vecAskFor.begin();
         while (it != pto->vecAskFor.end() && it->first <= nNow)
@@ -3830,7 +3932,7 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
             {
                 LogPrint("net", "SendMessages -- GETDATA -- requesting inv = %s peer=%d\n", inv.ToString(), pto->id);
                 vGetData.push_back(inv);
-                if (vGetData.size() >= 1000)
+                if (vGetData.size() >= MAX_GETDATA_SZ)
                 {
                     connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
                     LogPrint("net", "SendMessages -- GETDATA -- pushed size = %lu peer=%d\n", vGetData.size(), pto->id);

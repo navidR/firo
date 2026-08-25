@@ -2107,11 +2107,13 @@ class NodeConn(asyncore.dispatcher):
         "regtest": b"\xfa\xbf\xb5\xda",   # regtest
     }
 
-    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True):
+    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True, source_address=None):
         asyncore.dispatcher.__init__(self, map=mininode_socket_map)
         self.dstaddr = dstaddr
         self.dstport = dstport
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        if source_address is not None:
+            self.bind((source_address, 0))
         self.sendbuf = b""
         self.recvbuf = b""
         self.ver_send = 209

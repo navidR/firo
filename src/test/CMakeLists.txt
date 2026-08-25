@@ -84,6 +84,7 @@ add_executable(test_firo
   ${CMAKE_CURRENT_SOURCE_DIR}/testutil.h
   ${CMAKE_CURRENT_SOURCE_DIR}/timedata_tests.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/transaction_tests.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/txrequest_tests.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/txdb_tests.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/uint256_tests.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/univalue_tests.cpp
