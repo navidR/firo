@@ -1872,6 +1872,20 @@ void static InvalidChainFound(CBlockIndex* pindexNew)
     CheckForkWarningConditions();
 }
 
+void static ConflictingChainFound(CBlockIndex* pindexNew)
+{
+    LogPrintf("%s: conflicting block=%s  height=%d  log2_work=%.8g  date=%s\n", __func__,
+      pindexNew->GetBlockHash().ToString(), pindexNew->nHeight,
+      log(pindexNew->nChainWork.getdouble())/log(2.0), DateTimeStrFormat("%Y-%m-%d %H:%M:%S",
+      pindexNew->GetBlockTime()));
+    CBlockIndex *tip = chainActive.Tip();
+    assert(tip);
+    LogPrintf("%s:  current best=%s  height=%d  log2_work=%.8g  date=%s\n", __func__,
+      tip->GetBlockHash().ToString(), chainActive.Height(), log(tip->nChainWork.getdouble())/log(2.0),
+      DateTimeStrFormat("%Y-%m-%d %H:%M:%S", tip->GetBlockTime()));
+    CheckForkWarningConditions();
+}
+
 void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state) {
     if (!state.CorruptionPossible()) {
         pindex->nStatus |= BLOCK_FAILED_VALID;
@@ -3548,9 +3562,10 @@ static CBlockIndex* FindMostWorkChain() {
             // for the most work chain if we come across them; we can't switch
             // to a chain unless we have all the non-active-chain parent blocks.
             bool fFailedChain = pindexTest->nStatus & BLOCK_FAILED_MASK;
+            bool fConflictingChain = pindexTest->nStatus & BLOCK_CONFLICT_CHAINLOCK;
             bool fMissingData = !(pindexTest->nStatus & BLOCK_HAVE_DATA);
-            if (fFailedChain || fMissingData) {
-                // Candidate chain is not usable (either invalid or missing data)
+            if (fFailedChain || fConflictingChain || fMissingData) {
+                // Candidate chain is not usable (either invalid, conflicting, or missing data)
                 if (fFailedChain && (pindexBestInvalid == NULL || pindexNew->nChainWork > pindexBestInvalid->nChainWork))
                     pindexBestInvalid = pindexNew;
                 CBlockIndex *pindexFailed = pindexNew;
@@ -3558,6 +3573,9 @@ static CBlockIndex* FindMostWorkChain() {
                 while (pindexTest != pindexFailed) {
                     if (fFailedChain) {
                         pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
+                    } else if (fConflictingChain) {
+                        pindexFailed->nStatus |= BLOCK_CONFLICT_CHAINLOCK;
+                        setDirtyBlockIndex.insert(pindexFailed);
                     } else if (fMissingData) {
                         // If we're missing data, then add back to mapBlocksUnlinked,
                         // so that if the block arrives in the future we can try adding
@@ -3584,6 +3602,7 @@ static void PruneBlockIndexCandidates() {
     // This guards against edge cases in reorg/invalidation where it might be missing.
     if (chainActive.Tip() &&
         chainActive.Tip()->IsValid(BLOCK_VALID_TRANSACTIONS) &&
+        !(chainActive.Tip()->nStatus & BLOCK_CONFLICT_CHAINLOCK) &&
         chainActive.Tip()->nChainTx &&
         setBlockIndexCandidates.count(chainActive.Tip()) == 0) {
         LogPrintf("WARNING: PruneBlockIndexCandidates: tip was missing from candidates, re-adding\n");
@@ -3688,7 +3707,8 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
     return true;
 }
 
-static void NotifyHeaderTip() {
+void NotifyHeaderTip()
+{
     bool fNotify = false;
     bool fInitialBlockDownload = false;
     static CBlockIndex* pindexHeaderOld = NULL;
@@ -3842,7 +3862,7 @@ bool PreciousBlock(CValidationState& state, const CChainParams& params, CBlockIn
             // call preciousblock 2**31-1 times on the same set of tips...
             nBlockReverseSequenceId--;
         }
-        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && pindex->nChainTx) {
+        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && !(pindex->nStatus & BLOCK_CONFLICT_CHAINLOCK) && pindex->nChainTx) {
             setBlockIndexCandidates.insert(pindex);
             PruneBlockIndexCandidates();
         }
@@ -3882,7 +3902,7 @@ bool InvalidateBlock(CValidationState& state, const CChainParams& chainparams, C
     // add it again.
     BlockMap::iterator it = mapBlockIndex.begin();
     while (it != mapBlockIndex.end()) {
-        if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && it->second->nChainTx && !setBlockIndexCandidates.value_comp()(it->second, chainActive.Tip())) {
+        if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && !(it->second->nStatus & BLOCK_CONFLICT_CHAINLOCK) && it->second->nChainTx && !setBlockIndexCandidates.value_comp()(it->second, chainActive.Tip())) {
             setBlockIndexCandidates.insert(it->second);
         }
         it++;
@@ -3892,6 +3912,71 @@ bool InvalidateBlock(CValidationState& state, const CChainParams& chainparams, C
     txpools.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
     GetMainSignals().UpdatedBlockTip(chainActive.Tip(), NULL, IsInitialBlockDownload());
     uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
+    return true;
+}
+
+bool MarkConflictingBlock(CValidationState& state, const CChainParams& chainparams, CBlockIndex *pindex)
+{
+    AssertLockHeld(cs_main);
+
+    // Disconnect first, then mark the complete indexed subtree as conflicting.
+    bool pindexWasInChain = false;
+
+    while (chainActive.Contains(pindex)) {
+        pindexWasInChain = true;
+        // ActivateBestChain considers blocks already in chainActive unconditionally valid,
+        // so force disconnect away from the conflicting branch.
+        if (!DisconnectTip(state, chainparams)) {
+            txpools.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
+            return false;
+        }
+    }
+
+    for (const auto& item : mapBlockIndex) {
+        CBlockIndex* pindexWalk = item.second;
+        if (pindexWalk->nHeight >= pindex->nHeight &&
+            pindexWalk->GetAncestor(pindex->nHeight) == pindex) {
+            pindexWalk->nStatus |= BLOCK_CONFLICT_CHAINLOCK;
+            setDirtyBlockIndex.insert(pindexWalk);
+            setBlockIndexCandidates.erase(pindexWalk);
+        }
+    }
+
+    if (pindexBestHeader && (pindexBestHeader->nStatus & BLOCK_CONFLICT_CHAINLOCK)) {
+        pindexBestHeader = NULL;
+        for (const auto& item : mapBlockIndex) {
+            CBlockIndex* pindexHeader = item.second;
+            if (pindexHeader->IsValid(BLOCK_VALID_TREE) &&
+                !(pindexHeader->nStatus & BLOCK_CONFLICT_CHAINLOCK) &&
+                (pindexBestHeader == NULL || CBlockIndexWorkComparator()(pindexBestHeader, pindexHeader))) {
+                pindexBestHeader = pindexHeader;
+            }
+        }
+        assert(pindexBestHeader);
+    }
+
+    LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000, GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+
+    // Changes to mempool should also be made to Dandelion stempool.
+    LimitMempoolSize(txpools.getStemTxPool(), GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000, GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+
+    // The resulting new best tip may not be in setBlockIndexCandidates anymore, so
+    // add it again.
+    BlockMap::iterator it = mapBlockIndex.begin();
+    while (it != mapBlockIndex.end()) {
+        if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && !(it->second->nStatus & BLOCK_CONFLICT_CHAINLOCK) && it->second->nChainTx && !setBlockIndexCandidates.value_comp()(it->second, chainActive.Tip())) {
+            setBlockIndexCandidates.insert(it->second);
+        }
+        it++;
+    }
+
+    ConflictingChainFound(pindex);
+    txpools.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
+    GetMainSignals().UpdatedBlockTip(chainActive.Tip(), NULL, IsInitialBlockDownload());
+
+    if (pindexWasInChain) {
+        uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
+    }
     return true;
 }
 
@@ -3906,7 +3991,7 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
         if (!it->second->IsValid() && it->second->GetAncestor(nHeight) == pindex) {
             it->second->nStatus &= ~BLOCK_FAILED_MASK;
             setDirtyBlockIndex.insert(it->second);
-            if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && it->second->nChainTx && setBlockIndexCandidates.value_comp()(chainActive.Tip(), it->second)) {
+            if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && !(it->second->nStatus & BLOCK_CONFLICT_CHAINLOCK) && it->second->nChainTx && setBlockIndexCandidates.value_comp()(chainActive.Tip(), it->second)) {
                 setBlockIndexCandidates.insert(it->second);
             }
             if (it->second == pindexBestInvalid) {
@@ -3998,7 +4083,9 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
                 pindex->nSequenceId = nBlockSequenceId++;
             }
             if (chainActive.Tip() == NULL || !setBlockIndexCandidates.value_comp()(pindex, chainActive.Tip())) {
-                setBlockIndexCandidates.insert(pindex);
+                if (!(pindex->nStatus & BLOCK_CONFLICT_CHAINLOCK)) {
+                    setBlockIndexCandidates.insert(pindex);
+                }
             }
             std::pair<std::multimap<CBlockIndex*, CBlockIndex*>::iterator, std::multimap<CBlockIndex*, CBlockIndex*>::iterator> range = mapBlocksUnlinked.equal_range(pindex);
             while (range.first != range.second) {
@@ -4534,6 +4621,8 @@ static bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state
                 *ppindex = pindex;
             if (pindex->nStatus & BLOCK_FAILED_MASK)
                 return state.Invalid(error("%s: block %s is marked invalid", __func__, hash.ToString()), 0, "duplicate");
+            if (pindex->nStatus & BLOCK_CONFLICT_CHAINLOCK)
+                return state.Invalid(error("%s: block %s is marked conflicting", __func__, hash.ToString()), 0, "duplicate");
             return true;
         }
 
@@ -4546,10 +4635,15 @@ static bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state
         if (mi == mapBlockIndex.end())
             return state.DoS(10, error("%s: prev block not found", __func__), 0, "bad-prevblk");
         pindexPrev = (*mi).second;
+        assert(pindexPrev);
+
         if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
             return state.DoS(100, error("%s: prev block invalid", __func__), REJECT_INVALID, "bad-prevblk");
 
-        assert(pindexPrev);
+        if (pindexPrev->nStatus & BLOCK_CONFLICT_CHAINLOCK)
+            // The peer is probably missing the latest ChainLock.
+            return state.DoS(10, error("%s: prev block %s conflicts with ChainLock", __func__, block.hashPrevBlock.ToString()), REJECT_INVALID, "bad-prevblk-chainlock");
+
         if (fCheckpointsEnabled && !CheckIndexAgainstCheckpoint(pindexPrev, state, chainparams, hash))
             return error("%s: CheckIndexAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
 
@@ -4978,13 +5072,13 @@ bool static LoadBlockIndexDB(const CChainParams& chainparams)
                 pindex->nChainTx = pindex->nTx;
             }
         }
-        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->pprev == NULL))
+        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && !(pindex->nStatus & BLOCK_CONFLICT_CHAINLOCK) && (pindex->nChainTx || pindex->pprev == NULL))
             setBlockIndexCandidates.insert(pindex);
         if (pindex->nStatus & BLOCK_FAILED_MASK && (!pindexBestInvalid || pindex->nChainWork > pindexBestInvalid->nChainWork))
             pindexBestInvalid = pindex;
         if (pindex->pprev)
             pindex->BuildSkip();
-        if (pindex->IsValid(BLOCK_VALID_TREE) && (pindexBestHeader == NULL || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
+        if (pindex->IsValid(BLOCK_VALID_TREE) && !(pindex->nStatus & BLOCK_CONFLICT_CHAINLOCK) && (pindexBestHeader == NULL || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
             pindexBestHeader = pindex;
     }
 
@@ -5249,7 +5343,7 @@ bool RewindBlockIndex(const CChainParams& params)
                     ++ret.first;
                 }
             }
-        } else if (pindexIter->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexIter->nChainTx) {
+        } else if (pindexIter->IsValid(BLOCK_VALID_TRANSACTIONS) && !(pindexIter->nStatus & BLOCK_CONFLICT_CHAINLOCK) && pindexIter->nChainTx) {
             setBlockIndexCandidates.insert(pindexIter);
         }
     }
@@ -5506,6 +5600,7 @@ void static CheckBlockIndex(const Consensus::Params& consensusParams)
     size_t nNodes = 0;
     int nHeight = 0;
     CBlockIndex* pindexFirstInvalid = NULL; // Oldest ancestor of pindex which is invalid.
+    CBlockIndex* pindexFirstConflicting = NULL; // Oldest ancestor of pindex which conflicts with ChainLocks.
     CBlockIndex* pindexFirstMissing = NULL; // Oldest ancestor of pindex which does not have BLOCK_HAVE_DATA.
     CBlockIndex* pindexFirstNeverProcessed = NULL; // Oldest ancestor of pindex for which nTx == 0.
     CBlockIndex* pindexFirstNotTreeValid = NULL; // Oldest ancestor of pindex which does not have BLOCK_VALID_TREE (regardless of being valid or not).
@@ -5515,6 +5610,7 @@ void static CheckBlockIndex(const Consensus::Params& consensusParams)
     while (pindex != NULL) {
         nNodes++;
         if (pindexFirstInvalid == NULL && pindex->nStatus & BLOCK_FAILED_VALID) pindexFirstInvalid = pindex;
+        if (pindexFirstConflicting == NULL && pindex->nStatus & BLOCK_CONFLICT_CHAINLOCK) pindexFirstConflicting = pindex;
         if (pindexFirstMissing == NULL && !(pindex->nStatus & BLOCK_HAVE_DATA)) pindexFirstMissing = pindex;
         if (pindexFirstNeverProcessed == NULL && pindex->nTx == 0) pindexFirstNeverProcessed = pindex;
         if (pindex->pprev != NULL && pindexFirstNotTreeValid == NULL && (pindex->nStatus & BLOCK_VALID_MASK) < BLOCK_VALID_TREE) pindexFirstNotTreeValid = pindex;
@@ -5555,8 +5651,12 @@ void static CheckBlockIndex(const Consensus::Params& consensusParams)
             // Checks for not-invalid blocks.
             assert((pindex->nStatus & BLOCK_FAILED_MASK) == 0); // The failed mask cannot be set for blocks without invalid parents.
         }
+        if (pindexFirstConflicting == NULL) {
+            // Checks for blocks without a conflicting ancestor.
+            assert((pindex->nStatus & BLOCK_CONFLICT_CHAINLOCK) == 0);
+        }
         if (!CBlockIndexWorkComparator()(pindex, chainActive.Tip()) && pindexFirstNeverProcessed == NULL) {
-            if (pindexFirstInvalid == NULL) {
+            if (pindexFirstInvalid == NULL && pindexFirstConflicting == NULL) {
                 // If this block sorts at least as good as the current tip and
                 // is valid and we have all data for its parents, it must be in
                 // setBlockIndexCandidates.  chainActive.Tip() must also be there
@@ -5600,7 +5700,7 @@ void static CheckBlockIndex(const Consensus::Params& consensusParams)
             // So if this block is itself better than chainActive.Tip() and it wasn't in
             // setBlockIndexCandidates, then it must be in mapBlocksUnlinked.
             if (!CBlockIndexWorkComparator()(pindex, chainActive.Tip()) && setBlockIndexCandidates.count(pindex) == 0) {
-                if (pindexFirstInvalid == NULL) {
+                if (pindexFirstInvalid == NULL && pindexFirstConflicting == NULL) {
                     assert(foundInUnlinked);
                 }
             }
@@ -5622,6 +5722,7 @@ void static CheckBlockIndex(const Consensus::Params& consensusParams)
             // We are going to either move to a parent or a sibling of pindex.
             // If pindex was the first with a certain property, unset the corresponding variable.
             if (pindex == pindexFirstInvalid) pindexFirstInvalid = NULL;
+            if (pindex == pindexFirstConflicting) pindexFirstConflicting = NULL;
             if (pindex == pindexFirstMissing) pindexFirstMissing = NULL;
             if (pindex == pindexFirstNeverProcessed) pindexFirstNeverProcessed = NULL;
             if (pindex == pindexFirstNotTreeValid) pindexFirstNotTreeValid = NULL;

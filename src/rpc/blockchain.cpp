@@ -1523,7 +1523,7 @@ UniValue getchaintips(const JSONRPCRequest& request)
             "    \"height\": xxxx,\n"
             "    \"hash\": \"xxxx\",\n"
             "    \"branchlen\": 1          (numeric) length of branch connecting the tip to the main chain\n"
-            "    \"status\": \"xxxx\"        (string) status of the chain (active, valid-fork, valid-headers, headers-only, invalid)\n"
+            "    \"status\": \"xxxx\"        (string) status of the chain (active, valid-fork, valid-headers, headers-only, invalid, conflicting)\n"
             "  }\n"
             "]\n"
             "Possible values for status:\n"
@@ -1532,6 +1532,7 @@ UniValue getchaintips(const JSONRPCRequest& request)
             "3.  \"valid-headers\"         All blocks are available for this branch, but they were never fully validated\n"
             "4.  \"valid-fork\"            This branch is not part of the active chain, but is fully validated\n"
             "5.  \"active\"                This is the tip of the active main chain, which is certainly valid\n"
+            "6.  \"conflicting\"           This block or one of its ancestors conflicts with ChainLocks\n"
             "\nExamples:\n"
             + HelpExampleCli("getchaintips", "")
             + HelpExampleRpc("getchaintips", "")
@@ -1586,6 +1587,9 @@ UniValue getchaintips(const JSONRPCRequest& request)
         } else if (block->nStatus & BLOCK_FAILED_MASK) {
             // This block or one of its ancestors is invalid.
             status = "invalid";
+        } else if (block->nStatus & BLOCK_CONFLICT_CHAINLOCK) {
+            // This block or one of its ancestors conflicts with ChainLocks.
+            status = "conflicting";
         } else if (block->nChainTx == 0) {
             // This block cannot be connected because full block data for it or one of its parents is missing.
             status = "headers-only";

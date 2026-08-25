@@ -49,7 +49,7 @@ class LLMQChainLocksTest(EvoZnodeTestFramework):
 
         # Isolate node, mine on both parts of the network, and reconnect
         isolate_node(self.nodes[0])
-        self.nodes[0].generate(5)
+        bad_tip = self.nodes[0].generate(5)[-1]
         self.nodes[1].generate(1)
         good_tip = self.nodes[1].getbestblockhash()
         self.wait_for_chainlock_tip(self.nodes[1])
@@ -60,12 +60,25 @@ class LLMQChainLocksTest(EvoZnodeTestFramework):
         self.wait_for_chainlock(self.nodes[0], self.nodes[1].getbestblockhash())
         assert self.nodes[0].getblock(self.nodes[0].getbestblockhash())["previousblockhash"] == good_tip
         assert self.nodes[1].getblock(self.nodes[1].getbestblockhash())["previousblockhash"] == good_tip
+        bad_tip_status = next(tip["status"] for tip in self.nodes[0].getchaintips() if tip["hash"] == bad_tip)
+        assert_equal(bad_tip_status, "conflicting")
+        blockchain_info = self.nodes[0].getblockchaininfo()
+        assert_equal(blockchain_info["headers"], blockchain_info["blocks"])
 
         # Keep node connected and let it try to reorg the chain
         good_tip = self.nodes[0].getbestblockhash()
         # Restart it so that it forgets all the chainlocks from the past
         stop_node(self.nodes[0], 0)
         self.nodes[0] = start_node(0, self.options.tmpdir, self.extra_args[0])
+
+        # The conflicting status and best-header selection must survive restart
+        # before a peer can replay the ChainLock.
+        assert_equal(self.nodes[0].getconnectioncount(), 0)
+        bad_tip_status = next(tip["status"] for tip in self.nodes[0].getchaintips() if tip["hash"] == bad_tip)
+        assert_equal(bad_tip_status, "conflicting")
+        blockchain_info = self.nodes[0].getblockchaininfo()
+        assert_equal(blockchain_info["headers"], blockchain_info["blocks"])
+
         connect_nodes(self.nodes[0], 1)
 
         # NEW: Wait for nodes to sync before invalidating

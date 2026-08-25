@@ -36,6 +36,7 @@ add_executable(test_firo
   ${CMAKE_CURRENT_SOURCE_DIR}/bloom_tests.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/bswap_tests.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/checkqueue_tests.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/chainlock_conflict_tests.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/coins_tests.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/compress_tests.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/crypto_tests.cpp

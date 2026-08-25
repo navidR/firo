@@ -279,6 +279,9 @@ bool ProcessNewBlock(const CChainParams& chainparams, const std::shared_ptr<cons
  */
 bool ProcessNewBlockHeaders(const std::vector<CBlockHeader>& block, CValidationState& state, const CChainParams& chainparams, const CBlockIndex** ppindex=NULL);
 
+/** Notify listeners if the best known block header changed. Call without cs_main held. */
+void NotifyHeaderTip();
+
 /** Check whether enough disk space is available for an incoming block */
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /** Open a block file (blk?????.dat) */
@@ -591,6 +594,9 @@ bool PreciousBlock(CValidationState& state, const CChainParams& params, CBlockIn
 
 /** Mark a block as invalid. */
 bool InvalidateBlock(CValidationState& state, const CChainParams& chainparams, CBlockIndex *pindex);
+
+/** Mark a block as conflicting with ChainLocks. */
+bool MarkConflictingBlock(CValidationState& state, const CChainParams& chainparams, CBlockIndex *pindex);
 
 /** Remove invalidity status from a block and its descendants. */
 bool ResetBlockFailureFlags(CBlockIndex *pindex);

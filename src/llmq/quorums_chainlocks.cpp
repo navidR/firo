@@ -501,22 +501,28 @@ void CChainLocksHandler::EnforceBestChainLock()
     }
 
     bool activateNeeded;
+    CValidationState state;
+    const auto& params = Params();
     {
         LOCK(cs_main);
 
         // Go backwards through the chain referenced by clsig until we find a block that is part of the main chain.
         // For each of these blocks, check if there are children that are NOT part of the chain referenced by clsig
-        // and invalidate each of them.
+        // and mark all of them as conflicting.
         while (pindex && !chainActive.Contains(pindex)) {
-            // Invalidate all blocks that have the same prevBlockHash but are not equal to blockHash
+            // Mark all blocks that have the same prevBlockHash but are not equal to blockHash as conflicting.
             auto itp = mapPrevBlockIndex.equal_range(pindex->pprev->GetBlockHash());
             for (auto jt = itp.first; jt != itp.second; ++jt) {
                 if (jt->second == pindex) {
                     continue;
                 }
-                LogPrintf("CChainLocksHandler::%s -- CLSIG (%s) invalidates block %s\n",
+                if (!MarkConflictingBlock(state, params, jt->second)) {
+                    LogPrintf("CChainLocksHandler::%s -- MarkConflictingBlock failed: %s\n", __func__, FormatStateMessage(state));
+                    // This should not have happened and we are in a state were it's not safe to continue anymore
+                    assert(false);
+                }
+                LogPrintf("CChainLocksHandler::%s -- CLSIG (%s) marked block %s as conflicting\n",
                           __func__, clsig.ToString(), jt->second->GetBlockHash().ToString());
-                DoInvalidateBlock(jt->second, false);
             }
 
             pindex = pindex->pprev;
@@ -532,12 +538,13 @@ void CChainLocksHandler::EnforceBestChainLock()
         activateNeeded = chainActive.Tip()->GetAncestor(currentBestChainLockBlockIndex->nHeight) != currentBestChainLockBlockIndex;
     }
 
-    CValidationState state;
     if (activateNeeded) {
         LogPrintf("CChainLocksHandler::%s -- Activated best chain tip: %s\n", __func__, currentBestChainLockBlockIndex->GetBlockHash().ToString());
-        if (!ActivateBestChain(state, Params()))
+        if (!ActivateBestChain(state, params))
             LogPrintf("CChainLocksHandler::%s -- ActivateBestChain failed: %s\n", __func__, FormatStateMessage(state));
     }
+
+    NotifyHeaderTip();
 
     const CBlockIndex* pindexNotify = nullptr;
     {
@@ -578,33 +585,6 @@ void CChainLocksHandler::HandleNewRecoveredSig(const llmq::CRecoveredSig& recove
         clsig.sig = recoveredSig.sig.Get();
     }
     ProcessNewChainLock(-1, clsig, ::SerializeHash(clsig));
-}
-
-// WARNING, do not hold cs while calling this method as we'll otherwise run into a deadlock
-void CChainLocksHandler::DoInvalidateBlock(const CBlockIndex* pindex, bool activateBestChain)
-{
-    auto& params = Params();
-
-    {
-        LOCK(cs_main);
-
-        // get the non-const pointer
-        CBlockIndex* pindex2 = mapBlockIndex[pindex->GetBlockHash()];
-
-        CValidationState state;
-        if (!InvalidateBlock(state, params, pindex2)) {
-            LogPrintf("CChainLocksHandler::%s -- InvalidateBlock failed: %s\n", __func__, FormatStateMessage(state));
-            // This should not have happened and we are in a state were it's not safe to continue anymore
-            assert(false);
-        }
-    }
-
-    CValidationState state;
-    if (activateBestChain && !ActivateBestChain(state, params)) {
-        LogPrintf("CChainLocksHandler::%s -- ActivateBestChain failed: %s\n", __func__, FormatStateMessage(state));
-        // This should not have happened and we are in a state were it's not safe to continue anymore
-        assert(false);
-    }
 }
 
 bool CChainLocksHandler::HasChainLock(int nHeight, const uint256& blockHash)
@@ -735,4 +715,3 @@ bool IsChainlocksEnabled()
     if (!llmq::chainLocksHandler) return false;
     return llmq::chainLocksHandler->IsChainlocksEnabled();
 }
-
