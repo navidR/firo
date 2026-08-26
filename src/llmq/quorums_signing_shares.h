@@ -30,6 +30,9 @@ namespace llmq
 // <signHash, quorumMember>
 typedef std::pair<uint256, uint16_t> SigShareKey;
 
+// The maximum quorum size is also the maximum number of sig shares we need to support.
+static constexpr size_t MAX_MSGS_TOTAL_BATCHED_SIGS = 400;
+
 // this one does not get transmitted over the wire as it is batched inside CBatchedSigShares
 class CSigShare
 {
@@ -132,11 +135,15 @@ public:
     inline void SerializationOp(Stream& s, Operation ser_action)
     {
         READWRITE(VARINT(sessionId));
-        READWRITE(sigShares);
+        READWRITE(LIMITED_VECTOR(sigShares, MAX_MSGS_TOTAL_BATCHED_SIGS));
     }
 
     std::string ToInvString() const;
 };
+
+/** Decode a QBSIGSHARES payload while bounding its outer batch count and
+ * running total of inner sig shares. */
+std::vector<CBatchedSigShares> UnserializeBatchedSigShares(CDataStream& vRecv);
 
 template<typename T>
 class SigShareMap
@@ -344,8 +351,6 @@ class CSigSharesManager : public CRecoveredSigsListener
     const size_t MAX_MSGS_CNT_QSIGSESANN = 100;
     const size_t MAX_MSGS_CNT_QGETSIGSHARES = 200;
     const size_t MAX_MSGS_CNT_QSIGSHARESINV = 200;
-    // 400 is the maximum quorum size, so this is also the maximum number of sigs we need to support
-    const size_t MAX_MSGS_TOTAL_BATCHED_SIGS = 400;
 
 private:
     CCriticalSection cs;

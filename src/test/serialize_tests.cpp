@@ -59,6 +59,40 @@ public:
     }
 };
 
+class CCountingUnserialize
+{
+public:
+    static size_t calls;
+    uint8_t value{0};
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        if (ser_action.ForRead()) {
+            ++calls;
+        }
+        READWRITE(value);
+    }
+};
+
+size_t CCountingUnserialize::calls = 0;
+
+class CLimitedVectorTest
+{
+public:
+    std::vector<uint8_t> values;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(LIMITED_VECTOR(values, 5));
+    }
+};
+
 BOOST_AUTO_TEST_CASE(sizes)
 {
     BOOST_CHECK_EQUAL(sizeof(char), GetSerializeSize(char(0), 0));
@@ -275,6 +309,116 @@ BOOST_AUTO_TEST_CASE(sigsharesinv_max_inv_size)
     llmq::CSigSharesInv invalid_inv;
     CDataStream invalid_stream = SigSharesInvStream(llmq::CSigSharesInv::MAX_INV_SIZE + 1);
     BOOST_CHECK_THROW(invalid_stream >> invalid_inv, std::ios_base::failure);
+}
+
+BOOST_AUTO_TEST_CASE(batched_sig_shares_rejects_oversized_inner_vector_before_allocation)
+{
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << VARINT(uint32_t{1});
+    WriteCompactSize(stream, llmq::MAX_MSGS_TOTAL_BATCHED_SIGS + 1);
+
+    llmq::CBatchedSigShares batched_sig_shares;
+    BOOST_CHECK_THROW(stream >> batched_sig_shares, std::ios_base::failure);
+    BOOST_CHECK(batched_sig_shares.sigShares.empty());
+}
+
+BOOST_AUTO_TEST_CASE(vector_deserialization_limits)
+{
+    CDataStream oversized_stream(SER_NETWORK, PROTOCOL_VERSION);
+    WriteCompactSize(oversized_stream, MAX_SIZE);
+
+    std::vector<CCountingUnserialize> oversized;
+    CCountingUnserialize::calls = 0;
+    BOOST_CHECK(!UnserializeVectorWithMaxSize(oversized_stream, oversized, 8));
+    BOOST_CHECK(oversized.empty());
+    BOOST_CHECK_EQUAL(CCountingUnserialize::calls, 0U);
+
+    const std::vector<CCountingUnserialize> exact(8);
+    CDataStream exact_stream(SER_NETWORK, PROTOCOL_VERSION);
+    exact_stream << exact;
+
+    std::vector<CCountingUnserialize> decoded;
+    CCountingUnserialize::calls = 0;
+    BOOST_CHECK(UnserializeVectorWithMaxSize(exact_stream, decoded, 8));
+    BOOST_CHECK_EQUAL(decoded.size(), exact.size());
+    BOOST_CHECK_EQUAL(CCountingUnserialize::calls, exact.size());
+}
+
+BOOST_AUTO_TEST_CASE(limited_vector_wire_compatibility_and_bound)
+{
+    CLimitedVectorTest oversized;
+    oversized.values.resize(6);
+
+    CDataStream limited_stream(SER_NETWORK, PROTOCOL_VERSION);
+    CDataStream ordinary_stream(SER_NETWORK, PROTOCOL_VERSION);
+    limited_stream << oversized;
+    ordinary_stream << oversized.values;
+    BOOST_CHECK_EQUAL_COLLECTIONS(limited_stream.begin(), limited_stream.end(), ordinary_stream.begin(), ordinary_stream.end());
+
+    CLimitedVectorTest rejected;
+    BOOST_CHECK_THROW(limited_stream >> rejected, std::ios_base::failure);
+    BOOST_CHECK(rejected.values.empty());
+
+    std::vector<uint8_t> ordinary_decoded;
+    ordinary_stream >> ordinary_decoded;
+    BOOST_CHECK(ordinary_decoded == oversized.values);
+
+    CLimitedVectorTest exact;
+    exact.values.resize(5);
+    CDataStream exact_stream(SER_NETWORK, PROTOCOL_VERSION);
+    exact_stream << exact;
+
+    CLimitedVectorTest exact_decoded;
+    BOOST_CHECK_NO_THROW(exact_stream >> exact_decoded);
+    BOOST_CHECK(exact_decoded.values == exact.values);
+}
+
+static llmq::CBatchedSigShares MakeBatchedSigShares(uint32_t session_id, size_t share_count)
+{
+    llmq::CBatchedSigShares batch;
+    batch.sessionId = session_id;
+    batch.sigShares.resize(share_count);
+    return batch;
+}
+
+BOOST_AUTO_TEST_CASE(batched_sig_shares_accepts_exact_inner_limit)
+{
+    const auto batched_sig_shares = MakeBatchedSigShares(1, llmq::MAX_MSGS_TOTAL_BATCHED_SIGS);
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << batched_sig_shares;
+
+    llmq::CBatchedSigShares decoded;
+    BOOST_CHECK_NO_THROW(stream >> decoded);
+    BOOST_CHECK_EQUAL(decoded.sigShares.size(), llmq::MAX_MSGS_TOTAL_BATCHED_SIGS);
+}
+
+BOOST_AUTO_TEST_CASE(batched_sig_shares_decoder_bounds_outer_and_aggregate_counts)
+{
+    const std::vector<llmq::CBatchedSigShares> too_many_batches(llmq::MAX_MSGS_TOTAL_BATCHED_SIGS + 1);
+    CDataStream outer_stream(SER_NETWORK, PROTOCOL_VERSION);
+    outer_stream << too_many_batches;
+    BOOST_CHECK_THROW(llmq::UnserializeBatchedSigShares(outer_stream), std::ios_base::failure);
+
+    const std::vector<llmq::CBatchedSigShares> too_many_shares{
+        MakeBatchedSigShares(1, 300),
+        MakeBatchedSigShares(2, 200),
+    };
+    CDataStream aggregate_stream(SER_NETWORK, PROTOCOL_VERSION);
+    aggregate_stream << too_many_shares;
+    BOOST_CHECK_THROW(llmq::UnserializeBatchedSigShares(aggregate_stream), std::ios_base::failure);
+
+    const std::vector<llmq::CBatchedSigShares> exact{
+        MakeBatchedSigShares(1, 200),
+        MakeBatchedSigShares(2, llmq::MAX_MSGS_TOTAL_BATCHED_SIGS - 200),
+    };
+    CDataStream exact_stream(SER_NETWORK, PROTOCOL_VERSION);
+    exact_stream << exact;
+
+    std::vector<llmq::CBatchedSigShares> decoded;
+    BOOST_CHECK_NO_THROW(decoded = llmq::UnserializeBatchedSigShares(exact_stream));
+    BOOST_REQUIRE_EQUAL(decoded.size(), exact.size());
+    BOOST_CHECK_EQUAL(decoded[0].sigShares.size(), exact[0].sigShares.size());
+    BOOST_CHECK_EQUAL(decoded[1].sigShares.size(), exact[1].sigShares.size());
 }
 
 

@@ -950,29 +950,25 @@ inline void Serialize(Stream& os, const std::vector<T, A>& v)
 }
 
 
-template<typename Stream, typename T, typename A>
-void Unserialize_impl(Stream& is, std::vector<T, A>& v, const unsigned char&)
+template <typename Stream, typename T, typename A>
+void UnserializeVectorContents(Stream& is, std::vector<T, A>& v, size_t nSize, const unsigned char&)
 {
     // Limit size per read so bogus size value won't cause out of memory
-    v.clear();
-    unsigned int nSize = ReadCompactSize(is);
-    unsigned int i = 0;
+    size_t i = 0;
     while (i < nSize)
     {
-        unsigned int blk = std::min(nSize - i, (unsigned int)(1 + 4999999 / sizeof(T)));
+        size_t blk = std::min(nSize - i, size_t{1 + 4999999 / sizeof(T)});
         v.resize(i + blk);
         is.read((char*)&v[i], blk * sizeof(T));
         i += blk;
     }
 }
 
-template<typename Stream, typename T, typename A, typename V>
-void Unserialize_impl(Stream& is, std::vector<T, A>& v, const V&)
+template <typename Stream, typename T, typename A, typename V>
+void UnserializeVectorContents(Stream& is, std::vector<T, A>& v, size_t nSize, const V&)
 {
-    v.clear();
-    unsigned int nSize = ReadCompactSize(is);
-    unsigned int i = 0;
-    unsigned int nMid = 0;
+    size_t i = 0;
+    size_t nMid = 0;
     while (nMid < nSize)
     {
         nMid += 5000000 / sizeof(T);
@@ -987,9 +983,57 @@ void Unserialize_impl(Stream& is, std::vector<T, A>& v, const V&)
 template<typename Stream, typename T, typename A>
 inline void Unserialize(Stream& is, std::vector<T, A>& v)
 {
-    Unserialize_impl(is, v, T());
+    v.clear();
+    UnserializeVectorContents(is, v, ReadCompactSize(is), T());
 }
 
+/** Read a CompactSize-prefixed vector while rejecting counts above maxSize
+ * before allocating or decoding any element. */
+template <typename Stream, typename T, typename A>
+[[nodiscard]] bool UnserializeVectorWithMaxSize(Stream& is, std::vector<T, A>& v, size_t maxSize)
+{
+    v.clear();
+    const size_t size = ReadCompactSize(is);
+    if (size > maxSize) {
+        return false;
+    }
+    UnserializeVectorContents(is, v, size, T());
+    return true;
+}
+
+/** A vector reader with a compile-time deserialization limit and the ordinary
+ * wire format. Serialization remains unbounded for peer compatibility. */
+template <size_t Limit, typename T, typename A>
+class LimitedVector
+{
+private:
+    std::vector<T, A>& vector;
+
+public:
+    explicit LimitedVector(std::vector<T, A>& vectorIn) : vector(vectorIn) {}
+
+    template <typename Stream>
+    void Serialize(Stream& s) const
+    {
+        ::Serialize(s, vector);
+    }
+
+    template <typename Stream>
+    void Unserialize(Stream& s)
+    {
+        if (!UnserializeVectorWithMaxSize(s, vector, Limit)) {
+            throw std::ios_base::failure("Vector length limit exceeded");
+        }
+    }
+};
+
+template <size_t Limit, typename T, typename A>
+LimitedVector<Limit, T, A> WrapLimitedVector(std::vector<T, A>& vector)
+{
+    return LimitedVector<Limit, T, A>(vector);
+}
+
+#define LIMITED_VECTOR(obj, n) REF(WrapLimitedVector<n>(REF(obj)))
 
 
 /**
