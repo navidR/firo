@@ -688,11 +688,15 @@ void RemoveSpendReferencingBlock(CTxMemPool& pool, CBlockIndex* blockIndex) {
     }
 }
 
-void DisconnectTipSpark(CBlock& block, CBlockIndex *pindexDelete) {
+void DisconnectTipSpark(CBlock& block, CBlockIndex* pindexDelete, bool updatePools)
+{
     CSparkNameManager *sparkNameManager = CSparkNameManager::GetInstance();
     sparkNameManager->RemoveBlock(pindexDelete);
 
     sparkState.RemoveBlock(pindexDelete);
+
+    if (!updatePools)
+        return;
 
     // Spark verification depends on active-chain cover-set data. Refresh all
     // cached results after a disconnect so they use the current chain context.
@@ -839,7 +843,8 @@ bool CheckSparkSpendTransaction(
         int nHeight,
         bool isCheckWallet,
         bool fStatefulSigmaCheck,
-        CSparkTxInfo* sparkTxInfo) {
+        CSparkTxInfo* sparkTxInfo,
+        bool fDisconnectPreflight) {
 
     std::unordered_set<GroupElement, spark::CLTagHash> txLTags;
 
@@ -1066,7 +1071,13 @@ bool CheckSparkSpendTransaction(
     std::unordered_map<uint64_t, CoverSetData> cover_set_data;
 
     BatchProofContainer* batchProofContainer = BatchProofContainer::get_instance();
-    bool useBatching = batchProofContainer->fCollectProofs && !isVerifyDB && !isCheckWallet && sparkTxInfo && !sparkTxInfo->fInfoIsComplete;
+    bool useBatching =
+        !fDisconnectPreflight &&
+        batchProofContainer->fCollectProofs &&
+        !isVerifyDB &&
+        !isCheckWallet &&
+        sparkTxInfo &&
+        !sparkTxInfo->fInfoIsComplete;
 
     for (const auto& idAndHash : idAndBlockHashes) {
         const uint64_t wireGroupId = idAndHash.first;
@@ -1226,7 +1237,7 @@ bool CheckSparkSpendTransaction(
             bool haveCachedSuccess = false;
             // The cache is txid-only. VerifyDB reconstructs cover sets at the
             // historical height, so a mempool success must not skip re-verify.
-            if (!isVerifyDB) {
+            if (!isVerifyDB && !fDisconnectPreflight) {
                 LOCK(cs_checkedSparkSpendTransactions);
                 haveCachedSuccess = gCheckedSparkSpendTransactions.exists(hashTx);
             }
@@ -1276,7 +1287,7 @@ bool CheckSparkSpendTransaction(
 
         // do not check for duplicates in case we've seen exact copy of this tx in this block before
         if (!(sparkTxInfo && sparkTxInfo->spTransactions.count(hashTx) > 0)) {
-            const bool fConnectTip = sparkTxInfo &&
+            const bool fConnectTip = !fDisconnectPreflight && sparkTxInfo &&
                 (!isVerifyDB || activeVerifyDBContext);
             CSparkState& validationSparkState =
                 SparkStateForValidation(isVerifyDB);
@@ -1338,7 +1349,8 @@ bool CheckSparkTransaction(
         int nHeight,
         bool isCheckWallet,
         bool fStatefulSigmaCheck,
-        CSparkTxInfo* sparkTxInfo)
+        CSparkTxInfo* sparkTxInfo,
+        bool fDisconnectPreflight)
 {
     Consensus::Params const & consensus = ::Params().GetConsensus();
 
@@ -1391,11 +1403,13 @@ bool CheckSparkTransaction(
         try {
             if (!CheckSparkSpendTransaction(
                     tx, state, hashTx, isVerifyDB, nHeight,
-                    isCheckWallet, fStatefulSigmaCheck, sparkTxInfo)) {
+                    isCheckWallet, fStatefulSigmaCheck, sparkTxInfo,
+                    fDisconnectPreflight)) {
                 return false;
             }
 
-            if (!isVerifyDB || activeVerifyDBContext) {
+            if (!fDisconnectPreflight &&
+                (!isVerifyDB || activeVerifyDBContext)) {
                 CSparkNameManager *sparkNameManager =
                     SparkNameManagerForValidation(isVerifyDB);
                 CSparkNameTxData sparkTxData;
@@ -1587,6 +1601,7 @@ void CSparkState::Reset() {
     }
     usedLTags.clear();
     mobileUsedLTags.clear();
+    ltagTxhash.clear();
     mintMetaInfo.clear();
     spendMetaInfo.clear();
 }
@@ -1761,8 +1776,11 @@ void CSparkState::AddLTagTxHash(const uint256& lTagHash, const uint256& txHash) 
 
 void CSparkState::RemoveSpend(const GroupElement& lTag) {
     auto iter = usedLTags.find(lTag);
+    if (iter != usedLTags.end())
+        ltagTxhash.erase(primitives::GetLTagHash(lTag));
     if (GetBoolArg("-mobile", false) && iter != usedLTags.end()) {
-        for (auto tag = mobileUsedLTags.begin(); tag != mobileUsedLTags.end(); tag++) {
+        for (auto tag = mobileUsedLTags.end(); tag != mobileUsedLTags.begin();) {
+            --tag;
             if (tag->first == lTag) {
                 mobileUsedLTags.erase(tag);
                 break;
@@ -1808,6 +1826,92 @@ void CSparkState::AddBlock(CBlockIndex *index) {
             AddLTagTxHash(elem.first, elem.second);
         }
     }
+}
+
+bool CSparkState::CanRemoveBlocks(
+        CBlockIndex* tip,
+        int targetHeight) const {
+    auto simulatedCoinGroups = coinGroups;
+    int simulatedLatestCoinId = latestCoinId;
+
+    for (CBlockIndex* index = tip;
+         index && index->nHeight > targetHeight;
+         index = index->pprev) {
+        for (const auto& coins : index->sparkMintedCoins) {
+            if (coins.second.empty())
+                continue;
+
+            auto groupIt = simulatedCoinGroups.find(coins.first);
+            if (groupIt == simulatedCoinGroups.end())
+                return false;
+
+            SparkCoinGroupInfo& coinGroup = groupIt->second;
+            const size_t nMintsToForget = coins.second.size();
+            if (!cmp::greater_equal(
+                    coinGroup.nCoins, nMintsToForget)) {
+                return false;
+            }
+            coinGroup.nCoins -= nMintsToForget;
+
+            const bool isExtended = coins.first > 1;
+            bool isEdgedBlock = false;
+            if (isExtended) {
+                CBlockIndex* previousMintBlock = index;
+                size_t previousGroupCount = 0;
+                do {
+                    previousMintBlock =
+                        previousMintBlock->pprev;
+                } while (previousMintBlock &&
+                         CountCoinInBlock(
+                             previousMintBlock,
+                             coins.first) == 0 &&
+                         (previousGroupCount =
+                              CountCoinInBlock(
+                                  previousMintBlock,
+                                  coins.first - 1)) == 0);
+
+                if (cmp::less(
+                        coinGroup.nCoins,
+                        previousGroupCount)) {
+                    return false;
+                }
+                isEdgedBlock =
+                    previousGroupCount > 0 &&
+                    cmp::less(
+                        coinGroup.nCoins -
+                            previousGroupCount,
+                        startGroupSize);
+            }
+
+            if ((!isExtended && coinGroup.nCoins == 0) ||
+                    (isExtended && isEdgedBlock)) {
+                if (coins.first != simulatedLatestCoinId)
+                    return false;
+                simulatedCoinGroups.erase(groupIt);
+                --simulatedLatestCoinId;
+                continue;
+            }
+
+            if (coinGroup.lastBlock != index)
+                return false;
+            do {
+                if (!coinGroup.lastBlock ||
+                        coinGroup.lastBlock ==
+                            coinGroup.firstBlock) {
+                    return false;
+                }
+                coinGroup.lastBlock =
+                    coinGroup.lastBlock->pprev;
+            } while (coinGroup.lastBlock &&
+                     CountCoinInBlock(
+                         coinGroup.lastBlock,
+                         coins.first) == 0);
+            if (!coinGroup.lastBlock)
+                return false;
+        }
+    }
+
+    return true;
 }
 
 void CSparkState::RemoveBlock(CBlockIndex *index) {

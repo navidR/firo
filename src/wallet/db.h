@@ -263,22 +263,22 @@ protected:
     }
 
 public:
-    bool TxnBegin()
+    bool TxnBegin(int flags = DB_TXN_WRITE_NOSYNC)
     {
         if (!pdb || activeTxn)
             return false;
-        DbTxn* ptxn = bitdb.TxnBegin();
+        DbTxn* ptxn = bitdb.TxnBegin(flags);
         if (!ptxn)
             return false;
         activeTxn = ptxn;
         return true;
     }
 
-    bool TxnCommit()
+    bool TxnCommit(int flags = 0)
     {
         if (!pdb || !activeTxn)
             return false;
-        int ret = activeTxn->commit(0);
+        int ret = activeTxn->commit(flags);
         activeTxn = NULL;
         return (ret == 0);
     }

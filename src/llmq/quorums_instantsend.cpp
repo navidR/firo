@@ -28,8 +28,25 @@ namespace llmq
 
 static const std::string INPUTLOCK_REQUESTID_PREFIX = "inlock";
 static const std::string ISLOCK_REQUESTID_PREFIX = "islock";
+static const int ARCHIVED_ISLOCK_RETENTION = 100;
 
 CInstantSendManager* quorumInstantSendManager;
+
+uint256 GetInstantSendInputRequestId(
+    const COutPoint& outpoint)
+{
+    return ::SerializeHash(
+        std::make_pair(
+            INPUTLOCK_REQUESTID_PREFIX,
+            outpoint));
+}
+
+uint256 GetInstantSendInputRequestId(
+    const CTxIn& input)
+{
+    return GetInstantSendInputRequestId(
+        input.prevout);
+}
 
 uint256 CInstantSendLock::GetRequestId() const
 {
@@ -181,6 +198,39 @@ void CInstantSendDb::RemoveArchivedInstantSendLocks(int nUntilHeight)
 bool CInstantSendDb::HasArchivedInstantSendLock(const uint256& islockHash)
 {
     return db.Exists(std::make_tuple(std::string("is_a2"), islockHash));
+}
+
+bool CInstantSendDb::HasArchivedInstantSendLockInRange(
+    int minHeight,
+    int maxHeight)
+{
+    if (minHeight > maxHeight)
+        return false;
+
+    auto it = std::unique_ptr<CDBIterator>(db.NewIterator());
+    auto firstKey =
+        BuildInversedISLockKey("is_a1", maxHeight, uint256());
+    it->Seek(firstKey);
+    while (it->Valid()) {
+        decltype(firstKey) key;
+        if (!it->GetKey(key) || std::get<0>(key) != "is_a1")
+            break;
+
+        const int height =
+            std::numeric_limits<uint32_t>::max() -
+            be32toh(std::get<1>(key));
+        if (height < minHeight)
+            break;
+        if (height <= maxHeight)
+            return true;
+        it->Next();
+    }
+    return false;
+}
+
+bool CInstantSendDb::Sync()
+{
+    return db.Sync();
 }
 
 size_t CInstantSendDb::GetInstantSendLockCount()
@@ -435,7 +485,8 @@ bool CInstantSendManager::ProcessTx(const CTransaction& tx, bool allowReSigning,
 
     size_t alreadyVotedCount = 0;
     for (const auto& in : tx.vin) {
-        auto id = ::SerializeHash(std::make_pair(INPUTLOCK_REQUESTID_PREFIX, in.prevout));
+        auto id =
+            GetInstantSendInputRequestId(in);
         ids.emplace_back(id);
 
         uint256 otherTxHash;
@@ -619,7 +670,8 @@ void CInstantSendManager::HandleNewInputLockRecoveredSig(const CRecoveredSig& re
 
     if (LogAcceptCategory("instantsend")) {
         for (auto& in : tx->vin) {
-            auto id = ::SerializeHash(std::make_pair(INPUTLOCK_REQUESTID_PREFIX, in.prevout));
+            auto id =
+                GetInstantSendInputRequestId(in);
             if (id == recoveredSig.id) {
                 LogPrint("instantsend", "CInstantSendManager::%s -- txid=%s: got recovered sig for input %s\n", __func__,
                          txid.ToString(), in.prevout.ToStringShort());
@@ -636,7 +688,8 @@ void CInstantSendManager::TrySignInstantSendLock(const CTransaction& tx)
     auto llmqType = Params().GetConsensus().llmqForInstantSend;
 
     for (auto& in : tx.vin) {
-        auto id = ::SerializeHash(std::make_pair(INPUTLOCK_REQUESTID_PREFIX, in.prevout));
+        auto id =
+            GetInstantSendInputRequestId(in);
         if (!quorumSigningManager->HasRecoveredSig(llmqType, id, tx.GetHash())) {
             return;
         }
@@ -922,21 +975,28 @@ void CInstantSendManager::ProcessInstantSendLock(NodeId from, const uint256& has
         if (!hashBlock.IsNull()) {
             {
                 LOCK(cs_main);
-                pindexMined = mapBlockIndex.at(hashBlock);
-            }
+                const auto it = mapBlockIndex.find(hashBlock);
+                if (it != mapBlockIndex.end()) {
+                    pindexMined = it->second;
+                }
 
-            // Let's see if the TX that was locked by this islock is already mined in a ChainLocked block. If yes,
-            // we can simply ignore the islock, as the ChainLock implies locking of all TXs in that chain
-            if (llmq::chainLocksHandler->HasChainLock(pindexMined->nHeight, pindexMined->GetBlockHash())) {
-                LogPrint("instantsend", "CInstantSendManager::%s -- txlock=%s, islock=%s: dropping islock as it already got a ChainLock in block %s, peer=%d\n", __func__,
-                         islock.txid.ToString(), hash.ToString(), hashBlock.ToString(), from);
-                return;
+                // Let's see if the TX that was locked by this islock is already mined in a ChainLocked block. If yes,
+                // we can simply ignore the islock, as the ChainLock implies locking of all TXs in that chain
+                if (pindexMined &&
+                    chainActive.Contains(pindexMined) &&
+                    llmq::chainLocksHandler->HasChainLock(
+                        pindexMined->nHeight,
+                        pindexMined->GetBlockHash())) {
+                    LogPrint("instantsend", "CInstantSendManager::%s -- txlock=%s, islock=%s: dropping islock as it already got a ChainLock in block %s, peer=%d\n", __func__,
+                             islock.txid.ToString(), hash.ToString(), hashBlock.ToString(), from);
+                    return;
+                }
             }
         }
     }
 
     {
-        LOCK(cs);
+        LOCK2(cs_main, cs);
 
         LogPrint("instantsend", "CInstantSendManager::%s -- txid=%s, islock=%s: processsing islock, peer=%d\n", __func__,
                  islock.txid.ToString(), hash.ToString(), from);
@@ -962,7 +1022,8 @@ void CInstantSendManager::ProcessInstantSendLock(NodeId from, const uint256& has
         }
 
         db.WriteNewInstantSendLock(hash, islock);
-        if (pindexMined) {
+        if (pindexMined &&
+            chainActive.Contains(pindexMined)) {
             db.WriteInstantSendLockMined(hash, pindexMined->nHeight);
         }
 
@@ -1029,12 +1090,6 @@ void CInstantSendManager::SyncTransaction(const CTransaction& tx_, const CBlockI
     // conflicted TXs
     bool isConflictRemoved = isDisconnect && !inMempool;
 
-    if (isConflictRemoved) {
-        LOCK(cs);
-        RemoveConflictedTx(tx);
-        return;
-    }
-
     // This is different on develop as allowReSigning is passed in from the caller. In 0.14.0.x, we have to figure this out
 	// here to mimic develop.
     bool allowReSigning = !inMempool && !isDisconnect;
@@ -1052,6 +1107,11 @@ void CInstantSendManager::SyncTransaction(const CTransaction& tx_, const CBlockI
             } else {
                 db.WriteInstantSendLockMined(islockHash, pindex->nHeight);
             }
+        }
+
+        if (isConflictRemoved) {
+            RemoveConflictedTx(tx);
+            return;
         }
     }
 
@@ -1151,7 +1211,8 @@ void CInstantSendManager::RemoveConflictedTx(const CTransaction& tx)
     RemoveNonLockedTx(tx.GetHash(), false);
 
     for (const auto& in : tx.vin) {
-        auto inputRequestId = ::SerializeHash(std::make_pair(INPUTLOCK_REQUESTID_PREFIX, in));
+        auto inputRequestId =
+            GetInstantSendInputRequestId(in);
         inputRequestIds.erase(inputRequestId);
     }
 }
@@ -1178,6 +1239,141 @@ void CInstantSendManager::UpdatedBlockTip(const CBlockIndex* pindexNew)
     }
 }
 
+bool CInstantSendManager::CanRollbackToHeight(
+    int currentHeight,
+    const CBlockIndex* targetTip)
+{
+    assert(targetTip);
+
+    const auto& consensus = Params().GetConsensus();
+    const bool chainLocksEnabled =
+        !fLiteMode &&
+        chainLocksHandler &&
+        CSporkManager::GetSporkManager()->
+            IsFeatureEnabled(
+                CSporkAction::featureChainlocks,
+                targetTip);
+    const bool chainLocksEnforced =
+        chainLocksEnabled &&
+        (targetTip->nHeight >= consensus.DIP0008Height ||
+         Params().NetworkIDString() ==
+             CBaseChainParams::TESTNET);
+    if (chainLocksEnforced &&
+        chainLocksHandler->HasChainLock(
+            targetTip->nHeight,
+            targetTip->GetBlockHash())) {
+        return true;
+    }
+
+    const int targetHeight = targetTip->nHeight;
+    const int minHeight = std::max(
+        targetHeight - consensus.nInstantSendKeepLock + 1,
+        consensus.DIP0003Height);
+    const int maxHeight = targetHeight;
+    if (minHeight > maxHeight)
+        return true;
+
+    // ChainLocks can archive locks through the current tip. Older archive
+    // entries have discarded both their payload and hash, so their absence can
+    // no longer prove that rollback is safe.
+    if (minHeight <=
+        currentHeight - ARCHIVED_ISLOCK_RETENTION) {
+        return false;
+    }
+
+    LOCK(cs);
+    return !db.HasArchivedInstantSendLockInRange(
+        minHeight, maxHeight);
+}
+
+void CInstantSendManager::RemoveMinedInstantSendLocks(
+    const CBlock& block,
+    int height)
+{
+    LOCK(cs);
+    for (const CTransactionRef& txRef : block.vtx) {
+        if (txRef->IsCoinBase() || txRef->vin.empty())
+            continue;
+
+        const CTransaction& tx =
+            txRef->IsSparkSpend()
+            ? isutils::AdaptPrivateTx(*txRef)
+            : *txRef;
+        const uint256 islockHash =
+            db.GetInstantSendLockHashByTxid(tx.GetHash());
+        if (!islockHash.IsNull())
+            db.RemoveInstantSendLockMined(
+                islockHash, height);
+    }
+}
+
+void CInstantSendManager::RestoreMinedInstantSendLocks(
+    const CBlock& block,
+    int height)
+{
+    LOCK(cs);
+    for (const CTransactionRef& txRef : block.vtx) {
+        if (txRef->IsCoinBase() || txRef->vin.empty())
+            continue;
+
+        const CTransaction& tx =
+            txRef->IsSparkSpend()
+            ? isutils::AdaptPrivateTx(*txRef)
+            : *txRef;
+        const uint256 islockHash =
+            db.GetInstantSendLockHashByTxid(tx.GetHash());
+        if (!islockHash.IsNull())
+            db.WriteInstantSendLockMined(islockHash, height);
+    }
+}
+
+bool CInstantSendManager::SyncRecoveredMinedInstantSendLocks()
+{
+    LOCK(cs);
+    return db.Sync();
+}
+
+void CInstantSendManager::ClearRemovedTxState(
+    const CBlockIndex* pindexTip)
+{
+    AssertLockHeld(cs_main);
+    assert(pindexTip);
+    LOCK(cs);
+
+    std::vector<CTransactionRef> transactions;
+    transactions.reserve(nonLockedTxs.size());
+    for (const auto& entry : nonLockedTxs) {
+        if (!entry.second.tx)
+            continue;
+        const CBlockIndex* pindexMined =
+            entry.second.pindexMined;
+        if (pindexMined &&
+            pindexMined->nHeight <=
+                pindexTip->nHeight &&
+            pindexTip->GetAncestor(
+                pindexMined->nHeight) ==
+                pindexMined) {
+            continue;
+        }
+        transactions.emplace_back(entry.second.tx);
+    }
+
+    for (const CTransactionRef& tx : transactions) {
+        const auto creatingIt =
+            txToCreatingInstantSendLocks.find(
+                tx->GetHash());
+        if (creatingIt !=
+            txToCreatingInstantSendLocks.end()) {
+            creatingInstantSendLocks.erase(
+                creatingIt->second->GetRequestId());
+            txToCreatingInstantSendLocks.erase(
+                creatingIt);
+        }
+        pendingRetryTxs.erase(tx->GetHash());
+        RemoveConflictedTx(*tx);
+    }
+}
+
 void CInstantSendManager::HandleFullyConfirmedBlock(const CBlockIndex* pindex)
 {
     auto& consensusParams = Params().GetConsensus();
@@ -1187,8 +1383,10 @@ void CInstantSendManager::HandleFullyConfirmedBlock(const CBlockIndex* pindex)
         LOCK(cs);
 
         removeISLocks = db.RemoveConfirmedInstantSendLocks(pindex->nHeight);
-        if (pindex->nHeight > 100) {
-            db.RemoveArchivedInstantSendLocks(pindex->nHeight - 100);
+        if (pindex->nHeight > ARCHIVED_ISLOCK_RETENTION) {
+            db.RemoveArchivedInstantSendLocks(
+                pindex->nHeight -
+                ARCHIVED_ISLOCK_RETENTION);
         }
         for (auto& p : removeISLocks) {
             auto& islockHash = p.first;
@@ -1197,7 +1395,8 @@ void CInstantSendManager::HandleFullyConfirmedBlock(const CBlockIndex* pindex)
                      islock->txid.ToString(), islockHash.ToString());
 
             for (auto& in : islock->inputs) {
-                auto inputRequestId = ::SerializeHash(std::make_pair(INPUTLOCK_REQUESTID_PREFIX, in));
+                auto inputRequestId =
+                    GetInstantSendInputRequestId(in);
                 inputRequestIds.erase(inputRequestId);
 
                 // no need to keep recovered sigs for fully confirmed IS locks, as there is no chance for conflicts

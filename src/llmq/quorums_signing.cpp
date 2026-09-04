@@ -747,7 +747,9 @@ bool CSigningManager::AsyncSignIfMember(Consensus::LLMQType llmqType, const uint
 {
     FIRO_UNUSED auto& params = Params().GetConsensus().llmqs.at(llmqType);
 
-    if (!fMasternodeMode || activeMasternodeInfo.proTxHash.IsNull()) {
+    const uint256 activeProTxHash =
+        GetActiveMasternodeProTxHash();
+    if (!fMasternodeMode || activeProTxHash.IsNull()) {
         return false;
     }
 
@@ -798,7 +800,7 @@ bool CSigningManager::AsyncSignIfMember(Consensus::LLMQType llmqType, const uint
         return false;
     }
 
-    if (!quorum->IsValidMember(activeMasternodeInfo.proTxHash)) {
+    if (!quorum->IsValidMember(activeProTxHash)) {
         //LogPrint("llmq", "CSigningManager::%s -- we're not a valid member of quorum %s\n", __func__, quorum->quorumHash.ToString());
         return false;
     }

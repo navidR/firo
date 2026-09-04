@@ -355,7 +355,8 @@ void Shutdown()
         pdsNotificationInterface = NULL;
     }
     if (fMasternodeMode) {
-        UnregisterValidationInterface(activeMasternodeManager);
+        delete activeMasternodeManager;
+        activeMasternodeManager = nullptr;
     }
 
     // make sure to clean up BLS keys before global destructors are called (they have allocated from the secure memory pool)
@@ -835,11 +836,6 @@ void ThreadImport(std::vector <boost::filesystem::path> vImportFiles) {
     // but don't call it directly to prevent triggering of other listeners like zmq etc.
     // GetMainSignals().UpdatedBlockTip(chainActive.Tip());
     pdsNotificationInterface->InitializeCurrentBlockTip();
-
-    if (fMasternodeMode) {
-        assert(activeMasternodeManager);
-        activeMasternodeManager->Init();
-    }
 
 #ifdef ENABLE_WALLET
     // we can't do this before DIP3 is fully initialized
@@ -2013,6 +2009,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of unused mempool space)\n", nCoinCacheUsage * (1.0 / 1024 / 1024), nMempoolSizeMax * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
+    bool fDeferredPopBlocksRewind = false;
     while (!fLoaded) {
         bool fReset = fReindex;
         std::string strLoadError;
@@ -2114,7 +2111,11 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
 
                 deterministicMNManager->UpgradeDBIfNeeded();
 
-                if (!fReindex && chainActive.Tip() != NULL) {
+                fDeferredPopBlocksRewind =
+                    evoDb->HasPopBlocksRecovery();
+                if (!fReindex &&
+                    chainActive.Tip() != NULL &&
+                    !fDeferredPopBlocksRewind) {
                     uiInterface.InitMessage(_("Rewinding blocks..."));
                     if (!RewindBlockIndex(chainparams)) {
                         strLoadError = _("Unable to rewind the database to a pre-fork state. You will need to redownload the blockchain");
@@ -2208,6 +2209,18 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("No wallet support compiled in!\n");
 #endif // !ENABLE_WALLET
 
+    if (!FinishInterruptedPopBlocks(chainparams)) {
+        return InitError(
+            _("Failed to finish interrupted popblocks recovery"));
+    }
+    if (fDeferredPopBlocksRewind) {
+        uiInterface.InitMessage(_("Rewinding blocks..."));
+        if (!RewindBlockIndex(chainparams)) {
+            return InitError(
+                _("Unable to rewind the database to a pre-fork state. You will need to redownload the blockchain"));
+        }
+    }
+
     // ********************************************************* Step 9: data directory maintenance
     LogPrintf("Step 9: data directory maintenance **********************\n");
     // if pruning, unset the service bit and perform the initial blockstore prune
@@ -2273,9 +2286,8 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
             return InitError(_("You must specify a znodeblsprivkey in the configuration. Please see documentation for help."));
         }
 
-        // Create and register activeMasternodeManager, will init later in ThreadImport
+        // CDS updates this manager before notifying LLMQ consumers.
         activeMasternodeManager = new CActiveMasternodeManager();
-        RegisterValidationInterface(activeMasternodeManager);
     }
 
     if (activeMasternodeInfo.blsKeyOperator == nullptr) {

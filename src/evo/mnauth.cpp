@@ -16,7 +16,9 @@
 
 void CMNAuth::PushMNAUTH(CNode* pnode, CConnman& connman)
 {
-    if (!fMasternodeMode || activeMasternodeInfo.proTxHash.IsNull()) {
+    const uint256 activeProTxHash =
+        GetActiveMasternodeProTxHash();
+    if (!fMasternodeMode || activeProTxHash.IsNull()) {
         return;
     }
 
@@ -36,7 +38,7 @@ void CMNAuth::PushMNAUTH(CNode* pnode, CConnman& connman)
     }
 
     CMNAuth mnauth;
-    mnauth.proRegTxHash = activeMasternodeInfo.proTxHash;
+    mnauth.proRegTxHash = activeProTxHash;
     mnauth.sig = activeMasternodeInfo.blsKeyOperator->Sign(signHash);
 
     LogPrint("net", "CMNAuth::%s -- Sending MNAUTH, peer=%d\n", __func__, pnode->id);

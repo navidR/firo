@@ -1829,6 +1829,40 @@ UniValue reconsiderblock(const JSONRPCRequest& request)
     return NullUniValue;
 }
 
+UniValue popblocks(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "popblocks nblocks\n"
+            "\nDisconnects and deliberately forgets the most recent active-chain blocks.\n"
+            "All known blocks above the resulting height, including side branches, lose their locally stored block and undo metadata and must be downloaded and validated again.\n"
+            "Both transaction pools are cleared instead of receiving disconnected transactions; wallet-owned unconfirmed transactions may be rebroadcast later.\n"
+            "The command is unavailable when the address index or spent index is enabled.\n"
+            "Wallet support must be enabled and the wallet loaded so its Spark state can be rolled back safely.\n"
+            "It is also rejected if retained transactions would lose archived InstantSend protection.\n"
+            "Every block being removed must still have local block and undo data, so the range cannot include pruned data.\n"
+            "The full range is preflighted before mutation; requests whose retained preflight state exceeds the memory safety budget must use a smaller block count.\n"
+            "\nArguments:\n"
+            "1. nblocks    (numeric, required) Number of blocks to remove; the genesis block cannot be removed\n"
+            "\nResult:\n"
+            "n             (numeric) The resulting chain height\n"
+            "\nExamples:\n"
+            + HelpExampleCli("popblocks", "100")
+            + HelpExampleRpc("popblocks", "100"));
+
+    RPCTypeCheckArgument(request.params[0], UniValue::VNUM);
+    const int blocks = ParseInt32V(request.params[0], "nblocks");
+    CValidationState state;
+    int resultingHeight;
+    if (!PopBlocks(blocks, state, resultingHeight)) {
+        if (state.GetRejectReason() == "invalid-block-count")
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Block count must be positive and cannot remove the genesis block.");
+        throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+    }
+
+    return resultingHeight;
+}
+
 UniValue getspecialtxes(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() < 1 || request.params.size() > 5)
@@ -1968,6 +2002,7 @@ static const CRPCCommand commands[] =
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        true,  {"blockhash"} },
     { "hidden",             "reconsiderblock",        &reconsiderblock,        true,  {"blockhash"} },
+    { "hidden",             "popblocks",              &popblocks,              true,  {"nblocks"} },
     { "hidden",             "waitfornewblock",        &waitfornewblock,        true,  {"timeout"} },
     { "hidden",             "waitforblock",           &waitforblock,           true,  {"blockhash","timeout"} },
     { "hidden",             "waitforblockheight",     &waitforblockheight,     true,  {"height","timeout"} },

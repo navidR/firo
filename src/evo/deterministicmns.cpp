@@ -588,7 +588,11 @@ bool CDeterministicMNManager::ProcessBlock(
 }
 
 bool CDeterministicMNManager::UndoBlock(
-        const CBlock& block, const CBlockIndex* pindex, bool fNotify)
+        const CBlock& block,
+        const CBlockIndex* pindex,
+        bool fNotify,
+        bool fJustCheck,
+        bool fUpdateTip)
 {
     int nHeight = pindex->nHeight;
     uint256 blockHash = block.GetHash();
@@ -598,7 +602,15 @@ bool CDeterministicMNManager::UndoBlock(
     CDeterministicMNListDiff diff;
     {
         LOCK(cs);
-        evoDb.Read(std::make_pair(DB_LIST_DIFF, blockHash), diff);
+        const bool hasDiff =
+            evoDb.Read(std::make_pair(DB_LIST_DIFF, blockHash), diff);
+        if (pindex->nHeight >= Params().GetConsensus().DIP0003Height &&
+            !hasDiff) {
+            return false;
+        }
+
+        if (fJustCheck)
+            return true;
 
         if (diff.HasChanges()) {
             // need to call this before erasing
@@ -610,6 +622,8 @@ bool CDeterministicMNManager::UndoBlock(
         evoDb.Erase(std::make_pair(DB_LIST_SNAPSHOT, blockHash));
 
         mnListsCache.erase(blockHash);
+        if (fUpdateTip)
+            tipIndex = pindex->pprev;
     }
 
     if (fNotify && diff.HasChanges()) {

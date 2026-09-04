@@ -110,6 +110,16 @@ public:
     void RemoveSparkMints(const std::vector<spark::Coin>& mints);
     // mark the coins of the given linking tags as unspent again
     void RemoveSparkSpends(const std::vector<GroupElement>& lTags);
+    // Resolve wallet-owned mints and verify that a rollback transaction can
+    // be opened before PopBlocks mutates chainstate.
+    bool PrepareSparkStateRemoval(
+        const std::vector<spark::Coin>& mints,
+        std::vector<uint256>& mintHashes);
+    // Atomically persist and apply the combined rollback used by PopBlocks.
+    bool RemoveSparkState(
+        const std::vector<uint256>& mintHashes,
+        const std::vector<GroupElement>& lTags);
+    uint256 GetFullViewKeyHash() const;
     void AbandonSparkMints(const std::vector<spark::Coin>& mints);
     void AbandonSpends(const std::vector<GroupElement>& spends);
 

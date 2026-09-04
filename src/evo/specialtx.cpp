@@ -179,7 +179,12 @@ bool ProcessSpecialTxsInBlock(
 }
 
 bool UndoSpecialTxsInBlock(
-        const CBlock& block, const CBlockIndex* pindex, bool fNotify)
+        const CBlock& block,
+        const CBlockIndex* pindex,
+        bool fNotify,
+        bool fAddMinable,
+        bool fJustCheck,
+        bool fUpdateMNManagerTip)
 {
     for (int i = (int)block.vtx.size() - 1; i >= 0; --i) {
         const CTransaction& tx = *block.vtx[i];
@@ -188,11 +193,14 @@ bool UndoSpecialTxsInBlock(
         }
     }
 
-    if (!deterministicMNManager->UndoBlock(block, pindex, fNotify)) {
+    if (!deterministicMNManager->UndoBlock(
+            block, pindex, fNotify, fJustCheck,
+            fUpdateMNManagerTip)) {
         return false;
     }
 
-    if (!llmq::quorumBlockProcessor->UndoBlock(block, pindex, fNotify)) {
+    if (!llmq::quorumBlockProcessor->UndoBlock(
+            block, pindex, fAddMinable, fJustCheck)) {
         return false;
     }
 

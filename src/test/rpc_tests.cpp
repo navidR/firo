@@ -6,13 +6,26 @@
 #include "rpc/client.h"
 
 #include "base58.h"
+#include "clientversion.h"
+#include "evo/evodb.h"
+#include "keystore.h"
+#include "llmq/quorums_instantsend.h"
 #include "netbase.h"
+#include "script/sign.h"
+#ifdef ENABLE_WALLET
+#include "spark/sparkwallet.h"
+#endif
+#include "streams.h"
+#include "validation.h"
+#include "validationinterface.h"
 
 #include "test/test_bitcoin.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/test/unit_test.hpp>
+
+#include <limits>
 
 #include <univalue.h>
 
@@ -36,6 +49,111 @@ UniValue CallRPC(std::string args)
         throw std::runtime_error(find_value(objError, "message").get_str());
     }
 }
+
+namespace
+{
+
+class ScopedBool
+{
+public:
+    ScopedBool(bool& value, bool replacement) : value(value), original(value)
+    {
+        value = replacement;
+    }
+
+    ~ScopedBool()
+    {
+        value = original;
+    }
+
+private:
+    bool& value;
+    const bool original;
+};
+
+class PopBlocksNotificationRecorder : public CValidationInterface
+{
+public:
+    int tipNotifications{0};
+    const CBlockIndex* newTip{nullptr};
+    const CBlockIndex* fork{nullptr};
+    std::vector<const CBlockIndex*> transactionTips;
+    std::vector<int> transactionPositions;
+
+protected:
+    void UpdatedBlockTip(
+        const CBlockIndex* pindexNew,
+        const CBlockIndex* pindexFork,
+        bool) override
+    {
+        ++tipNotifications;
+        newTip = pindexNew;
+        fork = pindexFork;
+    }
+
+    void SyncTransaction(
+        const CTransaction&,
+        const CBlockIndex* pindex,
+        int posInBlock) override
+    {
+        transactionTips.push_back(pindex);
+        transactionPositions.push_back(posInBlock);
+    }
+};
+
+class ReentrantInvalidationRecorder :
+    public CValidationInterface
+{
+public:
+    explicit ReentrantInvalidationRecorder(
+        CBlockIndex* reentrantIndex) :
+        reentrantIndex(reentrantIndex)
+    {
+    }
+
+    int tipNotifications{0};
+    bool reentrantResult{false};
+
+protected:
+    void UpdatedBlockTip(
+        const CBlockIndex*,
+        const CBlockIndex*,
+        bool) override
+    {
+        ++tipNotifications;
+        if (tipNotifications != 1)
+            return;
+
+        LOCK(cs_main);
+        CValidationState state;
+        reentrantResult = InvalidateBlock(
+            state, Params(), reentrantIndex);
+    }
+
+private:
+    CBlockIndex* reentrantIndex;
+};
+
+class ScopedValidationRegistration
+{
+public:
+    explicit ScopedValidationRegistration(
+        CValidationInterface& validationInterface) :
+        validationInterface(validationInterface)
+    {
+        RegisterValidationInterface(&validationInterface);
+    }
+
+    ~ScopedValidationRegistration()
+    {
+        UnregisterValidationInterface(&validationInterface);
+    }
+
+private:
+    CValidationInterface& validationInterface;
+};
+
+} // namespace
 
 
 BOOST_FIXTURE_TEST_SUITE(rpc_tests, TestingSetup)
@@ -341,6 +459,703 @@ BOOST_AUTO_TEST_CASE(rpc_convert_values_generatetoaddress)
     BOOST_CHECK_EQUAL(result[0].get_int(), 1);
     BOOST_CHECK_EQUAL(result[1].get_str(), "mhMbmE2tE9xzJYCV9aNC8jKWN31vtGrguU");
     BOOST_CHECK_EQUAL(result[2].get_int(), 9);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_FIXTURE_TEST_SUITE(popblocks_rpc_tests, TestChain100Setup)
+
+BOOST_AUTO_TEST_CASE(popblocks_forgets_block_data)
+{
+    CBlockIndex* oldTip;
+    CBlockIndex* oldParent;
+    CBlock oldTipBlock;
+    CBlock oldParentBlock;
+    {
+        LOCK(cs_main);
+        oldTip = chainActive.Tip();
+        oldParent = oldTip->pprev;
+        BOOST_REQUIRE_EQUAL(chainActive.Height(), 100);
+        BOOST_REQUIRE(ReadBlockFromDisk(oldTipBlock, oldTip, Params().GetConsensus()));
+        BOOST_REQUIRE(ReadBlockFromDisk(oldParentBlock, oldParent, Params().GetConsensus()));
+    }
+
+    ScopedBool checkBlockIndex(fCheckBlockIndex, true);
+    BOOST_CHECK_EQUAL(CallRPC("popblocks 2").get_int(), 98);
+
+    {
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(chainActive.Height(), 98);
+        for (CBlockIndex* pindex : {oldParent, oldTip}) {
+            BOOST_CHECK_EQUAL(pindex->nStatus & (BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO), 0U);
+            BOOST_CHECK_EQUAL(pindex->nStatus & BLOCK_FAILED_MASK, 0U);
+            BOOST_CHECK_EQUAL(pindex->nStatus & BLOCK_VALID_MASK, BLOCK_VALID_TREE);
+            BOOST_CHECK_EQUAL(pindex->nFile, 0);
+            BOOST_CHECK_EQUAL(pindex->nDataPos, 0U);
+            BOOST_CHECK_EQUAL(pindex->nUndoPos, 0U);
+            BOOST_CHECK_EQUAL(pindex->nTx, 0U);
+            BOOST_CHECK_EQUAL(pindex->nChainTx, 0U);
+            BOOST_CHECK_EQUAL(pindex->nSequenceId, 0);
+        }
+    }
+
+    bool newBlock = false;
+    BOOST_REQUIRE(ProcessNewBlock(Params(), std::make_shared<const CBlock>(oldParentBlock), true, &newBlock));
+    BOOST_CHECK(newBlock);
+    BOOST_REQUIRE(ProcessNewBlock(Params(), std::make_shared<const CBlock>(oldTipBlock), true, &newBlock));
+    BOOST_CHECK(newBlock);
+    BOOST_CHECK_EQUAL(chainActive.Height(), 100);
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_rejects_invalid_counts)
+{
+    BOOST_CHECK_THROW(CallRPC("popblocks 0"), std::runtime_error);
+    BOOST_CHECK_THROW(CallRPC("popblocks -1"), std::runtime_error);
+    BOOST_CHECK_THROW(CallRPC("popblocks 101"), std::runtime_error);
+    BOOST_CHECK_THROW(CallRPC("popblocks true"), std::runtime_error);
+    BOOST_CHECK_THROW(CallRPC("popblocks 2147483648"), std::runtime_error);
+}
+
+BOOST_AUTO_TEST_CASE(disconnect_mask_skips_later_duplicate_txids)
+{
+    CMutableTransaction transaction;
+    transaction.vin.emplace_back(
+        COutPoint(uint256S("01"), 0));
+    transaction.vout.emplace_back(
+        CENT, CScript() << OP_TRUE);
+    const CTransactionRef duplicate =
+        MakeTransactionRef(transaction);
+
+    CBlock block;
+    block.vtx = {duplicate, duplicate};
+    const std::vector<bool> undoTransaction =
+        GetBlockUndoTransactionMask(block);
+    BOOST_REQUIRE_EQUAL(undoTransaction.size(), 2U);
+    BOOST_CHECK(undoTransaction[0]);
+    BOOST_CHECK(!undoTransaction[1]);
+}
+
+BOOST_AUTO_TEST_CASE(instantsend_input_request_id_uses_only_prevout)
+{
+    const COutPoint prevout(uint256S("01"), 2);
+    CTxIn first(prevout);
+    CTxIn second(prevout);
+    first.scriptSig = CScript() << 1;
+    second.scriptSig = CScript() << 2;
+    first.nSequence = 1;
+    second.nSequence = 2;
+
+    BOOST_CHECK(
+        llmq::GetInstantSendInputRequestId(first) ==
+        llmq::GetInstantSendInputRequestId(second));
+    BOOST_CHECK(
+        llmq::GetInstantSendInputRequestId(first) ==
+        llmq::GetInstantSendInputRequestId(prevout));
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_recovery_repairs_evodb_after_split_flush)
+{
+    uint256 initialTipHash;
+    CBlockIndex* forgottenIndex;
+    {
+        LOCK(cs_main);
+        forgottenIndex = chainActive.Tip();
+        initialTipHash =
+            forgottenIndex->GetBlockHash();
+    }
+
+    BOOST_REQUIRE(DisconnectBlocks(1));
+    BOOST_REQUIRE(pcoinsTip->Flush());
+    {
+        auto dbTx = evoDb->BeginTransaction();
+        evoDb->WriteBestBlock(initialTipHash);
+        dbTx->Commit();
+    }
+    BOOST_REQUIRE(evoDb->CommitRootTransaction());
+    BOOST_REQUIRE(
+        evoDb->WritePopBlocksRecovery(
+            initialTipHash,
+            pcoinsTip->GetBestBlock(),
+            false,
+            {}));
+
+    BOOST_REQUIRE(
+        RecoverInterruptedPopBlocks(Params()));
+    uint256 evoTipHash;
+    BOOST_REQUIRE(evoDb->ReadBestBlock(evoTipHash));
+    {
+        LOCK(cs_main);
+        BOOST_CHECK(
+            evoTipHash ==
+            chainActive.Tip()->GetBlockHash());
+    }
+    BOOST_CHECK(evoDb->HasPopBlocksRecovery());
+
+    BOOST_REQUIRE(
+        FinishInterruptedPopBlocks(Params()));
+    BOOST_CHECK(!evoDb->HasPopBlocksRecovery());
+    BOOST_CHECK_EQUAL(
+        forgottenIndex->nStatus & BLOCK_HAVE_MASK,
+        0U);
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_recovery_finishes_partial_durable_rollback)
+{
+    CreateAndProcessBlock({}, coinbaseKey);
+    CreateAndProcessBlock({}, coinbaseKey);
+
+    CBlockIndex* initialTip;
+    CBlockIndex* targetTip;
+    {
+        LOCK(cs_main);
+        initialTip = chainActive.Tip();
+        targetTip = chainActive[100];
+    }
+
+    BOOST_REQUIRE(DisconnectBlocks(1));
+    FlushStateToDisk();
+    BOOST_REQUIRE(
+        evoDb->WritePopBlocksRecovery(
+            initialTip->GetBlockHash(),
+            targetTip->GetBlockHash(),
+            false,
+            {}));
+
+    BOOST_REQUIRE(
+        RecoverInterruptedPopBlocks(Params()));
+    uint256 evoTipHash;
+    BOOST_REQUIRE(evoDb->ReadBestBlock(evoTipHash));
+    {
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(chainActive.Tip(), targetTip);
+        BOOST_CHECK(
+            pcoinsTip->GetBestBlock() ==
+            targetTip->GetBlockHash());
+        BOOST_CHECK(
+            evoTipHash ==
+            targetTip->GetBlockHash());
+    }
+    BOOST_CHECK(evoDb->HasPopBlocksRecovery());
+
+    BOOST_REQUIRE(
+        FinishInterruptedPopBlocks(Params()));
+    BOOST_CHECK(!evoDb->HasPopBlocksRecovery());
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_recovery_finishes_metadata_phase)
+{
+    CBlockIndex* forgottenIndex;
+    CBlockIndex* targetTip;
+    {
+        LOCK(cs_main);
+        forgottenIndex = chainActive.Tip();
+        targetTip = forgottenIndex->pprev;
+    }
+
+    BOOST_REQUIRE(DisconnectBlocks(1));
+    FlushStateToDisk();
+    BOOST_REQUIRE(
+        evoDb->WritePopBlocksMempoolCleanup());
+    BOOST_REQUIRE(
+        evoDb->WritePopBlocksRecovery(
+            forgottenIndex->GetBlockHash(),
+            targetTip->GetBlockHash(),
+            true,
+            {}));
+
+    BOOST_REQUIRE(
+        RecoverInterruptedPopBlocks(Params()));
+    BOOST_CHECK(!evoDb->HasPopBlocksRecovery());
+    BOOST_CHECK_EQUAL(
+        forgottenIndex->nStatus & BLOCK_HAVE_MASK,
+        0U);
+    BOOST_CHECK_EQUAL(
+        forgottenIndex->nTx,
+        0U);
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_recovery_clears_completed_marker_after_resync)
+{
+    CBlock oldTipBlock;
+    CBlockIndex* initialTip;
+    CBlockIndex* targetTip;
+    {
+        LOCK(cs_main);
+        initialTip = chainActive.Tip();
+        targetTip = initialTip->pprev;
+        BOOST_REQUIRE(ReadBlockFromDisk(
+            oldTipBlock,
+            initialTip,
+            Params().GetConsensus()));
+    }
+
+    BOOST_CHECK_EQUAL(
+        CallRPC("popblocks 1").get_int(),
+        targetTip->nHeight);
+    BOOST_REQUIRE(
+        evoDb->WritePopBlocksRecovery(
+            initialTip->GetBlockHash(),
+            targetTip->GetBlockHash(),
+            true,
+            {}));
+
+    bool newBlock = false;
+    BOOST_REQUIRE(ProcessNewBlock(
+        Params(),
+        std::make_shared<const CBlock>(oldTipBlock),
+        true,
+        &newBlock));
+    BOOST_REQUIRE(newBlock);
+    BOOST_REQUIRE_EQUAL(chainActive.Tip(), initialTip);
+
+    BOOST_REQUIRE(
+        RecoverInterruptedPopBlocks(Params()));
+    BOOST_CHECK(!evoDb->HasPopBlocksRecovery());
+    BOOST_CHECK_EQUAL(chainActive.Tip(), initialTip);
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_rejects_missing_undo_without_disconnect)
+{
+    CBlockIndex* oldTip;
+    unsigned int oldStatus;
+    {
+        LOCK(cs_main);
+        oldTip = chainActive.Tip();
+        oldStatus = oldTip->nStatus;
+        oldTip->nStatus &= ~BLOCK_HAVE_UNDO;
+    }
+
+    BOOST_CHECK_EXCEPTION(
+        CallRPC("popblocks 1"),
+        std::runtime_error,
+        HasReason("local block and undo data"));
+    LOCK(cs_main);
+    oldTip->nStatus = oldStatus;
+    BOOST_CHECK_EQUAL(chainActive.Tip(), oldTip);
+    BOOST_CHECK_EQUAL(chainActive.Height(), 100);
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_rejects_unreadable_undo_without_disconnect)
+{
+    CreateAndProcessBlock({}, coinbaseKey);
+    CreateAndProcessBlock({}, coinbaseKey);
+
+    CBlockIndex* corruptIndex;
+    unsigned int undoPos;
+    {
+        LOCK(cs_main);
+        corruptIndex = chainActive[101];
+        undoPos = corruptIndex->nUndoPos;
+        corruptIndex->nUndoPos = std::numeric_limits<unsigned int>::max();
+    }
+
+    BOOST_CHECK_EXCEPTION(
+        CallRPC("popblocks 2"),
+        std::runtime_error,
+        HasReason("failed to read local undo data"));
+
+    LOCK(cs_main);
+    corruptIndex->nUndoPos = undoPos;
+    BOOST_CHECK_EQUAL(chainActive.Height(), 102);
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_rejects_wrong_transaction_count_without_disconnect)
+{
+    CBlockIndex* oldTip;
+    CBlockIndex* corruptIndex;
+    unsigned int transactionCount;
+    {
+        LOCK(cs_main);
+        oldTip = chainActive.Tip();
+        corruptIndex = chainActive[99];
+        transactionCount = corruptIndex->nTx;
+        ++corruptIndex->nTx;
+    }
+
+    BOOST_CHECK_EXCEPTION(
+        CallRPC("popblocks 2"),
+        std::runtime_error,
+        HasReason("transaction count mismatch"));
+
+    LOCK(cs_main);
+    corruptIndex->nTx = transactionCount;
+    BOOST_CHECK_EQUAL(chainActive.Tip(), oldTip);
+    BOOST_CHECK_EQUAL(chainActive.Height(), 100);
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_clears_failed_side_branch_metadata)
+{
+    CBlock parentBlock;
+    CBlockIndex* parentIndex;
+    {
+        LOCK(cs_main);
+        parentIndex = chainActive.Tip();
+        BOOST_REQUIRE(ReadBlockFromDisk(parentBlock, parentIndex, Params().GetConsensus()));
+    }
+
+    const CBlock invalidatedBlock = CreateAndProcessBlock({}, coinbaseKey);
+    CBlockIndex* invalidatedIndex;
+    {
+        LOCK(cs_main);
+        invalidatedIndex = mapBlockIndex.at(invalidatedBlock.GetHash());
+        CValidationState state;
+        BOOST_REQUIRE(InvalidateBlock(state, Params(), invalidatedIndex));
+        BOOST_REQUIRE(invalidatedIndex->nStatus & BLOCK_FAILED_MASK);
+        BOOST_REQUIRE_EQUAL(chainActive.Height(), 100);
+    }
+
+    BOOST_CHECK_EQUAL(CallRPC("popblocks 1").get_int(), 99);
+    {
+        LOCK(cs_main);
+        for (CBlockIndex* pindex : {parentIndex, invalidatedIndex}) {
+            BOOST_CHECK_EQUAL(pindex->nStatus & BLOCK_FAILED_MASK, 0U);
+            BOOST_CHECK_EQUAL(pindex->nStatus & BLOCK_HAVE_MASK, 0U);
+            BOOST_CHECK_EQUAL(pindex->nStatus & BLOCK_VALID_MASK, BLOCK_VALID_TREE);
+            BOOST_CHECK_EQUAL(pindex->nFile, 0);
+            BOOST_CHECK_EQUAL(pindex->nDataPos, 0U);
+            BOOST_CHECK_EQUAL(pindex->nUndoPos, 0U);
+            BOOST_CHECK_EQUAL(pindex->nTx, 0U);
+            BOOST_CHECK_EQUAL(pindex->nChainTx, 0U);
+            BOOST_CHECK_EQUAL(pindex->nSequenceId, 0);
+        }
+    }
+
+    bool newBlock = false;
+    BOOST_REQUIRE(ProcessNewBlock(Params(), std::make_shared<const CBlock>(parentBlock), true, &newBlock));
+    BOOST_CHECK(newBlock);
+    BOOST_REQUIRE(ProcessNewBlock(Params(), std::make_shared<const CBlock>(invalidatedBlock), true, &newBlock));
+    BOOST_CHECK(newBlock);
+    BOOST_CHECK_EQUAL(chainActive.Height(), 101);
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_preserves_transaction_index)
+{
+    ScopedBool txIndex(fTxIndex, true);
+    const CBlock block = CreateAndProcessBlock({}, coinbaseKey);
+    const uint256 txid = block.vtx[0]->GetHash();
+    CDiskTxPos oldPos;
+    BOOST_REQUIRE(pblocktree->ReadTxIndex(txid, oldPos));
+
+    BOOST_CHECK_EQUAL(CallRPC("popblocks 1").get_int(), 100);
+    CDiskTxPos newPos;
+    BOOST_REQUIRE(pblocktree->ReadTxIndex(txid, newPos));
+    BOOST_CHECK_EQUAL(newPos.nFile, oldPos.nFile);
+    BOOST_CHECK_EQUAL(newPos.nPos, oldPos.nPos);
+    BOOST_CHECK_EQUAL(newPos.nTxOffset, oldPos.nTxOffset);
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_rejects_optional_indexes_without_disconnect)
+{
+    CBlockIndex* oldTip;
+    {
+        LOCK(cs_main);
+        oldTip = chainActive.Tip();
+    }
+
+    {
+        ScopedBool addressIndex(fAddressIndex, true);
+        BOOST_CHECK_EXCEPTION(
+            CallRPC("popblocks 1"),
+            std::runtime_error,
+            HasReason("address or spent index"));
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(chainActive.Tip(), oldTip);
+    }
+
+    {
+        ScopedBool spentIndex(fSpentIndex, true);
+        BOOST_CHECK_EXCEPTION(
+            CallRPC("popblocks 1"),
+            std::runtime_error,
+            HasReason("address or spent index"));
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(chainActive.Tip(), oldTip);
+    }
+}
+
+#ifdef ENABLE_WALLET
+BOOST_AUTO_TEST_CASE(popblocks_rejects_disabled_wallet_without_disconnect)
+{
+    CBlockIndex* oldTip;
+    {
+        LOCK(cs_main);
+        oldTip = chainActive.Tip();
+    }
+
+    ForceSetArg("-disablewallet", "1");
+    BOOST_CHECK_EXCEPTION(
+        CallRPC("popblocks 1"),
+        std::runtime_error,
+        HasReason("wallet loading is disabled"));
+    ForceSetArg("-disablewallet", "0");
+
+    LOCK(cs_main);
+    BOOST_CHECK_EQUAL(chainActive.Tip(), oldTip);
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_recovery_rejects_a_different_wallet)
+{
+    CBlockIndex* initialTip;
+    CBlockIndex* targetTip;
+    {
+        LOCK(cs_main);
+        initialTip = chainActive.Tip();
+        targetTip = initialTip->pprev;
+    }
+
+    BOOST_REQUIRE(DisconnectBlocks(1));
+    FlushStateToDisk();
+
+    uint256 wrongViewKeyHash =
+        pwalletMain->sparkWallet->GetFullViewKeyHash();
+    wrongViewKeyHash.begin()[0] ^= 1;
+    std::vector<uint256> mintHashes;
+    std::vector<GroupElement> lTags;
+    CDataStream cleanupStream(
+        SER_DISK, CLIENT_VERSION);
+    cleanupStream << uint8_t{2};
+    cleanupStream << true;
+    cleanupStream << wrongViewKeyHash;
+    cleanupStream << mintHashes;
+    cleanupStream << lTags;
+    const std::vector<unsigned char> cleanupData(
+        cleanupStream.begin(),
+        cleanupStream.end());
+    BOOST_REQUIRE(
+        evoDb->WritePopBlocksRecovery(
+            initialTip->GetBlockHash(),
+            targetTip->GetBlockHash(),
+            false,
+            cleanupData));
+
+    BOOST_CHECK(
+        !FinishInterruptedPopBlocks(Params()));
+    BOOST_CHECK(evoDb->HasPopBlocksRecovery());
+    BOOST_REQUIRE(evoDb->ErasePopBlocksRecovery());
+}
+#endif
+
+BOOST_AUTO_TEST_CASE(normal_disconnect_updates_spent_index)
+{
+    ScopedBool spentIndex(fSpentIndex, true);
+    const CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
+    CBasicKeyStore keyStore;
+    BOOST_REQUIRE(keyStore.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey()));
+
+    CMutableTransaction spend;
+    spend.vin.emplace_back(COutPoint(coinbaseTxns.front().GetHash(), 0));
+    spend.vout.emplace_back(coinbaseTxns.front().vout[0].nValue - CENT, scriptPubKey);
+    BOOST_REQUIRE(SignSignature(keyStore, coinbaseTxns.front(), spend, 0, SIGHASH_ALL));
+    CreateAndProcessBlock({spend}, coinbaseKey);
+
+    CSpentIndexKey key(coinbaseTxns.front().GetHash(), 0);
+    CSpentIndexValue value;
+    BOOST_REQUIRE(pblocktree->ReadSpentIndex(key, value));
+    BOOST_CHECK(value.txid == spend.GetHash());
+
+    BOOST_REQUIRE(DisconnectBlocks(1));
+    BOOST_CHECK(!pblocktree->ReadSpentIndex(key, value));
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_clears_both_transaction_pools)
+{
+    const CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
+    CBasicKeyStore keyStore;
+    BOOST_REQUIRE(keyStore.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey()));
+
+    CMutableTransaction parent;
+    parent.vin.emplace_back(COutPoint(coinbaseTxns.front().GetHash(), 0));
+    parent.vout.emplace_back(coinbaseTxns.front().vout[0].nValue - CENT, scriptPubKey);
+    BOOST_REQUIRE(SignSignature(keyStore, coinbaseTxns.front(), parent, 0, SIGHASH_ALL));
+    CreateAndProcessBlock({parent}, coinbaseKey);
+
+    CMutableTransaction child;
+    child.vin.emplace_back(COutPoint(parent.GetHash(), 0));
+    child.vout.emplace_back(parent.vout[0].nValue - CENT, scriptPubKey);
+    BOOST_REQUIRE(SignSignature(keyStore, parent, child, 0, SIGHASH_ALL));
+
+    CMutableTransaction unrelated;
+    unrelated.vin.emplace_back(COutPoint(coinbaseTxns[1].GetHash(), 0));
+    unrelated.vout.emplace_back(coinbaseTxns[1].vout[0].nValue - CENT, scriptPubKey);
+    BOOST_REQUIRE(SignSignature(keyStore, coinbaseTxns[1], unrelated, 0, SIGHASH_ALL));
+
+    TestMemPoolEntryHelper entry;
+    mempool.addUnchecked(child.GetHash(), entry.FromTx(child, &mempool));
+    mempool.addUnchecked(unrelated.GetHash(), entry.FromTx(unrelated, &mempool));
+    CTxMemPool& stemPool = txpools.getStemTxPool();
+    stemPool.addUnchecked(child.GetHash(), entry.FromTx(child, &stemPool));
+    stemPool.addUnchecked(unrelated.GetHash(), entry.FromTx(unrelated, &stemPool));
+    BOOST_REQUIRE(mempool.exists(child.GetHash()));
+    BOOST_REQUIRE(mempool.exists(unrelated.GetHash()));
+    BOOST_REQUIRE(stemPool.exists(child.GetHash()));
+    BOOST_REQUIRE(stemPool.exists(unrelated.GetHash()));
+
+    BOOST_CHECK_EQUAL(CallRPC("popblocks 1").get_int(), 100);
+    BOOST_CHECK_EQUAL(mempool.size(), 0U);
+    BOOST_CHECK_EQUAL(stemPool.size(), 0U);
+    BOOST_CHECK(mempool.vTxHashes.empty());
+    BOOST_CHECK(stemPool.vTxHashes.empty());
+}
+
+BOOST_AUTO_TEST_CASE(popblocks_publishes_one_coherent_final_tip)
+{
+    CBlockIndex* expectedTip;
+    CBlockIndex* firstTransactionTip;
+    std::size_t firstBlockTransactions;
+    std::size_t secondBlockTransactions;
+    {
+        LOCK(cs_main);
+        expectedTip = chainActive[98];
+        firstTransactionTip = chainActive[99];
+        firstBlockTransactions = chainActive[100]->nTx;
+        secondBlockTransactions = chainActive[99]->nTx;
+    }
+
+    PopBlocksNotificationRecorder recorder;
+    ScopedValidationRegistration registration(recorder);
+    BOOST_CHECK_EQUAL(CallRPC("popblocks 2").get_int(), 98);
+
+    BOOST_CHECK_EQUAL(recorder.tipNotifications, 1);
+    BOOST_CHECK_EQUAL(recorder.newTip, expectedTip);
+    BOOST_CHECK_EQUAL(recorder.fork, expectedTip);
+    BOOST_REQUIRE_EQUAL(
+        recorder.transactionTips.size(),
+        firstBlockTransactions + secondBlockTransactions);
+    BOOST_REQUIRE_EQUAL(
+        recorder.transactionPositions.size(),
+        recorder.transactionTips.size());
+    for (std::size_t i = 0; i < recorder.transactionTips.size(); ++i) {
+        const CBlockIndex* expectedTransactionTip =
+            i < firstBlockTransactions ? firstTransactionTip : expectedTip;
+        BOOST_CHECK_EQUAL(
+            recorder.transactionTips[i], expectedTransactionTip);
+        BOOST_CHECK(
+            recorder.transactionPositions[i] ==
+            CMainSignals::SYNC_TRANSACTION_NOT_IN_BLOCK);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(invalidateblock_preserves_fork_notification_semantics)
+{
+    CBlockIndex* invalidatedTip;
+    CBlockIndex* expectedTip;
+    {
+        LOCK(cs_main);
+        invalidatedTip = chainActive.Tip();
+        expectedTip = invalidatedTip->pprev;
+    }
+
+    PopBlocksNotificationRecorder recorder;
+    ScopedValidationRegistration registration(recorder);
+    CValidationState state;
+    {
+        LOCK(cs_main);
+        BOOST_REQUIRE(
+            InvalidateBlock(state, Params(), invalidatedTip));
+    }
+
+    BOOST_CHECK_EQUAL(recorder.tipNotifications, 1);
+    BOOST_CHECK_EQUAL(recorder.newTip, expectedTip);
+    BOOST_CHECK(recorder.fork == nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(invalidateblock_notifies_for_a_side_branch)
+{
+    CKey sideKey;
+    sideKey.MakeNewKey(true);
+    const CScript sideScript =
+        CScript() << ToByteVector(sideKey.GetPubKey()) << OP_CHECKSIG;
+    const CBlock sideBlock = CreateBlock({}, sideScript);
+    CreateAndProcessBlock({}, coinbaseKey);
+    CreateAndProcessBlock({}, coinbaseKey);
+
+    bool newBlock = false;
+    BOOST_REQUIRE(ProcessNewBlock(
+        Params(),
+        std::make_shared<const CBlock>(sideBlock),
+        true,
+        &newBlock));
+    BOOST_REQUIRE(newBlock);
+
+    CBlockIndex* activeTip;
+    CBlockIndex* sideIndex;
+    {
+        LOCK(cs_main);
+        activeTip = chainActive.Tip();
+        sideIndex = mapBlockIndex.at(sideBlock.GetHash());
+        BOOST_REQUIRE(!chainActive.Contains(sideIndex));
+    }
+
+    PopBlocksNotificationRecorder recorder;
+    ScopedValidationRegistration registration(recorder);
+    CValidationState state;
+    {
+        LOCK(cs_main);
+        BOOST_REQUIRE(
+            InvalidateBlock(state, Params(), sideIndex));
+    }
+
+    BOOST_CHECK_EQUAL(recorder.tipNotifications, 1);
+    BOOST_CHECK_EQUAL(recorder.newTip, activeTip);
+    BOOST_CHECK(recorder.fork == nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(reentrant_invalidations_publish_every_tip_event)
+{
+    CKey firstSideKey;
+    CKey secondSideKey;
+    firstSideKey.MakeNewKey(true);
+    secondSideKey.MakeNewKey(true);
+    const CBlock firstSideBlock = CreateBlock(
+        {},
+        CScript() <<
+            ToByteVector(firstSideKey.GetPubKey()) <<
+            OP_CHECKSIG);
+    const CBlock secondSideBlock = CreateBlock(
+        {},
+        CScript() <<
+            ToByteVector(secondSideKey.GetPubKey()) <<
+            OP_CHECKSIG);
+    CreateAndProcessBlock({}, coinbaseKey);
+    CreateAndProcessBlock({}, coinbaseKey);
+
+    bool newBlock = false;
+    BOOST_REQUIRE(ProcessNewBlock(
+        Params(),
+        std::make_shared<const CBlock>(firstSideBlock),
+        true,
+        &newBlock));
+    BOOST_REQUIRE(newBlock);
+    BOOST_REQUIRE(ProcessNewBlock(
+        Params(),
+        std::make_shared<const CBlock>(secondSideBlock),
+        true,
+        &newBlock));
+    BOOST_REQUIRE(newBlock);
+
+    CBlockIndex* firstSideIndex;
+    CBlockIndex* secondSideIndex;
+    {
+        LOCK(cs_main);
+        firstSideIndex =
+            mapBlockIndex.at(firstSideBlock.GetHash());
+        secondSideIndex =
+            mapBlockIndex.at(secondSideBlock.GetHash());
+        BOOST_REQUIRE(!chainActive.Contains(firstSideIndex));
+        BOOST_REQUIRE(!chainActive.Contains(secondSideIndex));
+    }
+
+    ReentrantInvalidationRecorder recorder(
+        secondSideIndex);
+    ScopedValidationRegistration registration(recorder);
+    CValidationState state;
+    {
+        LOCK(cs_main);
+        BOOST_REQUIRE(InvalidateBlock(
+            state, Params(), firstSideIndex));
+    }
+    BOOST_CHECK(recorder.reentrantResult);
+    BOOST_CHECK_EQUAL(recorder.tipNotifications, 2);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

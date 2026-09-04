@@ -19,8 +19,10 @@
 #include "hash.h"
 #include "init.h"
 #include "base58.h"
+#include "memusage.h"
 #include "merkleblock.h"
 #include "net.h"
+#include "net_processing.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "pow.h"
@@ -57,6 +59,7 @@
 #include "warnings.h"
 
 #include "masternode-payments.h"
+#include "masternode-sync.h"
 
 #include "evo/specialtx.h"
 #include "evo/providertx.h"
@@ -72,8 +75,9 @@
 
 #include <algorithm>
 #include <atomic>
-#include <sstream>
 #include <chrono>
+#include <deque>
+#include <sstream>
 #include <unordered_set>
 
 #include <boost/algorithm/string/replace.hpp>
@@ -94,6 +98,26 @@ bool AbortNode(CValidationState &state, const std::string& strMessage, const std
  */
 
 CCriticalSection cs_main;
+static boost::mutex cs_tip_notification;
+
+struct TipNotification
+{
+    const CBlockIndex* tip;
+    const CBlockIndex* fork;
+    const CBlockIndex* uiTip;
+    uint64_t sequence;
+    bool initialDownload;
+    bool notifyUI;
+    // InvalidateBlock historically publishes a null fork.
+    bool preserveFork;
+};
+
+static std::deque<TipNotification> pendingTipNotifications
+    GUARDED_BY(cs_main);
+static uint64_t activeTipSequence GUARDED_BY(cs_main) = 0;
+static uint64_t lastPublishedTipSequence GUARDED_BY(cs_main) = 0;
+static const CBlockIndex* lastPublishedTip GUARDED_BY(cs_main) = nullptr;
+static thread_local bool ownsTipNotificationMutex = false;
 
 BlockMap mapBlockIndex;
 PrevBlockMap mapPrevBlockIndex;
@@ -134,6 +158,7 @@ std::map <uint256, int64_t> mapRejectedBlocks GUARDED_BY(cs_main);
 
 
 static void CheckBlockIndex(const Consensus::Params& consensusParams);
+static void PruneBlockIndexCandidates();
 
 /** Constant stuff for coinbase transactions we create: */
 CScript COINBASE_FLAGS;
@@ -597,7 +622,7 @@ static bool HasConsistentSparkCoinTypes(const CTransaction& tx)
     return true;
 }
 
-bool CheckTransaction(const CTransaction &tx, CValidationState &state, bool fCheckDuplicateInputs, uint256 hashTx,  bool isVerifyDB, int nHeight, bool isCheckWallet, bool fStatefulZerocoinCheck, spark::CSparkTxInfo* sparkTxInfo)
+bool CheckTransaction(const CTransaction &tx, CValidationState &state, bool fCheckDuplicateInputs, uint256 hashTx, bool isVerifyDB, int nHeight, bool isCheckWallet, bool fStatefulZerocoinCheck, spark::CSparkTxInfo* sparkTxInfo, bool fDisconnectPreflight)
 {
     LogPrint("validation", "CheckTransaction nHeight=%d, isVerifyDB=%d, isCheckWallet=%d, txHash=%s\n", nHeight, (int)isVerifyDB, (int)isCheckWallet, tx.GetHash().ToString());
 
@@ -730,7 +755,10 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state, bool fChe
         if (tx.IsSparkTransaction()) {
             if (hasExchangeUTXOs)
                 return state.DoS(100, false, REJECT_INVALID, "bad-exchange-address");
-            if (!CheckSparkTransaction(tx, state, hashTx, isVerifyDB, nHeight, isCheckWallet, fStatefulZerocoinCheck, sparkTxInfo))
+            if (!CheckSparkTransaction(
+                    tx, state, hashTx, isVerifyDB, nHeight,
+                    isCheckWallet, fStatefulZerocoinCheck, sparkTxInfo,
+                    fDisconnectPreflight))
                 return false;
         }
 
@@ -2360,19 +2388,40 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out)
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
+std::vector<bool> GetBlockUndoTransactionMask(const CBlock& block)
+{
+    std::set<uint256> txids;
+    std::vector<bool> undoTransaction;
+    undoTransaction.reserve(block.vtx.size());
+    for (const CTransactionRef& tx : block.vtx)
+        undoTransaction.push_back(txids.insert(tx->GetHash()).second);
+    return undoTransaction;
+}
+
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  When UNCLEAN or FAILED is returned, view is left in an indeterminate state. */
-static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockIndex* pindex, CCoinsViewCache& view, bool *pfClean = nullptr)
+static DisconnectResult DisconnectBlock(
+    const CBlock& block,
+    CValidationState& state,
+    const CBlockIndex* pindex,
+    CCoinsViewCache& view,
+    bool* pfClean = nullptr,
+    bool fDisconnectPreflight = false,
+    bool fPopBlocks = false)
 {
     assert(pindex->GetBlockHash() == view.GetBestBlock());
 
-    bool fDIP0003Active = pindex->nHeight >= Params().GetConsensus().DIP0003Height;
-    bool fHasBestBlock = evoDb->VerifyBestBlock(pindex->GetBlockHash());
+    if (!fDisconnectPreflight) {
+        bool fDIP0003Active =
+            pindex->nHeight >= Params().GetConsensus().DIP0003Height;
+        bool fHasBestBlock =
+            evoDb->VerifyBestBlock(pindex->GetBlockHash());
 
-    if (fDIP0003Active && !fHasBestBlock) {
-        // Nodes that upgraded after DIP3 activation will have to reindex to ensure evodb consistency
-        AbortNode("Found EvoDB inconsistency, you must reindex to continue");
-        return DISCONNECT_FAILED;
+        if (fDIP0003Active && !fHasBestBlock) {
+            // Nodes that upgraded after DIP3 activation will have to reindex to ensure evodb consistency
+            AbortNode("Found EvoDB inconsistency, you must reindex to continue");
+            return DISCONNECT_FAILED;
+        }
     }
 
     if (pfClean)
@@ -2423,9 +2472,20 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
         }
     }
 
-    if (!UndoSpecialTxsInBlock(block, pindex, pfClean == nullptr)) {
+    if (!UndoSpecialTxsInBlock(
+            block,
+            pindex,
+            !fDisconnectPreflight && !fPopBlocks &&
+                pfClean == nullptr,
+            !fDisconnectPreflight && !fPopBlocks &&
+                pfClean == nullptr,
+            fDisconnectPreflight,
+            fPopBlocks)) {
         return DISCONNECT_FAILED;
     }
+
+    const std::vector<bool> undoTransaction =
+        GetBlockUndoTransactionMask(block);
 
     // undo transactions in reverse order
     for (int i = block.vtx.size() - 1; i >= 0; i--) {
@@ -2434,35 +2494,41 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
 
         dbIndexHelper.DisconnectTransactionOutputs(tx, pindex->nHeight, i, view);
 
-        // Check that all outputs are available and match the outputs in the block itself
-        // exactly.
-        for (size_t o = 0; o < tx.vout.size(); o++) {
-            if (!tx.vout[o].scriptPubKey.IsUnspendable()) {
-                COutPoint out(hash, o);
-                Coin coin;
-                view.SpendCoin(out, &coin);
-                if (tx.vout[o] != coin.out) {
-                    fClean = false; // transaction output mismatch
+        if (undoTransaction[i]) {
+            // Check that all outputs are available and match the outputs in the
+            // block itself exactly.
+            for (size_t o = 0; o < tx.vout.size(); o++) {
+                if (!tx.vout[o].scriptPubKey.IsUnspendable()) {
+                    COutPoint out(hash, o);
+                    Coin coin;
+                    view.SpendCoin(out, &coin);
+                    if (tx.vout[o] != coin.out) {
+                        fClean = false; // transaction output mismatch
+                    }
                 }
             }
-        }
 
-        // restore inputs
-        if (!tx.IsCoinBase() && !tx.HasNoRegularInputs()) { // not coinbases
-            CTxUndo &txundo = blockUndo.vtxundo[i-1];
-            if (txundo.vprevout.size() != tx.vin.size()) {
-                error("DisconnectBlock(): transaction and undo data inconsistent");
-                return DISCONNECT_FAILED;
-            }
-            for (unsigned int j = tx.vin.size(); j-- > 0;) {
-                const COutPoint &out = tx.vin[j].prevout;
-                if (Params().ApplyUndoForTxout(pindex->nHeight, tx.GetHash(), j)) {
-                    int res = ApplyTxInUndo(std::move(txundo.vprevout[j]), view, out);
-                    if (res == DISCONNECT_FAILED) return DISCONNECT_FAILED;
-                    fClean = fClean && res != DISCONNECT_UNCLEAN;
+            // Restore inputs.
+            if (!tx.IsCoinBase() && !tx.HasNoRegularInputs()) {
+                CTxUndo &txundo = blockUndo.vtxundo[i-1];
+                if (txundo.vprevout.size() != tx.vin.size()) {
+                    error("DisconnectBlock(): transaction and undo data inconsistent");
+                    return DISCONNECT_FAILED;
                 }
+                for (unsigned int j = tx.vin.size(); j-- > 0;) {
+                    const COutPoint &out = tx.vin[j].prevout;
+                    if (Params().ApplyUndoForTxout(
+                            pindex->nHeight, tx.GetHash(), j)) {
+                        int res = ApplyTxInUndo(
+                            std::move(txundo.vprevout[j]), view, out);
+                        if (res == DISCONNECT_FAILED)
+                            return DISCONNECT_FAILED;
+                        fClean = fClean &&
+                            res != DISCONNECT_UNCLEAN;
+                    }
+                }
+                // At this point, all of txundo.vprevout should have been moved out.
             }
-            // At this point, all of txundo.vprevout should have been moved out.
         }
 
         dbIndexHelper.DisconnectTransactionInputs(tx, pindex->nHeight, i, view);
@@ -2491,6 +2557,13 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
                 return DISCONNECT_FAILED;
             }
         }
+        if (fSpentIndex) {
+            if (!pblocktree->UpdateSpentIndex(dbIndexHelper.getSpentIndex())) {
+                AbortNode(state, "Failed to delete spent index");
+                error("Failed to delete spent index");
+                return DISCONNECT_FAILED;
+            }
+        }
     }
 
     /*
@@ -2499,7 +2572,8 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     instantsend.isAutoLockBip9Active = pindex->nHeight >= Params().GetConsensus().DIP0003Height;
     */
 
-    evoDb->WriteBestBlock(pindex->pprev->GetBlockHash());
+    if (!fDisconnectPreflight)
+        evoDb->WriteBestBlock(pindex->pprev->GetBlockHash());
 
     if(Params().SkipUndoForBlock(pindex->nHeight)) {
         fClean = true;
@@ -3330,6 +3404,9 @@ void PruneAndFlush() {
 void static UpdateTip(CBlockIndex *pindexNew, const CChainParams &chainParams) {
     LogPrint("validation", "UpdateTip() pindexNew.nHeight=%d\n", pindexNew->nHeight);
     chainActive.SetTip(pindexNew);
+    ++activeTipSequence;
+    if (deterministicMNManager)
+        deterministicMNManager->UpdatedBlockTip(pindexNew);
 
     // New best block
     txpools.AddTransactionsUpdated(1);
@@ -3390,8 +3467,468 @@ void static UpdateTip(CBlockIndex *pindexNew, const CChainParams &chainParams) {
         GuessVerificationProgress(chainParams.TxData(), chainActive.Tip()), pcoinsTip->DynamicMemoryUsage() * (1.0 / (1 << 20)), pcoinsTip->GetCacheSize(), warning);
 }
 
-/** Disconnect chainActive's tip. You probably want to call mempool.removeForReorg and manually re-limit mempool size after this, with cs_main held. */
-bool static DisconnectTip(CValidationState& state, const CChainParams& chainparams, bool fBare = false)
+static void NotifyTip(const TipNotification& notification)
+{
+    GetMainSignals().UpdatedBlockTip(
+        notification.tip,
+        notification.fork,
+        notification.initialDownload);
+    if (notification.notifyUI)
+        uiInterface.NotifyBlockTip(
+            notification.initialDownload, notification.uiTip);
+}
+
+class TipNotificationOwner
+{
+public:
+    TipNotificationOwner()
+    {
+        assert(!ownsTipNotificationMutex);
+        ownsTipNotificationMutex = true;
+    }
+
+    ~TipNotificationOwner()
+    {
+        ownsTipNotificationMutex = false;
+    }
+};
+
+static void PrepareTipNotification(TipNotification& notification)
+{
+    AssertLockHeld(cs_main);
+
+    if (lastPublishedTip && !notification.preserveFork) {
+        const CBlockIndex* left = lastPublishedTip;
+        const CBlockIndex* right = notification.tip;
+        if (left->nHeight > right->nHeight)
+            left = left->GetAncestor(right->nHeight);
+        else if (right->nHeight > left->nHeight)
+            right = right->GetAncestor(left->nHeight);
+        while (left != right) {
+            left = left->pprev;
+            right = right->pprev;
+        }
+        notification.fork = left;
+        notification.uiTip = notification.tip;
+        notification.notifyUI =
+            notification.notifyUI ||
+            notification.fork != notification.tip;
+    }
+    lastPublishedTipSequence = notification.sequence;
+    lastPublishedTip = notification.tip;
+}
+
+static void QueueTipNotification(const TipNotification& notification)
+{
+    AssertLockHeld(cs_main);
+
+    if (chainActive.Tip() == notification.tip &&
+        activeTipSequence == notification.sequence &&
+        notification.sequence > lastPublishedTipSequence) {
+        if (pendingTipNotifications.empty() ||
+            pendingTipNotifications.back().sequence <
+                notification.sequence) {
+            pendingTipNotifications.push_back(notification);
+        }
+    }
+}
+
+static bool PrepareNextTipNotification(
+    TipNotification& notification)
+{
+    AssertLockHeld(cs_main);
+
+    while (!pendingTipNotifications.empty() &&
+           pendingTipNotifications.front().sequence <=
+               lastPublishedTipSequence) {
+        pendingTipNotifications.pop_front();
+    }
+    if (pendingTipNotifications.empty())
+        return false;
+
+    notification = pendingTipNotifications.front();
+    pendingTipNotifications.pop_front();
+    PrepareTipNotification(notification);
+    return true;
+}
+
+/**
+ * Publish while both cs_tip_notification and cs_main are held by the caller.
+ * A callback can re-enter validation on the same thread, so drain every
+ * resulting notification before returning.
+ */
+static void PublishTipsWithMainLock()
+{
+    AssertLockHeld(cs_main);
+
+    TipNotification notification;
+    while (PrepareNextTipNotification(notification))
+        NotifyTip(notification);
+}
+
+/**
+ * Publish a tip from a caller that already holds cs_main. Never wait for the
+ * publication mutex while holding cs_main; the current publisher will drain
+ * the queued final state after its callback returns.
+ */
+static void PublishTipFromMainLock(TipNotification notification)
+{
+    AssertLockHeld(cs_main);
+    const bool publisherAlreadyOwnsQueue =
+        !pendingTipNotifications.empty();
+    QueueTipNotification(notification);
+
+    // A pre-existing queued activation has a publisher that will drain the
+    // queue after this caller releases cs_main. Do not move that ordinary
+    // callback under cs_main merely because this invalidation arrived later.
+    if (ownsTipNotificationMutex ||
+        publisherAlreadyOwnsQueue) {
+        return;
+    }
+
+    boost::unique_lock<boost::mutex> notificationLock(
+        cs_tip_notification, boost::try_to_lock);
+    if (!notificationLock.owns_lock())
+        return;
+
+    TipNotificationOwner notificationOwner;
+    PublishTipsWithMainLock();
+}
+
+static void PublishTipsWithNotificationLock(
+    boost::unique_lock<boost::mutex>& notificationLock)
+{
+    assert(ownsTipNotificationMutex);
+    assert(notificationLock.owns_lock());
+
+    while (true) {
+        TipNotification notification;
+        {
+            LOCK(cs_main);
+            if (!PrepareNextTipNotification(notification)) {
+                // Unlock while cs_main still excludes a new tip mutation.
+                notificationLock.unlock();
+                return;
+            }
+        }
+
+        NotifyTip(notification);
+    }
+}
+
+/**
+ * Publish an ordinary activation tip without racing a PopBlocks publication.
+ *
+ * ActivateBestChain is historically callable with cs_main already held. A
+ * caller therefore never waits for the publication mutex: the current
+ * publisher observes and publishes the pending final tip before releasing it.
+ */
+static void PublishActivationTips()
+{
+    if (ownsTipNotificationMutex)
+        return;
+
+    boost::unique_lock<boost::mutex> notificationLock(
+        cs_tip_notification, boost::try_to_lock);
+    if (!notificationLock.owns_lock())
+        return;
+
+    TipNotificationOwner notificationOwner;
+    PublishTipsWithNotificationLock(notificationLock);
+}
+
+struct PopBlocksPreflightData
+{
+    bool walletCleanupRequired{false};
+    uint256 walletViewKeyHash;
+    std::vector<GroupElement> walletLTags;
+    std::vector<uint256> walletMintHashes;
+#ifdef ENABLE_WALLET
+    std::vector<spark::Coin> walletMintCandidates;
+#endif
+};
+
+#ifdef ENABLE_WALLET
+static void CollectSparkWalletState(
+    const CTransaction& tx,
+    PopBlocksPreflightData& data)
+{
+    if (!tx.IsSparkTransaction())
+        return;
+
+    if (tx.IsSparkSpend()) {
+        const spark::SpendTransaction spend =
+            spark::ParseSparkSpend(tx);
+        const std::vector<GroupElement>& lTags = spend.getUsedLTags();
+        data.walletLTags.insert(
+            data.walletLTags.end(), lTags.begin(), lTags.end());
+    }
+
+    std::vector<spark::Coin> mints = spark::GetSparkMintCoins(tx);
+    data.walletMintCandidates.insert(
+        data.walletMintCandidates.end(),
+        mints.begin(), mints.end());
+}
+
+#endif
+
+static void AddPopBlocksMemoryUsage(
+    std::size_t amount,
+    std::size_t& usage)
+{
+    if (amount >
+        std::numeric_limits<std::size_t>::max() - usage) {
+        usage = std::numeric_limits<std::size_t>::max();
+    } else {
+        usage += amount;
+    }
+}
+
+static std::size_t MultiplyPopBlocksMemoryUsage(
+    std::size_t count,
+    std::size_t amount)
+{
+    if (amount != 0 &&
+        count > std::numeric_limits<std::size_t>::max() /
+            amount) {
+        return std::numeric_limits<std::size_t>::max();
+    }
+    return count * amount;
+}
+
+static std::size_t PopBlocksPreflightMemoryUsage(
+    const CCoinsViewCache& view,
+    const PopBlocksPreflightData& data,
+    const CSparkNameManager* sparkNameManager = nullptr)
+{
+    std::size_t usage = view.DynamicMemoryUsage();
+    if (sparkNameManager) {
+        AddPopBlocksMemoryUsage(
+            sparkNameManager->DynamicMemoryUsage(), usage);
+    }
+    AddPopBlocksMemoryUsage(
+        memusage::DynamicUsage(data.walletLTags), usage);
+    // GroupElement owns a heap-allocated secp256k1 point. This deliberately
+    // overestimates all supported field representations.
+    AddPopBlocksMemoryUsage(
+        MultiplyPopBlocksMemoryUsage(
+            data.walletLTags.size(),
+            memusage::MallocUsage(256)),
+        usage);
+    AddPopBlocksMemoryUsage(
+        memusage::DynamicUsage(data.walletMintHashes), usage);
+#ifdef ENABLE_WALLET
+    AddPopBlocksMemoryUsage(
+        memusage::DynamicUsage(data.walletMintCandidates), usage);
+    for (const spark::Coin& coin : data.walletMintCandidates) {
+        AddPopBlocksMemoryUsage(
+            3 * memusage::MallocUsage(256), usage);
+        AddPopBlocksMemoryUsage(
+            memusage::DynamicUsage(coin.r_.ciphertext), usage);
+        AddPopBlocksMemoryUsage(
+            memusage::DynamicUsage(coin.r_.tag), usage);
+        AddPopBlocksMemoryUsage(
+            memusage::DynamicUsage(coin.r_.key_commitment), usage);
+        AddPopBlocksMemoryUsage(
+            memusage::DynamicUsage(coin.serial_context), usage);
+    }
+#endif
+    return usage;
+}
+
+static std::size_t PopBlocksPreflightMemoryLimit()
+{
+    const uint64_t configuredMempoolLimit =
+        static_cast<uint64_t>(std::max<int64_t>(
+            GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE), 0));
+    const std::size_t mempoolLimit =
+        configuredMempoolLimit >
+            std::numeric_limits<std::size_t>::max() / 1000000
+        ? std::numeric_limits<std::size_t>::max()
+        : static_cast<std::size_t>(
+            configuredMempoolLimit * 1000000);
+    std::size_t limit = nCoinCacheUsage;
+    AddPopBlocksMemoryUsage(mempoolLimit, limit);
+    return limit;
+}
+
+#ifdef ENABLE_WALLET
+static bool CollectSparkPoolWalletState(
+    const CTxMemPool& pool,
+    PopBlocksPreflightData& data,
+    const CCoinsViewCache& view,
+    std::size_t memoryLimit)
+{
+    for (const TxMempoolInfo& entry : pool.infoAll()) {
+        CollectSparkWalletState(*entry.tx, data);
+        if (PopBlocksPreflightMemoryUsage(view, data) >
+            memoryLimit) {
+            return false;
+        }
+    }
+    return true;
+}
+#endif
+
+static const uint8_t POPBLOCKS_CLEANUP_VERSION = 2;
+
+static std::size_t PopBlocksCleanupSerializeSize(
+    const PopBlocksPreflightData& data)
+{
+    std::size_t size = 0;
+    AddPopBlocksMemoryUsage(
+        GetSerializeSize(
+            POPBLOCKS_CLEANUP_VERSION,
+            SER_DISK,
+            CLIENT_VERSION),
+        size);
+    AddPopBlocksMemoryUsage(
+        GetSerializeSize(
+            data.walletCleanupRequired,
+            SER_DISK,
+            CLIENT_VERSION),
+        size);
+    AddPopBlocksMemoryUsage(
+        GetSerializeSize(
+            data.walletViewKeyHash,
+            SER_DISK,
+            CLIENT_VERSION),
+        size);
+    AddPopBlocksMemoryUsage(
+        GetSerializeSize(
+            data.walletMintHashes,
+            SER_DISK,
+            CLIENT_VERSION),
+        size);
+    AddPopBlocksMemoryUsage(
+        GetSerializeSize(
+            data.walletLTags,
+            SER_DISK,
+            CLIENT_VERSION),
+        size);
+    return size;
+}
+
+static bool SerializePopBlocksCleanupData(
+    const PopBlocksPreflightData& data,
+    std::vector<unsigned char>& serialized)
+{
+    try {
+        CDataStream stream(SER_DISK, CLIENT_VERSION);
+        stream.reserve(
+            PopBlocksCleanupSerializeSize(data));
+        stream << POPBLOCKS_CLEANUP_VERSION;
+        stream << data.walletCleanupRequired;
+        stream << data.walletViewKeyHash;
+        stream << data.walletMintHashes;
+        stream << data.walletLTags;
+        serialized.assign(stream.begin(), stream.end());
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+static bool DeserializePopBlocksCleanupData(
+    const std::vector<unsigned char>& serialized,
+    PopBlocksPreflightData& data)
+{
+    if (serialized.empty())
+        return true;
+
+    try {
+        CDataStream stream(
+            serialized, SER_DISK, CLIENT_VERSION);
+        uint8_t version;
+        stream >> version;
+        if (version != 1 &&
+            version != POPBLOCKS_CLEANUP_VERSION) {
+            return false;
+        }
+        stream >> data.walletCleanupRequired;
+        if (version >= 2)
+            stream >> data.walletViewKeyHash;
+        stream >> data.walletMintHashes;
+        stream >> data.walletLTags;
+        return stream.empty();
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+#ifdef ENABLE_WALLET
+static bool PreparePopBlocksWalletCleanup(
+    int targetHeight,
+    PopBlocksPreflightData& data,
+    CValidationState& state)
+{
+    data.walletCleanupRequired =
+        pwalletMain && pwalletMain->sparkWallet;
+    if (!data.walletCleanupRequired)
+        return true;
+    data.walletViewKeyHash =
+        pwalletMain->sparkWallet->GetFullViewKeyHash();
+
+    std::vector<uint256> resolvedHashes;
+    if (!pwalletMain->sparkWallet->
+            PrepareSparkStateRemoval(
+                data.walletMintCandidates,
+                resolvedHashes) ||
+        resolvedHashes.size() !=
+            data.walletMintCandidates.size()) {
+        return state.Error(
+            "Cannot pop blocks: failed to preflight the Spark wallet");
+    }
+
+    std::set<uint256> uniqueMintHashes;
+    spark::CSparkState* sparkState =
+        spark::CSparkState::GetState();
+    for (std::size_t i = 0;
+         i < data.walletMintCandidates.size(); ++i) {
+        if (resolvedHashes[i].IsNull())
+            continue;
+
+        const std::pair<int, int> location =
+            sparkState->GetMintedCoinHeightAndId(
+                data.walletMintCandidates[i]);
+        if (location.first >= 0 &&
+            location.first <= targetHeight) {
+            continue;
+        }
+        uniqueMintHashes.emplace(resolvedHashes[i]);
+    }
+    data.walletMintHashes.assign(
+        uniqueMintHashes.begin(),
+        uniqueMintHashes.end());
+
+    std::map<uint256, GroupElement> uniqueLTags;
+    for (const GroupElement& lTag : data.walletLTags) {
+        uniqueLTags.emplace(
+            primitives::GetLTagHash(lTag), lTag);
+    }
+    data.walletLTags.clear();
+    data.walletLTags.reserve(uniqueLTags.size());
+    for (const auto& entry : uniqueLTags)
+        data.walletLTags.emplace_back(entry.second);
+
+    data.walletMintCandidates.clear();
+    data.walletMintCandidates.shrink_to_fit();
+    return true;
+}
+#endif
+
+/**
+ * Disconnect chainActive's tip.
+ *
+ * fBare suppresses transaction resurrection. fDeferPopBlocksCleanup defers only
+ * the pool-dependent Spark and wallet cleanup that PopBlocks performs once for
+ * its complete range.
+ */
+bool static DisconnectTip(
+    CValidationState& state,
+    const CChainParams& chainparams,
+    bool fBare = false,
+    bool fDeferPopBlocksCleanup = false)
 {
     LogPrintf("DisconnectTip()\n");
     CBlockIndex *pindexDelete = chainActive.Tip();
@@ -3402,13 +3939,15 @@ bool static DisconnectTip(CValidationState& state, const CChainParams& chainpara
         return AbortNode(state, "Failed to read block");
 
 
-    // retrieve all mints
-    block.sparkTxInfo = std::make_shared<spark::CSparkTxInfo>();
-
     std::vector<spark::SpendTransaction> sparkTransactionsToRemove;
+    if (!fDeferPopBlocksCleanup)
+        block.sparkTxInfo = std::make_shared<spark::CSparkTxInfo>();
     for (CTransactionRef tx : block.vtx) {
-        CheckTransaction(*tx, state, false, tx->GetHash(), false, pindexDelete->pprev->nHeight,
-            false, false, block.sparkTxInfo.get());
+        if (!fDeferPopBlocksCleanup)
+            CheckTransaction(
+                *tx, state, false, tx->GetHash(), false,
+                pindexDelete->pprev->nHeight, false, false,
+                block.sparkTxInfo.get());
         if(GetBoolArg("-batching", true)) {
             if (tx->IsSparkSpend()) {
                 try {
@@ -3428,15 +3967,28 @@ bool static DisconnectTip(CValidationState& state, const CChainParams& chainpara
         auto dbTx = evoDb->BeginTransaction();
 
         CCoinsViewCache view(pcoinsTip);
-        if (DisconnectBlock(block, state, pindexDelete, view) != DISCONNECT_OK)
+        if (DisconnectBlock(
+                block,
+                state,
+                pindexDelete,
+                view,
+                nullptr,
+                false,
+                fDeferPopBlocksCleanup) != DISCONNECT_OK) {
+            if (fDeferPopBlocksCleanup) {
+                deterministicMNManager->UpdatedBlockTip(
+                    chainActive.Tip());
+            }
             return error("DisconnectTip(): DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
+        }
         bool flushed = view.Flush();
         assert(flushed);
         dbTx->Commit();
     }
     LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
 
-    spark::DisconnectTipSpark(block, pindexDelete);
+    spark::DisconnectTipSpark(
+        block, pindexDelete, !fDeferPopBlocksCleanup);
 
     BatchProofContainer* batchProofContainer = BatchProofContainer::get_instance();
 
@@ -3448,7 +4000,8 @@ bool static DisconnectTip(CValidationState& state, const CChainParams& chainpara
     MTPState::GetMTPState()->SetLastBlock(pindexDelete->pprev, chainparams.GetConsensus());
 
     // Write the chain state to disk, if necessary.
-    if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
+    if (!fDeferPopBlocksCleanup &&
+        !FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
 
     if (!fBare) {
@@ -3496,7 +4049,9 @@ bool static DisconnectTip(CValidationState& state, const CChainParams& chainpara
     // its serial context, which is not serialized with the coin but is required to
     // identify it, and it covers the SMint outputs of spend transactions as well as pure
     // mints.
-    if (!GetBoolArg("-disablewallet", false) && pwalletMain->sparkWallet) {
+    if (!fDeferPopBlocksCleanup &&
+        !GetBoolArg("-disablewallet", false) &&
+        pwalletMain->sparkWallet) {
         for (const CTransactionRef& tx : block.vtx) {
             if (!tx->IsSparkTransaction())
                 continue;
@@ -3688,6 +4243,693 @@ bool DisconnectBlocks(int blocks) {
     }
 
     return true;
+}
+
+static bool PreflightPopBlocks(
+    int targetHeight,
+    const CChainParams& chainparams,
+    PopBlocksPreflightData& data,
+    std::vector<unsigned char>& cleanupData,
+    CValidationState& state)
+{
+    try {
+        CCoinsViewCache view(pcoinsTip);
+        const std::size_t memoryLimit =
+            PopBlocksPreflightMemoryLimit();
+#ifdef ENABLE_WALLET
+        const bool collectWalletState =
+            !GetBoolArg("-disablewallet", false) &&
+            pwalletMain &&
+            pwalletMain->sparkWallet;
+        if (collectWalletState) {
+            if (!CollectSparkPoolWalletState(
+                    mempool, data, view, memoryLimit) ||
+                !CollectSparkPoolWalletState(
+                    txpools.getStemTxPool(),
+                    data,
+                    view,
+                    memoryLimit)) {
+                return state.Error(
+                    "Cannot pop blocks: preflight exceeds the memory safety limit; use a smaller block count");
+            }
+        }
+#else
+        (void)data;
+#endif
+
+        if (PopBlocksPreflightMemoryUsage(view, data) > memoryLimit) {
+            return state.Error(
+                "Cannot pop blocks: preflight exceeds the memory safety limit; use a smaller block count");
+        }
+
+        uint256 expectedEvoBestBlock;
+        bool hasExpectedEvoBestBlock =
+            evoDb->ReadBestBlock(expectedEvoBestBlock);
+        if (!hasExpectedEvoBestBlock) {
+            return state.Error(
+                "Cannot pop blocks: EvoDB state does not match the active chain");
+        }
+        CSparkNameManager sparkNameManager;
+        const std::size_t sparkNameMemoryUsage =
+            CSparkNameManager::GetInstance()->
+                DynamicMemoryUsage();
+        // The live name state remains allocated while its temporary copy is
+        // built, so reserve enough budget for the copy before allocating it.
+        std::size_t expectedPreflightUsage =
+            PopBlocksPreflightMemoryUsage(view, data);
+        AddPopBlocksMemoryUsage(
+            sparkNameMemoryUsage, expectedPreflightUsage);
+        if (expectedPreflightUsage > memoryLimit) {
+            return state.Error(
+                "Cannot pop blocks: preflight exceeds the memory safety limit; use a smaller block count");
+        }
+        sparkNameManager.CopyFrom(
+            *CSparkNameManager::GetInstance());
+
+        if (!spark::CSparkState::GetState()->
+                CanRemoveBlocks(
+                    chainActive.Tip(), targetHeight)) {
+            return state.Error(
+                "Cannot pop blocks: Spark state does not match the active chain");
+        }
+
+        for (CBlockIndex* pindex = chainActive.Tip();
+            pindex->nHeight > targetHeight;
+            pindex = pindex->pprev) {
+            if ((pindex->nStatus & (BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO)) !=
+                (BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO)) {
+                return state.Error(
+                    "Cannot pop blocks without local block and undo data");
+            }
+
+            CBlock block;
+            if (!ReadBlockFromDisk(
+                    block, pindex, chainparams.GetConsensus())) {
+                return state.Error(
+                    "Cannot pop blocks: failed to read local block data");
+            }
+            if (block.vtx.size() != pindex->nTx) {
+                return state.Error(strprintf(
+                    "Cannot pop blocks: transaction count mismatch at height %d",
+                    pindex->nHeight));
+            }
+
+            if (BlockMerkleRoot(block) != block.hashMerkleRoot) {
+                return state.Error(strprintf(
+                    "Cannot pop blocks: invalid transaction data at height %d",
+                    pindex->nHeight));
+            }
+
+            CBlockUndo undo;
+            if (!UndoReadFromDisk(
+                    undo,
+                    pindex->GetUndoPos(),
+                    pindex->pprev->GetBlockHash())) {
+                return state.Error(
+                    "Cannot pop blocks: failed to read local undo data");
+            }
+            if (undo.vtxundo.size() + 1 != block.vtx.size()) {
+                return state.Error(
+                    "Cannot pop blocks: block and undo data are inconsistent");
+            }
+            if (expectedEvoBestBlock != pindex->GetBlockHash()) {
+                return state.Error(
+                    "Cannot pop blocks: EvoDB state does not match the active chain");
+            }
+
+            if (!sparkNameManager.RemoveBlock(pindex, false)) {
+                return state.Error(strprintf(
+                    "Cannot pop blocks: failed to preflight Spark name state at height %d",
+                    pindex->nHeight));
+            }
+
+            block.sparkTxInfo = std::make_shared<spark::CSparkTxInfo>();
+            CValidationState blockState;
+            std::map<std::string, CSparkNameTxData> blockNames;
+            for (const CTransactionRef& tx : block.vtx) {
+                if (!CheckTransaction(
+                        *tx,
+                        blockState,
+                        false,
+                        tx->GetHash(),
+                        false,
+                        pindex->nHeight,
+                        false,
+                        false,
+                        block.sparkTxInfo.get(),
+                        true)) {
+                    return state.Error(strprintf(
+                        "Cannot pop blocks: transaction validation failed at height %d: %s",
+                        pindex->nHeight,
+                        FormatStateMessage(blockState)));
+                }
+                if (tx->IsSparkSpend()) {
+                    CValidationState nameState;
+                    CSparkNameTxData nameData;
+                    if (!sparkNameManager.CheckSparkNameTx(
+                            *tx,
+                            pindex->nHeight,
+                            nameState,
+                            &nameData)) {
+                        return state.Error(strprintf(
+                            "Cannot pop blocks: Spark name validation failed at height %d: %s",
+                            pindex->nHeight,
+                            FormatStateMessage(nameState)));
+                    }
+                    if (!nameData.name.empty() &&
+                        CSparkNameManager::IsInConflict(
+                            nameData,
+                            blockNames,
+                            [](std::map<std::string, CSparkNameTxData>::const_iterator it) {
+                                return it->second.sparkAddress;
+                            })) {
+                        return state.Error(strprintf(
+                            "Cannot pop blocks: conflicting Spark names at height %d",
+                            pindex->nHeight));
+                    }
+                    if (!nameData.name.empty()) {
+                        blockNames.emplace(
+                            CSparkNameManager::ToUpper(nameData.name),
+                            std::move(nameData));
+                    }
+                }
+#ifdef ENABLE_WALLET
+                if (collectWalletState) {
+                    CollectSparkWalletState(*tx, data);
+                }
+#endif
+            }
+            bool clean = false;
+            CValidationState disconnectState;
+            if (DisconnectBlock(
+                    block,
+                    disconnectState,
+                    pindex,
+                    view,
+                    &clean,
+                    true) != DISCONNECT_OK ||
+                !clean) {
+                return state.Error(strprintf(
+                    "Cannot pop blocks: disconnect preflight failed at height %d",
+                    pindex->nHeight));
+            }
+            if (PopBlocksPreflightMemoryUsage(
+                    view, data, &sparkNameManager) >
+                memoryLimit) {
+                return state.Error(
+                    "Cannot pop blocks: preflight exceeds the memory safety limit; use a smaller block count");
+            }
+
+            hasExpectedEvoBestBlock = true;
+            expectedEvoBestBlock =
+                pindex->pprev->GetBlockHash();
+        }
+
+#ifdef ENABLE_WALLET
+        if (collectWalletState &&
+            !PreparePopBlocksWalletCleanup(
+                targetHeight, data, state)) {
+            return false;
+        }
+#endif
+        const std::size_t serializedSize =
+            PopBlocksCleanupSerializeSize(data);
+        std::size_t serializationPeak =
+            PopBlocksPreflightMemoryUsage(view, data);
+        AddPopBlocksMemoryUsage(
+            MultiplyPopBlocksMemoryUsage(
+                4,
+                memusage::MallocUsage(serializedSize)),
+            serializationPeak);
+        if (serializationPeak > memoryLimit) {
+            return state.Error(
+                "Cannot pop blocks: preflight exceeds the memory safety limit; use a smaller block count");
+        }
+        if (!SerializePopBlocksCleanupData(
+                data, cleanupData)) {
+            return state.Error(
+                "Cannot pop blocks: failed to serialize recovery data");
+        }
+        std::size_t finalMemoryUsage =
+            PopBlocksPreflightMemoryUsage(view, data);
+        AddPopBlocksMemoryUsage(
+            memusage::DynamicUsage(cleanupData),
+            finalMemoryUsage);
+        if (finalMemoryUsage > memoryLimit) {
+            return state.Error(
+                "Cannot pop blocks: preflight exceeds the memory safety limit; use a smaller block count");
+        }
+    } catch (const std::bad_alloc&) {
+        return state.Error(
+            "Cannot pop blocks: memory allocation failed during preflight");
+    } catch (const std::exception& e) {
+        return state.Error(strprintf(
+            "Cannot pop blocks: preflight failed: %s", e.what()));
+    }
+
+    return true;
+}
+
+static bool CanCleanupPopBlocksWallet(
+    const PopBlocksPreflightData& data)
+{
+#ifdef ENABLE_WALLET
+    return !data.walletCleanupRequired ||
+        (!GetBoolArg("-disablewallet", false) &&
+         pwalletMain &&
+         pwalletMain->sparkWallet &&
+         !data.walletViewKeyHash.IsNull() &&
+         pwalletMain->sparkWallet->GetFullViewKeyHash() ==
+             data.walletViewKeyHash);
+#else
+    return !data.walletCleanupRequired;
+#endif
+}
+
+static bool CleanupPopBlocksAfterDisconnect(
+    const PopBlocksPreflightData& data)
+{
+    if (!CanCleanupPopBlocksWallet(data))
+        return false;
+
+    spark::ClearSparkSpendProofCache();
+    txpools.clear();
+    if (llmq::quorumInstantSendManager) {
+        llmq::quorumInstantSendManager->
+            ClearRemovedTxState(chainActive.Tip());
+    }
+    llmq::quorumBlockProcessor->
+        PruneMinableCommitments(chainActive.Tip());
+    masternodeSync.Reset();
+
+#ifdef ENABLE_WALLET
+    if (data.walletCleanupRequired) {
+        if (!pwalletMain->sparkWallet->
+                RemoveSparkState(
+                    data.walletMintHashes,
+                    data.walletLTags)) {
+            return false;
+        }
+    }
+#endif
+    return true;
+}
+
+static bool RemoveAndSyncPopBlocksInstantSendState(
+    CBlockIndex* initialTip,
+    CBlockIndex* targetTip,
+    const CChainParams& chainparams)
+{
+    if (!llmq::quorumInstantSendManager)
+        return true;
+
+    for (CBlockIndex* pindex = initialTip;
+         pindex != targetTip;
+         pindex = pindex->pprev) {
+        CBlock block;
+        if (!ReadBlockFromDisk(
+                block, pindex,
+                chainparams.GetConsensus())) {
+            return false;
+        }
+        llmq::quorumInstantSendManager->
+            RemoveMinedInstantSendLocks(
+                block, pindex->nHeight);
+    }
+    return llmq::quorumInstantSendManager->
+        SyncRecoveredMinedInstantSendLocks();
+}
+
+static bool CommitPopBlocksCleanup(
+    CBlockIndex* initialTip,
+    CBlockIndex* targetTip,
+    const PopBlocksPreflightData& data,
+    CValidationState& state)
+{
+    AssertLockHeld(cs_main);
+    assert(chainActive.Tip() == targetTip);
+
+    try {
+        if (!RemoveAndSyncPopBlocksInstantSendState(
+                initialTip, targetTip, Params())) {
+            return AbortNode(
+                state,
+                "Failed to persist PopBlocks InstantSend state");
+        }
+        if (!CleanupPopBlocksAfterDisconnect(data)) {
+            return AbortNode(
+                state,
+                "Failed to persist PopBlocks Spark wallet state");
+        }
+        if (!evoDb->WritePopBlocksMempoolCleanup()) {
+            return AbortNode(
+                state,
+                "Failed to persist PopBlocks mempool cleanup");
+        }
+        if (!evoDb->WritePopBlocksRecovery(
+                initialTip->GetBlockHash(),
+                targetTip->GetBlockHash(),
+                true,
+                {})) {
+            return AbortNode(
+                state,
+                "Failed to commit PopBlocks recovery phase");
+        }
+    } catch (const std::exception& e) {
+        return AbortNode(
+            state,
+            strprintf(
+                "PopBlocks cleanup failed: %s",
+                e.what()));
+    }
+    return true;
+}
+
+static void ForgetBlockIndexDataAboveHeight(
+    int targetHeight,
+    const CChainParams& chainparams)
+{
+    AssertLockHeld(cs_main);
+    assert(chainActive.Height() == targetHeight);
+
+    setBlockIndexCandidates.clear();
+    for (const auto& entry : mapBlockIndex) {
+        CBlockIndex* pindex = entry.second;
+        if (pindex->nHeight <= targetHeight)
+            continue;
+
+        pindex->nStatus = std::min<unsigned int>(
+            pindex->nStatus & BLOCK_VALID_MASK,
+            BLOCK_VALID_TREE) |
+            (pindex->nStatus & ~BLOCK_VALID_MASK);
+        pindex->nStatus &=
+            ~(BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO |
+              BLOCK_FAILED_MASK | BLOCK_OPT_WITNESS);
+        pindex->nFile = 0;
+        pindex->nDataPos = 0;
+        pindex->nUndoPos = 0;
+        pindex->nTx = 0;
+        pindex->nChainTx = 0;
+        pindex->nSequenceId = 0;
+        pindex->mintedPubCoins.clear();
+        pindex->accumulatorChanges.clear();
+        pindex->spentSerials.clear();
+        pindex->sigmaMintedPubCoins.clear();
+        pindex->sigmaSpentSerials.clear();
+        pindex->lelantusMintedPubCoins.clear();
+        pindex->lelantusMintData.clear();
+        pindex->anonymitySetHash.clear();
+        pindex->sparkMintedCoins.clear();
+        pindex->sparkSetHash.clear();
+        pindex->spentLTags.clear();
+        pindex->ltagTxhash.clear();
+        pindex->sparkTxHashContext.clear();
+        pindex->lelantusSpentSerials.clear();
+        pindex->activeDisablingSporks.clear();
+        pindex->addedSparkNames.clear();
+        pindex->removedSparkNames.clear();
+        setDirtyBlockIndex.insert(pindex);
+    }
+
+    for (auto it = mapBlocksUnlinked.begin();
+         it != mapBlocksUnlinked.end();) {
+        if ((it->first &&
+             it->first->nHeight > targetHeight) ||
+            it->second->nHeight > targetHeight) {
+            mapBlocksUnlinked.erase(it++);
+        } else {
+            ++it;
+        }
+    }
+    for (auto it = mapRejectedBlocks.begin();
+         it != mapRejectedBlocks.end();) {
+        const auto index = mapBlockIndex.find(it->first);
+        if (index != mapBlockIndex.end() &&
+            index->second->nHeight > targetHeight) {
+            mapRejectedBlocks.erase(it++);
+        } else {
+            ++it;
+        }
+    }
+
+    if (pindexBestForkTip &&
+        pindexBestForkTip->nHeight > targetHeight) {
+        pindexBestForkTip = nullptr;
+        pindexBestForkBase = nullptr;
+    }
+    pindexBestInvalid = nullptr;
+    for (const auto& entry : mapBlockIndex) {
+        CBlockIndex* pindex = entry.second;
+        if ((pindex->nStatus & BLOCK_FAILED_MASK) &&
+            (!pindexBestInvalid ||
+             pindex->nChainWork >
+                 pindexBestInvalid->nChainWork)) {
+            pindexBestInvalid = pindex;
+        }
+        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) &&
+            pindex->nChainTx &&
+            !setBlockIndexCandidates.value_comp()(
+                pindex, chainActive.Tip())) {
+            setBlockIndexCandidates.insert(pindex);
+        }
+    }
+    ResetBlockDownloadPeerCaches();
+    SetfLargeWorkForkFound(false);
+    SetfLargeWorkInvalidChainFound(false);
+    CheckForkWarningConditions();
+    PruneBlockIndexCandidates();
+    CheckBlockIndex(chainparams.GetConsensus());
+}
+
+static bool PopBlocksLocked(
+    int blocks,
+    CValidationState& state,
+    int& resultingHeight)
+{
+    AssertLockHeld(cs_main);
+
+    if (blocks <= 0 || blocks > chainActive.Height())
+        return state.Invalid(false, 0, "invalid-block-count");
+    if (fAddressIndex || fSpentIndex)
+        return state.Error("Cannot pop blocks while the address or spent index is enabled");
+    if (evoDb->HasPopBlocksRecovery()) {
+        return state.Error(
+            "Cannot pop blocks while an earlier recovery is pending; restart the node");
+    }
+#ifdef ENABLE_WALLET
+    if (GetBoolArg("-disablewallet", false) ||
+        !pwalletMain) {
+        return state.Error(
+            "Cannot pop blocks while wallet loading is disabled");
+    }
+#else
+    return state.Error(
+        "Cannot pop blocks without wallet support");
+#endif
+
+    const CChainParams& chainparams = Params();
+    const int targetHeight = chainActive.Height() - blocks;
+    CBlockIndex* const initialTip = chainActive.Tip();
+    CBlockIndex* const targetTip =
+        chainActive[targetHeight];
+    if (llmq::quorumInstantSendManager &&
+        !llmq::quorumInstantSendManager->
+            CanRollbackToHeight(
+                chainActive.Height(),
+                targetTip)) {
+        return state.Error(
+            "Cannot pop blocks because retained transactions would lose archived InstantSend protection");
+    }
+    // Make the recovery marker's initial tip a durable CoinsDB/EvoDB
+    // checkpoint. Preflight then observes any pruning performed by the flush.
+    if (!FlushStateToDisk(state, FLUSH_STATE_ALWAYS))
+        return false;
+
+    PopBlocksPreflightData preflightData;
+    std::vector<unsigned char> cleanupData;
+    if (!PreflightPopBlocks(
+            targetHeight,
+            chainparams,
+            preflightData,
+            cleanupData,
+            state)) {
+        return false;
+    }
+
+    CDeterministicMNList initialMNList;
+    CDeterministicMNList targetMNList;
+    CDeterministicMNListDiff aggregateMNDiff;
+    const bool hasDeterministicMNState =
+        chainActive.Height() >=
+        chainparams.GetConsensus().DIP0003Height;
+    if (hasDeterministicMNState) {
+        initialMNList =
+            deterministicMNManager->GetListForBlock(
+                initialTip);
+        targetMNList =
+            deterministicMNManager->GetListForBlock(
+                targetTip);
+        aggregateMNDiff =
+            initialMNList.BuildDiff(targetMNList);
+    }
+    bool recoveryMarkerWritten = false;
+    try {
+        recoveryMarkerWritten =
+            evoDb->WritePopBlocksRecovery(
+                initialTip->GetBlockHash(),
+                targetTip->GetBlockHash(),
+                false,
+                cleanupData);
+    } catch (const std::exception& e) {
+        return state.Error(strprintf(
+            "Cannot pop blocks: failed to write the recovery marker: %s",
+            e.what()));
+    }
+    if (!recoveryMarkerWritten) {
+        return state.Error(
+            "Cannot pop blocks: failed to write the recovery marker");
+    }
+
+    LogPrintf("PopBlocks: removing %d blocks from height %d to %d\n",
+        blocks, chainActive.Height(), targetHeight);
+    std::size_t disconnectedBlocks = 0;
+    bool disconnectedAll = true;
+    while (chainActive.Height() > targetHeight) {
+        if (!DisconnectTip(
+                state, chainparams, true, true)) {
+            disconnectedAll = false;
+            break;
+        }
+        ++disconnectedBlocks;
+        if (!state.IsValid()) {
+            disconnectedAll = false;
+            break;
+        }
+    }
+
+    if (!disconnectedAll) {
+        return AbortNode(
+            state,
+            strprintf(
+                "PopBlocks stopped after disconnecting %u of %d preflighted blocks",
+                disconnectedBlocks,
+                blocks));
+    }
+
+    // Persist the disconnected chainstate while all old block-index entries
+    // still describe readable data. This ordering makes interruption safe.
+    if (!FlushStateToDisk(
+            state, FLUSH_STATE_ALWAYS)) {
+        return AbortNode(
+            state,
+            "Failed to persist disconnected PopBlocks chainstate");
+    }
+    if (!CommitPopBlocksCleanup(
+            initialTip,
+            targetTip,
+            preflightData,
+            state)) {
+        return false;
+    }
+
+    ForgetBlockIndexDataAboveHeight(
+        targetHeight, chainparams);
+
+    if (!FlushStateToDisk(
+            state, FLUSH_STATE_ALWAYS)) {
+        return AbortNode(
+            state,
+            "Failed to persist forgotten PopBlocks block metadata");
+    }
+
+    try {
+        if (!evoDb->ErasePopBlocksRecovery()) {
+            return AbortNode(
+                state,
+                "Failed to clear the PopBlocks recovery marker");
+        }
+    } catch (const std::exception& e) {
+        return AbortNode(
+            state,
+            strprintf(
+                "Failed to clear the PopBlocks recovery marker: %s",
+                e.what()));
+    }
+
+    if (hasDeterministicMNState &&
+        aggregateMNDiff.HasChanges()) {
+        GetMainSignals().NotifyMasternodeListChanged(
+            true, initialMNList, aggregateMNDiff);
+        uiInterface.NotifyMasternodeListChanged(
+            targetMNList);
+    }
+
+    resultingHeight = chainActive.Height();
+    LogPrintf("PopBlocks: removed %d blocks; new tip=%s height=%d\n",
+        blocks, chainActive.Tip()->GetBlockHash().ToString(), resultingHeight);
+    return true;
+}
+
+bool PopBlocks(int blocks, CValidationState& state, int& resultingHeight)
+{
+    if (ownsTipNotificationMutex)
+        return state.Error(
+            "Cannot pop blocks from a tip notification callback");
+    AssertLockNotHeld(cs_main);
+
+    boost::unique_lock<boost::mutex> notificationLock(
+        cs_tip_notification);
+    TipNotificationOwner notificationOwner;
+
+    bool result = false;
+    bool mutationAttempted = false;
+    while (true) {
+        TipNotification notification = {
+            nullptr, nullptr, nullptr, 0, false, false, false};
+        bool notify = false;
+        {
+            LOCK(cs_main);
+            notify = PrepareNextTipNotification(notification);
+            if (!notify && !mutationAttempted) {
+                mutationAttempted = true;
+                CBlockIndex* initialTip = chainActive.Tip();
+                const uint64_t initialTipSequence =
+                    activeTipSequence;
+                try {
+                    result = PopBlocksLocked(
+                        blocks, state, resultingHeight);
+                } catch (const std::exception& e) {
+                    result = AbortNode(
+                        state,
+                        strprintf(
+                            "PopBlocks failed: %s",
+                            e.what()));
+                }
+                if (chainActive.Tip() != initialTip ||
+                    activeTipSequence != initialTipSequence) {
+                    QueueTipNotification({
+                        chainActive.Tip(),
+                        chainActive.Tip(),
+                        chainActive.Tip(),
+                        activeTipSequence,
+                        IsInitialBlockDownload(),
+                        true,
+                        false});
+                }
+                notify = PrepareNextTipNotification(notification);
+                if (!notify && pendingTipNotifications.empty()) {
+                    // Release serialization while cs_main excludes a mutation.
+                    notificationLock.unlock();
+                }
+            } else if (!notify && mutationAttempted) {
+                notificationLock.unlock();
+            }
+        }
+
+        if (!notify)
+            return result;
+        NotifyTip(notification);
+    }
 }
 
 void ReprocessBlocks(int nBlocks) {
@@ -3918,6 +5160,8 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
 
     CBlockIndex *pindexMostWork = NULL;
     CBlockIndex *pindexNewTip = NULL;
+    uint64_t mostWorkTipSequence = 0;
+    bool hasMostWorkTipSequence = false;
     do {
         boost::this_thread::interruption_point();
         if (ShutdownRequested())
@@ -3926,6 +5170,7 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
         const CBlockIndex *pindexFork;
         ConnectTrace connectTrace;
         bool fInitialDownload;
+        uint64_t tipSequence;
         {
             LOCK(cs_main);
             { // TODO: Tempoarily ensure that mempool removals are notified before
@@ -3937,8 +5182,17 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
               // the notification that the conflicted transaction was evicted.
             MemPoolConflictRemovalTracker mrt(mempool);
             CBlockIndex *pindexOldTip = chainActive.Tip();
-            if (pindexMostWork == NULL) {
+            // The candidate is cached across iterations that release cs_main. It may
+            // have been invalidated or forgotten by another thread while unlocked.
+            if (pindexMostWork == NULL ||
+                !hasMostWorkTipSequence ||
+                mostWorkTipSequence != activeTipSequence ||
+                !pindexMostWork->IsValid(BLOCK_VALID_TRANSACTIONS) ||
+                !(pindexMostWork->nStatus & BLOCK_HAVE_DATA) ||
+                !pindexMostWork->nChainTx) {
                 pindexMostWork = FindMostWorkChain();
+                mostWorkTipSequence = activeTipSequence;
+                hasMostWorkTipSequence = true;
                 if (!fReindex && !IsInitialBlockDownload() &&
                         pindexMostWork != NULL &&
                         pindexMostWork != chainActive.Tip() &&
@@ -3972,10 +5226,13 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
             if (fInvalidFound) {
                 // Wipe cache, we may need another branch now.
                 pindexMostWork = NULL;
+                hasMostWorkTipSequence = false;
             }
             pindexNewTip = chainActive.Tip();
             pindexFork = chainActive.FindFork(pindexOldTip);
             fInitialDownload = IsInitialBlockDownload();
+            tipSequence = activeTipSequence;
+            mostWorkTipSequence = activeTipSequence;
 
             // throw all transactions though the signal-interface
 
@@ -3992,19 +5249,18 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
             batchProofContainer->fCollectProofs = ShouldBatchSparkProofs(pindexNewTip);
             if (!VerifyPendingSparkBatch(state, "connecting new tip"))
                 return false;
+
+            QueueTipNotification({
+                pindexNewTip,
+                pindexFork,
+                pindexNewTip,
+                tipSequence,
+                fInitialDownload,
+                pindexFork != pindexNewTip,
+                false});
         }
 
-        // When we reach this point, we switched to a new tip (stored in pindexNewTip).
-
-        // Notifications/callbacks that can run without cs_main
-
-        // Notify external listeners about the new tip.
-        GetMainSignals().UpdatedBlockTip(pindexNewTip, pindexFork, fInitialDownload);
-
-        // Always notify the UI if a new block tip was connected
-        if (pindexFork != pindexNewTip) {
-            uiInterface.NotifyBlockTip(fInitialDownload, pindexNewTip);
-        }
+        PublishActivationTips();
     } while (pindexNewTip != pindexMostWork);
     CheckBlockIndex(chainparams.GetConsensus());
 
@@ -4085,8 +5341,16 @@ bool InvalidateBlock(CValidationState& state, const CChainParams& chainparams, C
 
     InvalidChainFound(pindex);
     txpools.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
-    GetMainSignals().UpdatedBlockTip(chainActive.Tip(), NULL, IsInitialBlockDownload());
-    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
+    // Invalidation publishes even when the invalidated block was not active.
+    ++activeTipSequence;
+    PublishTipFromMainLock({
+        chainActive.Tip(),
+        nullptr,
+        pindex->pprev,
+        activeTipSequence,
+        IsInitialBlockDownload(),
+        true,
+        true});
     return true;
 }
 
@@ -5140,6 +6404,402 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     return pindexNew;
 }
 
+namespace
+{
+
+struct PopBlocksRecoveryContext
+{
+    bool found{false};
+    bool forgetData{false};
+    bool legacy{false};
+    std::vector<unsigned char> cleanupData;
+    CBlockIndex* initialTip{nullptr};
+    CBlockIndex* targetTip{nullptr};
+    CBlockIndex* chainstateTip{nullptr};
+    CBlockIndex* evoTip{nullptr};
+    uint256 evoTipHash;
+};
+
+static bool ReadPopBlocksRecoveryContext(
+    PopBlocksRecoveryContext& context)
+{
+    AssertLockHeld(cs_main);
+
+    if (!evoDb->HasPopBlocksRecovery())
+        return true;
+    context.found = true;
+
+    uint256 initialTipHash;
+    uint256 targetTipHash;
+    if (!evoDb->ReadPopBlocksRecovery(
+            initialTipHash,
+            targetTipHash,
+            context.forgetData,
+            context.cleanupData,
+            context.legacy)) {
+        return error(
+            "PopBlocks recovery marker is malformed");
+    }
+
+    const auto initialIt =
+        mapBlockIndex.find(initialTipHash);
+    const auto targetIt =
+        mapBlockIndex.find(targetTipHash);
+    const auto chainstateIt =
+        mapBlockIndex.find(pcoinsTip->GetBestBlock());
+    if (initialIt == mapBlockIndex.end() ||
+        targetIt == mapBlockIndex.end() ||
+        chainstateIt == mapBlockIndex.end() ||
+        !evoDb->ReadBestBlock(context.evoTipHash)) {
+        return error(
+            "PopBlocks recovery tips are inconsistent");
+    }
+    const auto resolvedEvoIt =
+        mapBlockIndex.find(context.evoTipHash);
+    if (resolvedEvoIt == mapBlockIndex.end()) {
+        return error(
+            "PopBlocks recovery EvoDB tip is unknown");
+    }
+
+    context.initialTip = initialIt->second;
+    context.targetTip = targetIt->second;
+    context.chainstateTip = chainstateIt->second;
+    context.evoTip = resolvedEvoIt->second;
+    if (context.targetTip->nHeight >
+            context.initialTip->nHeight ||
+        context.initialTip->GetAncestor(
+            context.targetTip->nHeight) !=
+            context.targetTip) {
+        return error(
+            "PopBlocks recovery target is inconsistent");
+    }
+    const bool chainstateDescendsTarget =
+        context.chainstateTip->nHeight >=
+            context.targetTip->nHeight &&
+        context.chainstateTip->GetAncestor(
+            context.targetTip->nHeight) ==
+            context.targetTip;
+    const bool chainstateOnRollbackPath =
+        chainstateDescendsTarget &&
+        context.chainstateTip->nHeight <=
+            context.initialTip->nHeight &&
+        context.initialTip->GetAncestor(
+            context.chainstateTip->nHeight) ==
+            context.chainstateTip;
+    if ((!context.forgetData &&
+         !chainstateOnRollbackPath) ||
+        (context.forgetData &&
+         !chainstateDescendsTarget)) {
+        return error(
+            "PopBlocks recovery chainstate is outside the rollback range");
+    }
+    const bool evoOnRollbackPath =
+        context.evoTip->nHeight >=
+            context.targetTip->nHeight &&
+        context.evoTip->nHeight <=
+            context.initialTip->nHeight &&
+        context.initialTip->GetAncestor(
+            context.evoTip->nHeight) ==
+            context.evoTip;
+    if (!evoOnRollbackPath &&
+        (!context.forgetData ||
+         context.evoTip != context.chainstateTip)) {
+        return error(
+            "PopBlocks recovery EvoDB tip is outside the rollback range");
+    }
+    if (!context.forgetData &&
+        context.evoTip->nHeight <
+            context.chainstateTip->nHeight) {
+        return error(
+            "PopBlocks recovery EvoDB is ahead of chainstate rollback");
+    }
+    if (chainActive.Tip() != context.chainstateTip) {
+        return error(
+            "PopBlocks recovery chainstate is inconsistent");
+    }
+    return true;
+}
+
+static bool RestoreAndSyncPopBlocksInstantSendState(
+    CBlockIndex* initialTip,
+    CBlockIndex* targetTip,
+    const CChainParams& chainparams)
+{
+    if (!llmq::quorumInstantSendManager)
+        return true;
+
+    for (CBlockIndex* pindex = initialTip;
+         pindex != targetTip;
+         pindex = pindex->pprev) {
+        if (!(pindex->nStatus & BLOCK_HAVE_DATA))
+            return false;
+        CBlock block;
+        if (!ReadBlockFromDisk(
+                block, pindex,
+                chainparams.GetConsensus())) {
+            return false;
+        }
+        llmq::quorumInstantSendManager->
+            RestoreMinedInstantSendLocks(
+                block, pindex->nHeight);
+    }
+    return llmq::quorumInstantSendManager->
+        SyncRecoveredMinedInstantSendLocks();
+}
+
+static bool RepairPopBlocksEvoDB(
+    const PopBlocksRecoveryContext& context,
+    const CChainParams& chainparams)
+{
+    AssertLockHeld(cs_main);
+
+    if (context.evoTip == context.targetTip) {
+        return true;
+    }
+
+    {
+        auto dbTx = evoDb->BeginTransaction();
+        for (CBlockIndex* pindex = context.evoTip;
+             pindex != context.targetTip;
+             pindex = pindex->pprev) {
+            if (!(pindex->nStatus & BLOCK_HAVE_DATA)) {
+                return error(
+                    "PopBlocks recovery block data is unavailable");
+            }
+            CBlock block;
+            if (!ReadBlockFromDisk(
+                    block, pindex,
+                    chainparams.GetConsensus()) ||
+                !UndoSpecialTxsInBlock(
+                    block,
+                    pindex,
+                    false,
+                    false,
+                    false)) {
+                return error(
+                    "PopBlocks recovery failed to restore EvoDB");
+            }
+        }
+        evoDb->WriteBestBlock(
+            context.targetTip->GetBlockHash());
+        dbTx->Commit();
+    }
+    if (!evoDb->CommitRootTransaction()) {
+        return error(
+            "PopBlocks recovery failed to commit EvoDB");
+    }
+    deterministicMNManager->ClearCache();
+    llmq::quorumBlockProcessor->
+        ClearMinedCommitmentCache();
+    return true;
+}
+
+static bool FinishPopBlocksChainstateRollback(
+    PopBlocksRecoveryContext& context,
+    const CChainParams& chainparams)
+{
+    AssertLockHeld(cs_main);
+
+    if (context.chainstateTip == context.targetTip)
+        return true;
+
+    CCoinsViewCache view(pcoinsTip);
+    for (CBlockIndex* pindex = context.chainstateTip;
+         pindex != context.targetTip;
+         pindex = pindex->pprev) {
+        if (!(pindex->nStatus & BLOCK_HAVE_DATA)) {
+            return error(
+                "PopBlocks recovery block data is unavailable");
+        }
+        CBlock block;
+        if (!ReadBlockFromDisk(
+                block, pindex,
+                chainparams.GetConsensus())) {
+            return error(
+                "PopBlocks recovery failed to read block data");
+        }
+        bool clean = false;
+        CValidationState state;
+        if (DisconnectBlock(
+                block,
+                state,
+                pindex,
+                view,
+                &clean,
+                true,
+                true) != DISCONNECT_OK ||
+            !clean) {
+            return error(
+                "PopBlocks recovery failed to finish chainstate rollback");
+        }
+    }
+    if (!view.Flush()) {
+        return error(
+            "PopBlocks recovery failed to update chainstate");
+    }
+
+    chainActive.SetTip(context.targetTip);
+    context.chainstateTip = context.targetTip;
+    return true;
+}
+
+} // namespace
+
+bool RecoverInterruptedPopBlocks(
+    const CChainParams& chainparams)
+{
+    LOCK(cs_main);
+
+    PopBlocksRecoveryContext context;
+    if (!ReadPopBlocksRecoveryContext(context) ||
+        !context.found) {
+        return !context.found;
+    }
+
+    // A phase-complete marker can survive only if its final erase failed.
+    // If synchronization advanced before shutdown took effect, the cleanup
+    // and metadata flush still preceded that failed erase.
+    if (context.forgetData &&
+        context.chainstateTip != context.targetTip) {
+        if (context.evoTip != context.chainstateTip) {
+            return error(
+                "PopBlocks completed recovery tips are inconsistent");
+        }
+        if (!evoDb->ErasePopBlocksRecovery()) {
+            return error(
+                "PopBlocks recovery failed to clear a completed operation");
+        }
+        LogPrintf(
+            "Cleared completed PopBlocks recovery marker at height %d\n",
+            context.chainstateTip->nHeight);
+        return true;
+    }
+
+    if (context.chainstateTip == context.initialTip) {
+        if (context.forgetData ||
+            context.evoTip != context.initialTip) {
+            return error(
+                "PopBlocks recovery phase is inconsistent");
+        }
+        if (!RestoreAndSyncPopBlocksInstantSendState(
+                context.initialTip,
+                context.targetTip,
+                chainparams)) {
+            return error(
+                "PopBlocks recovery failed to restore InstantSend state");
+        }
+        if (!evoDb->ErasePopBlocksRecovery()) {
+            return error(
+                "PopBlocks recovery failed to clear an aborted operation");
+        }
+        return true;
+    }
+
+    if (fAddressIndex || fSpentIndex) {
+        return error(
+            "PopBlocks recovery cannot continue with the address or spent index enabled");
+    }
+    if (context.legacy) {
+        return error(
+            "Legacy PopBlocks recovery requires a chainstate reindex");
+    }
+
+    const bool resumedChainstate =
+        context.chainstateTip != context.targetTip;
+    if (!FinishPopBlocksChainstateRollback(
+            context, chainparams)) {
+        return false;
+    }
+    if (!RepairPopBlocksEvoDB(
+            context, chainparams)) {
+        return false;
+    }
+    if (resumedChainstate) {
+        CValidationState state;
+        if (!FlushStateToDisk(
+                state, FLUSH_STATE_ALWAYS)) {
+            return error(
+                "PopBlocks recovery failed to persist the completed rollback");
+        }
+    }
+    if (!context.forgetData)
+        return true;
+
+    ForgetBlockIndexDataAboveHeight(
+        context.targetTip->nHeight,
+        chainparams);
+    CValidationState state;
+    if (!FlushStateToDisk(
+            state, FLUSH_STATE_ALWAYS) ||
+        !evoDb->ErasePopBlocksRecovery()) {
+        return error(
+            "PopBlocks recovery failed to persist forgotten block metadata");
+    }
+    LogPrintf(
+        "Recovered PopBlocks metadata at height %d\n",
+        context.targetTip->nHeight);
+    return true;
+}
+
+bool FinishInterruptedPopBlocks(
+    const CChainParams& chainparams)
+{
+    LOCK(cs_main);
+
+    PopBlocksRecoveryContext context;
+    if (!ReadPopBlocksRecoveryContext(context) ||
+        !context.found) {
+        return !context.found;
+    }
+    if (context.chainstateTip != context.targetTip ||
+        context.forgetData ||
+        context.legacy) {
+        return error(
+            "PopBlocks cleanup recovery phase is inconsistent");
+    }
+    if (fAddressIndex || fSpentIndex) {
+        return error(
+            "PopBlocks cleanup recovery cannot continue with optional indexes enabled");
+    }
+    if (!RepairPopBlocksEvoDB(
+            context, chainparams)) {
+        return false;
+    }
+
+    PopBlocksPreflightData cleanup;
+    if (!DeserializePopBlocksCleanupData(
+            context.cleanupData, cleanup)) {
+        return error(
+            "PopBlocks cleanup recovery data is malformed");
+    }
+    if (!CanCleanupPopBlocksWallet(cleanup)) {
+        return error(
+            "PopBlocks cleanup recovery requires the wallet that started the operation");
+    }
+    CValidationState state;
+    if (!CommitPopBlocksCleanup(
+            context.initialTip,
+            context.targetTip,
+            cleanup,
+            state)) {
+        return false;
+    }
+
+    ForgetBlockIndexDataAboveHeight(
+        context.targetTip->nHeight,
+        chainparams);
+    if (!FlushStateToDisk(
+            state, FLUSH_STATE_ALWAYS) ||
+        !evoDb->ErasePopBlocksRecovery()) {
+        return error(
+            "PopBlocks cleanup recovery failed to persist block metadata");
+    }
+    LogPrintf(
+        "Completed interrupted PopBlocks at height %d\n",
+        context.targetTip->nHeight);
+    return true;
+}
+
 bool static LoadBlockIndexDB(const CChainParams& chainparams)
 {
     LogPrintf("LoadBlockIndexDB\n");
@@ -5259,6 +6919,11 @@ bool static LoadBlockIndexDB(const CChainParams& chainparams)
         return true;
     chainActive.SetTip(it->second);
 
+    if (!RecoverInterruptedPopBlocks(chainparams))
+        return false;
+
+    deterministicMNManager->UpdatedBlockTip(
+        chainActive.Tip());
     PruneBlockIndexCandidates();
 
     spark::BuildSparkStateFromIndex(&chainActive);
@@ -5493,6 +7158,10 @@ bool RewindBlockIndex(const CChainParams& params)
 void UnloadBlockIndex()
 {
     LOCK(cs_main);
+    pendingTipNotifications.clear();
+    activeTipSequence = 0;
+    lastPublishedTipSequence = 0;
+    lastPublishedTip = nullptr;
     setBlockIndexCandidates.clear();
     chainActive.SetTip(NULL);
     pindexBestInvalid = NULL;
@@ -5903,6 +7572,13 @@ static const uint64_t MEMPOOL_DUMP_VERSION = 1;
 
 bool LoadMempool(void)
 {
+    if (evoDb &&
+        evoDb->HasPopBlocksMempoolCleanup()) {
+        LogPrintf(
+            "Skipping stale mempool data after PopBlocks\n");
+        return true;
+    }
+
     int64_t nExpiryTimeout = GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
     FILE* filestr = fopen((GetDataDir() / "mempool.dat").string().c_str(), "rb");
     CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
@@ -6006,7 +7682,19 @@ void DumpMempool(void)
         file << mapDeltas;
         FileCommit(file.Get());
         file.fclose();
-        RenameOver(GetDataDir() / "mempool.dat.new", GetDataDir() / "mempool.dat");
+        if (!RenameOver(
+                GetDataDir() / "mempool.dat.new",
+                GetDataDir() / "mempool.dat")) {
+            LogPrintf(
+                "Failed to replace mempool data file\n");
+            return;
+        }
+        if (evoDb &&
+            evoDb->HasPopBlocksMempoolCleanup() &&
+            !evoDb->ErasePopBlocksMempoolCleanup()) {
+            LogPrintf(
+                "Failed to clear PopBlocks mempool marker\n");
+        }
         int64_t last = GetTimeMicros();
         LogPrintf("Dumped mempool: %gs to copy, %gs to dump\n", (mid-start)*0.000001, (last-mid)*0.000001);
     } catch (const std::exception& e) {

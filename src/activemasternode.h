@@ -25,6 +25,7 @@ static const int ACTIVE_MASTERNODE_STARTED          = 4;
 
 extern CActiveMasternodeInfo activeMasternodeInfo;
 extern CActiveMasternodeManager* activeMasternodeManager;
+uint256 GetActiveMasternodeProTxHash();
 
 struct CActiveMasternodeInfo {
     // Keys for the active Masternode
@@ -52,14 +53,20 @@ public:
     };
 
 private:
+    mutable CCriticalSection cs;
     masternode_state_t state{MASTERNODE_WAITING_FOR_PROTX};
     std::string strError;
 
 public:
+    virtual ~CActiveMasternodeManager() = default;
+
     virtual void UpdatedBlockTip(const CBlockIndex* pindexNew, const CBlockIndex* pindexFork, bool fInitialDownload) override;
 
     void Init();
 
+    uint256 GetProTxHash() const;
+    COutPoint GetOutPoint() const;
+    CService GetService() const;
     std::string GetStateString() const;
     std::string GetStatus() const;
 

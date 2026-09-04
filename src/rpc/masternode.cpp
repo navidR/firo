@@ -259,10 +259,18 @@ UniValue masternode_status(const JSONRPCRequest& request)
     UniValue mnObj(UniValue::VOBJ);
 
     // keep compatibility with legacy status for now (might get deprecated/removed later)
-    mnObj.push_back(Pair("outpoint", activeMasternodeInfo.outpoint.ToStringShort()));
-    mnObj.push_back(Pair("service", activeMasternodeInfo.service.ToString()));
+    mnObj.push_back(Pair(
+        "outpoint",
+        activeMasternodeManager->
+            GetOutPoint().ToStringShort()));
+    mnObj.push_back(Pair(
+        "service",
+        activeMasternodeManager->
+            GetService().ToString()));
 
-    auto dmn = deterministicMNManager->GetListAtChainTip().GetMN(activeMasternodeInfo.proTxHash);
+    auto dmn = deterministicMNManager->
+        GetListAtChainTip().GetMN(
+            activeMasternodeManager->GetProTxHash());
     if (dmn) {
         mnObj.push_back(Pair("proTxHash", dmn->proTxHash.ToString()));
         mnObj.push_back(Pair("collateralHash", dmn->collateralOutpoint.hash.ToString()));

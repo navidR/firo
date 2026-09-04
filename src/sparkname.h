@@ -227,6 +227,7 @@ public:
     bool RemoveBlock(CBlockIndex *pindex, bool notify = true);
 
     void CopyFrom(const CSparkNameManager& other);
+    std::size_t DynamicMemoryUsage() const;
 
     static std::string ToUpper(const std::string &sparkName);
 

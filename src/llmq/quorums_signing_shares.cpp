@@ -273,7 +273,8 @@ void CSigSharesManager::InterruptWorkerThread()
 void CSigSharesManager::ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, CConnman& connman)
 {
     // non-masternodes are not interested in sigshares
-    if (!fMasternodeMode || activeMasternodeInfo.proTxHash.IsNull()) {
+    if (!fMasternodeMode ||
+        GetActiveMasternodeProTxHash().IsNull()) {
         return;
     }
 
@@ -551,7 +552,8 @@ bool CSigSharesManager::PreVerifyBatchedSigShares(NodeId nodeId, const CSigShare
         // quorum is too old
         return false;
     }
-    if (!session.quorum->IsMember(activeMasternodeInfo.proTxHash)) {
+    if (!session.quorum->IsMember(
+            GetActiveMasternodeProTxHash())) {
         // we're not a member so we can't verify it (we actually shouldn't have received it)
         return false;
     }
@@ -748,7 +750,9 @@ void CSigSharesManager::ProcessSigShare(NodeId nodeId, const CSigShare& sigShare
 
     // prepare node set for direct-push in case this is our sig share
     std::set<NodeId> quorumNodes;
-    if (sigShare.quorumMember == quorum->GetMemberIndex(activeMasternodeInfo.proTxHash)) {
+    if (sigShare.quorumMember ==
+        quorum->GetMemberIndex(
+            GetActiveMasternodeProTxHash())) {
         quorumNodes = connman.GetMasternodeQuorumNodes((Consensus::LLMQType) sigShare.llmqType, sigShare.quorumHash);
     }
 
@@ -1520,8 +1524,10 @@ bool CSigSharesManager::SignPendingSigShares()
 void CSigSharesManager::Sign(const CQuorumCPtr& quorum, const uint256& id, const uint256& msgHash)
 {
     cxxtimer::Timer t(true);
+    const uint256 activeProTxHash =
+        GetActiveMasternodeProTxHash();
 
-    if (!quorum->IsValidMember(activeMasternodeInfo.proTxHash)) {
+    if (!quorum->IsValidMember(activeProTxHash)) {
         return;
     }
 
@@ -1531,7 +1537,8 @@ void CSigSharesManager::Sign(const CQuorumCPtr& quorum, const uint256& id, const
         return;
     }
 
-    int memberIdx = quorum->GetMemberIndex(activeMasternodeInfo.proTxHash);
+    int memberIdx =
+        quorum->GetMemberIndex(activeProTxHash);
     if (memberIdx == -1) {
         // this should really not happen (IsValidMember gave true)
         return;

@@ -26,6 +26,8 @@ private:
     ctpl::thread_pool messageHandlerPool;
 
     std::map<Consensus::LLMQType, CDKGSessionHandler> dkgSessionHandlers;
+    CCriticalSection tipCs;
+    const CBlockIndex* lastTip{nullptr};
 
     CCriticalSection contributionsCacheCs;
     struct ContributionsCacheKey {

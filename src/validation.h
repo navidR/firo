@@ -195,6 +195,8 @@ extern std::atomic_bool fImporting;
 extern bool fReindex;
 extern int nScriptCheckThreads;
 extern bool fTxIndex;
+extern bool fAddressIndex;
+extern bool fSpentIndex;
 extern bool fIsBareMultisigStd;
 extern bool fRequireStandard;
 extern bool fCheckBlockIndex;
@@ -424,7 +426,7 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight);
 /** Transaction validation functions */
 
 /** Context-independent validity checks */
-bool CheckTransaction(const CTransaction& tx, CValidationState& state, bool fCheckDuplicateInputs, uint256 hashTx, bool isVerifyDB, int nHeight = INT_MAX, bool isCheckWallet = false, bool fStatefulZerocoinCheck = true, spark::CSparkTxInfo* sparkTxInfo = NULL);
+bool CheckTransaction(const CTransaction& tx, CValidationState& state, bool fCheckDuplicateInputs, uint256 hashTx, bool isVerifyDB, int nHeight = INT_MAX, bool isCheckWallet = false, bool fStatefulZerocoinCheck = true, spark::CSparkTxInfo* sparkTxInfo = NULL, bool fDisconnectPreflight = false);
 /**
  * Contextual transaction checks (version and type against the previous block).
  * @param[in] tx Transaction to check.
@@ -573,6 +575,16 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
 /** Reprocess a number of blocks to try and get on the correct chain again **/
 bool DisconnectBlocks(int blocks);
+/** Transactions whose UTXO changes were applied by ConnectBlock. */
+std::vector<bool> GetBlockUndoTransactionMask(const CBlock& block);
+/** Repair chain databases before wallet loading after interrupted PopBlocks. */
+bool RecoverInterruptedPopBlocks(
+    const CChainParams& chainparams);
+/** Finish wallet cleanup and block-index forgetting after wallet loading. */
+bool FinishInterruptedPopBlocks(
+    const CChainParams& chainparams);
+/** Disconnect and forget recent blocks. Must be called without cs_main. **/
+bool PopBlocks(int blocks, CValidationState& state, int& resultingHeight);
 void ReprocessBlocks(int nBlocks);
 
 int GetInputAge(const CTxIn &txin);

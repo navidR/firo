@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "activemasternode.h"
 #include "chainparams.h"
 #include "dsnotificationinterface.h"
 //#include "governance.h"
@@ -34,22 +35,30 @@ void CDSNotificationInterface::NotifyHeaderTip(const CBlockIndex *pindexNew, boo
     masternodeSync.NotifyHeaderTip(pindexNew, fInitialDownload, connman);
 }
 
-void CDSNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlockIndex *pindexFork, bool fInitialDownload)
+void CDSNotificationInterface::UpdatedBlockTip(
+    const CBlockIndex* pindexNew,
+    const CBlockIndex* pindexFork,
+    bool fInitialDownload)
 {
-    deterministicMNManager->UpdatedBlockTip(pindexNew);
-
-    if (pindexNew == pindexFork) // blocks were disconnected without any new ones
-        return;
-
+    // Pure disconnects also need every tip-derived subsystem refreshed.
     masternodeSync.UpdatedBlockTip(pindexNew, fInitialDownload, connman);
+    if (activeMasternodeManager) {
+        activeMasternodeManager->UpdatedBlockTip(
+            pindexNew, pindexFork, fInitialDownload);
+    }
 
     // Update global DIP0001 activation status
     //fDIP0001ActiveAtTip = pindexNew->nHeight >= Params().GetConsensus().DIP0001Height;
     // update instantsend autolock activation flag (we reuse the DIP3 deployment)
     //instantsend.isAutoLockBip9Active = pindexNew->nHeight + 1 >= Params().GetConsensus().DIP0003Height;
 
-    if (fInitialDownload)
+    if (fInitialDownload) {
+        if (!fLiteMode) {
+            llmq::quorumDKGSessionManager->
+                UpdatedBlockTip(pindexNew, true);
+        }
         return;
+    }
 
     if (fLiteMode)
         return;

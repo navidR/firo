@@ -62,6 +62,9 @@ void Misbehaving(NodeId nodeid, int howmuch);
 
 bool IsBanned(NodeId nodeid);
 
+/** Forget cached peer common-block pointers after local block data is forgotten. Requires cs_main. */
+void ResetBlockDownloadPeerCaches();
+
 /** Process protocol messages received from a given node */
 bool ProcessMessages(CNode* pfrom, CConnman& connman, const std::atomic<bool>& interrupt);
 /**

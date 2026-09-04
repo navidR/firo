@@ -41,17 +41,22 @@ public:
 private:
     mutable CCriticalSection cs;
     size_t maxMessagesPerNode;
+    const std::atomic<uint64_t>* resetEpoch;
+    uint64_t localEpoch{0};
     std::list<BinaryMessage> pendingMessages;
     std::map<NodeId, size_t> messagesPerNode;
     std::set<uint256> seenMessages;
 
 public:
-    CDKGPendingMessages(size_t _maxMessagesPerNode);
+    CDKGPendingMessages(
+        size_t _maxMessagesPerNode,
+        const std::atomic<uint64_t>* _resetEpoch = nullptr);
 
     void PushPendingMessage(NodeId from, CDataStream& vRecv);
     std::list<BinaryMessage> PopPendingMessages(size_t maxCount);
     bool HasSeen(const uint256& hash) const;
     void Clear();
+    void SetLocalEpoch(uint64_t epoch);
 
     template<typename Message>
     void PushPendingMessage(NodeId from, Message& msg)
@@ -109,6 +114,7 @@ private:
     QuorumPhase phase{QuorumPhase_Idle};
     int quorumHeight{-1};
     uint256 quorumHash;
+    std::atomic<uint64_t> resetEpoch{0};
     std::shared_ptr<CDKGSession> curSession;
     std::thread phaseHandlerThread;
 
@@ -121,20 +127,22 @@ public:
     CDKGSessionHandler(const Consensus::LLMQParams& _params, ctpl::thread_pool& _messageHandlerPool, CBLSWorker& blsWorker, CDKGSessionManager& _dkgManager);
     ~CDKGSessionHandler();
 
-    void UpdatedBlockTip(const CBlockIndex *pindexNew);
+    void UpdatedBlockTip(
+        const CBlockIndex* pindexNew, bool reset);
     void ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, CConnman& connman);
 
 private:
     bool InitNewQuorum(const CBlockIndex* pindexQuorum);
+    void Reset(const CBlockIndex* pindexNew);
 
     std::pair<QuorumPhase, uint256> GetPhaseAndQuorumHash() const;
 
     typedef std::function<void()> StartPhaseFunc;
     typedef std::function<bool()> WhileWaitFunc;
-    void WaitForNextPhase(QuorumPhase curPhase, QuorumPhase nextPhase, const uint256& expectedQuorumHash, const WhileWaitFunc& runWhileWaiting);
-    void WaitForNewQuorum(const uint256& oldQuorumHash);
-    void SleepBeforePhase(QuorumPhase curPhase, const uint256& expectedQuorumHash, double randomSleepFactor, const WhileWaitFunc& runWhileWaiting);
-    void HandlePhase(QuorumPhase curPhase, QuorumPhase nextPhase, const uint256& expectedQuorumHash, double randomSleepFactor, const StartPhaseFunc& startPhaseFunc, const WhileWaitFunc& runWhileWaiting);
+    void WaitForNextPhase(QuorumPhase curPhase, QuorumPhase nextPhase, const uint256& expectedQuorumHash, uint64_t expectedResetEpoch, const WhileWaitFunc& runWhileWaiting);
+    void WaitForNewQuorum(const uint256& oldQuorumHash, uint64_t expectedResetEpoch);
+    void SleepBeforePhase(QuorumPhase curPhase, const uint256& expectedQuorumHash, uint64_t expectedResetEpoch, double randomSleepFactor, const WhileWaitFunc& runWhileWaiting);
+    void HandlePhase(QuorumPhase curPhase, QuorumPhase nextPhase, const uint256& expectedQuorumHash, uint64_t expectedResetEpoch, double randomSleepFactor, const StartPhaseFunc& startPhaseFunc, const WhileWaitFunc& runWhileWaiting);
     void HandleDKGRound();
     void PhaseHandlerThread();
 };

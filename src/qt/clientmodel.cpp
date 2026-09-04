@@ -28,6 +28,7 @@ class CBlockIndex;
 static const int64_t nClientStartupTime = GetTime();
 static int64_t nLastHeaderTipUpdateNotification = 0;
 static int64_t nLastBlockTipUpdateNotification = 0;
+static int nLastBlockTipUpdateHeight = -1;
 
 ClientModel::ClientModel(OptionsModel *_optionsModel, QObject *parent) :
     QObject(parent),
@@ -360,6 +361,10 @@ static void BlockTipChanged(ClientModel *clientmodel, bool initialSync, const CB
         now = GetTimeMillis();
 
     int64_t& nLastUpdateNotification = fHeader ? nLastHeaderTipUpdateNotification : nLastBlockTipUpdateNotification;
+    const bool blockTipWentBackwards =
+        !fHeader &&
+        nLastBlockTipUpdateHeight >= 0 &&
+        pIndex->nHeight < nLastBlockTipUpdateHeight;
     clientmodel->cachedNumBlocks = pIndex->nHeight;
 
     if (fHeader) {
@@ -368,7 +373,8 @@ static void BlockTipChanged(ClientModel *clientmodel, bool initialSync, const CB
         clientmodel->cachedBestHeaderTime = pIndex->GetBlockTime();
     }
     // if we are in-sync, update the UI regardless of last update time
-    if (!initialSync || now - nLastUpdateNotification > MODEL_UPDATE_DELAY) {
+    if (!initialSync || blockTipWentBackwards ||
+        now - nLastUpdateNotification > MODEL_UPDATE_DELAY) {
         //pass a async signal to the UI thread
         QMetaObject::invokeMethod(clientmodel, "numBlocksChanged", Qt::QueuedConnection,
                                   Q_ARG(int, pIndex->nHeight),
@@ -377,6 +383,8 @@ static void BlockTipChanged(ClientModel *clientmodel, bool initialSync, const CB
                                   Q_ARG(bool, fHeader));
         nLastUpdateNotification = now;
     }
+    if (!fHeader)
+        nLastBlockTipUpdateHeight = pIndex->nHeight;
 }
 
 void ClientModel::subscribeToCoreSignals()

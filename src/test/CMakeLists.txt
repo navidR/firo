@@ -198,4 +198,11 @@ endfunction()
 
 add_all_test_targets()
 
+add_test(NAME popblocks_rpc_tests
+  COMMAND test_firo --run_test=popblocks_rpc_tests --catch_system_error=no --log_level=test_suite -- DEBUG_LOG_OUT
+)
+set_property(TEST popblocks_rpc_tests PROPERTY
+  SKIP_REGULAR_EXPRESSION "no test cases matching filter"
+)
+
 list(APPEND installable_targets test_firo)

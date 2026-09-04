@@ -15,6 +15,8 @@
 #include "../init.h"
 #include <boost/format.hpp>
 #include <algorithm>
+#include <map>
+#include <set>
 #include <string>
 
 const uint32_t DEFAULT_SPARK_NCOUNT = 1;
@@ -303,6 +305,12 @@ spark::FullViewKey CSparkWallet::generateFullViewKey(const spark::SpendKey& spen
 spark::IncomingViewKey CSparkWallet::generateIncomingViewKey(const spark::FullViewKey& full_view_key) {
     viewKey = spark::IncomingViewKey(full_view_key);
     return viewKey;
+}
+
+uint256 CSparkWallet::GetFullViewKeyHash() const
+{
+    LOCK(cs_spark_wallet);
+    return ::SerializeHash(fullViewKey);
 }
 
 std::unordered_map<int32_t, spark::Address> CSparkWallet::getAllAddresses() {
@@ -968,6 +976,104 @@ void CSparkWallet::RemoveSparkSpends(const std::vector<GroupElement>& lTags) {
             walletdb.EraseSparkSpendEntry(lTag);
         }
     }
+}
+
+bool CSparkWallet::PrepareSparkStateRemoval(
+    const std::vector<spark::Coin>& mints,
+    std::vector<uint256>& mintHashes)
+{
+    LOCK(cs_spark_wallet);
+    mintHashes.clear();
+    mintHashes.reserve(mints.size());
+    for (spark::Coin coin : mints) {
+        try {
+            const spark::IdentifiedCoinData identified =
+                coin.identify(viewKey);
+            const spark::RecoveredCoinData recovered =
+                coin.recover(fullViewKey, identified);
+            mintHashes.emplace_back(
+                primitives::GetLTagHash(recovered.T));
+        } catch (const std::bad_alloc&) {
+            return false;
+        } catch (const std::runtime_error&) {
+            // Coins not owned by this wallet require no update.
+            mintHashes.emplace_back();
+        }
+    }
+
+    CWalletDB walletdb(strWalletFile);
+    if (!walletdb.TxnBegin())
+        return false;
+    return walletdb.TxnAbort();
+}
+
+bool CSparkWallet::RemoveSparkState(
+    const std::vector<uint256>& mintHashes,
+    const std::vector<GroupElement>& lTags)
+{
+    LOCK(cs_spark_wallet);
+    if (mintHashes.empty() && lTags.empty())
+        return true;
+
+    const std::set<uint256> uniqueMintHashes(
+        mintHashes.begin(), mintHashes.end());
+    std::map<
+        uint256,
+        std::pair<GroupElement, CSparkMintMeta>>
+        spendUpdates;
+    for (const GroupElement& lTag : lTags) {
+        const uint256 lTagHash =
+            primitives::GetLTagHash(lTag);
+        const auto it = coinMeta.find(lTagHash);
+        if (it == coinMeta.end())
+            continue;
+
+        CSparkMintMeta mint = it->second;
+        mint.isUsed = false;
+        spendUpdates.emplace(
+            lTagHash, std::make_pair(lTag, std::move(mint)));
+    }
+
+    CWalletDB walletdb(strWalletFile);
+    if (!walletdb.TxnBegin(0))
+        return false;
+
+    for (const auto& entry : spendUpdates) {
+        if (!walletdb.WriteSparkMint(
+                entry.first, entry.second.second) ||
+            !walletdb.EraseSparkSpendEntry(
+                entry.second.first)) {
+            walletdb.TxnAbort();
+            return false;
+        }
+    }
+    for (const uint256& hash : uniqueMintHashes) {
+        if (!walletdb.EraseSparkMint(hash)) {
+            walletdb.TxnAbort();
+            return false;
+        }
+    }
+    if (!walletdb.TxnCommit(DB_TXN_SYNC))
+        return false;
+
+    for (const auto& entry : spendUpdates) {
+        if (uniqueMintHashes.count(entry.first))
+            continue;
+        const auto it = coinMeta.find(entry.first);
+        if (it == coinMeta.end())
+            continue;
+        removeFromLookups(entry.first, it->second);
+        it->second = entry.second.second;
+        addToLookups(entry.first, it->second);
+    }
+    for (const uint256& hash : uniqueMintHashes) {
+        const auto it = coinMeta.find(hash);
+        if (it == coinMeta.end())
+            continue;
+        removeFromLookups(hash, it->second);
+        coinMeta.erase(it);
+    }
+    return true;
 }
 
 void CSparkWallet::AbandonSparkMints(const std::vector<spark::Coin>& mints) {

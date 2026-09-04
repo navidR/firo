@@ -676,7 +676,8 @@ public:
                       bool* cbTxMerkleRootMNListChangedRet = nullptr,
                       bool fNotify = true);
     bool UndoBlock(const CBlock& block, const CBlockIndex* pindex,
-                   bool fNotify = true);
+                   bool fNotify = true, bool fJustCheck = false,
+                   bool fUpdateTip = false);
 
     void UpdatedBlockTip(const CBlockIndex* pindex);
 

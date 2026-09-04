@@ -743,6 +743,7 @@ void CDbIndexHelper::ConnectTransaction(CTransaction const & tx, int height, int
 void CDbIndexHelper::DisconnectTransactionInputs(CTransaction const & tx, int height, int txNumber, CCoinsViewCache const & view)
 {
     size_t pAddressBegin{0}, pUnspentBegin{0}, pSpentBegin{0};
+    SpentIndexPtr noSpentIndex;
 
     if(addressIndex){
         pAddressBegin = addressIndex->size();
@@ -761,14 +762,33 @@ void CDbIndexHelper::DisconnectTransactionInputs(CTransaction const & tx, int he
            error("A Zerocoin to Sigma remint tx shoud have just 1 input");
            return;
         }
-        handleRemint(tx.vin[0], tx.GetHash(), height, txNumber, remintValue, addressIndex, addressUnspentIndex, spentIndex);
+        if (addressIndex) {
+            handleRemint(
+                tx.vin[0], tx.GetHash(), height, txNumber, remintValue,
+                addressIndex, addressUnspentIndex, noSpentIndex);
+        }
+        if (spentIndex) {
+            spentIndex->emplace_back(
+                CSpentIndexKey(tx.vin[0].prevout.hash, tx.vin[0].prevout.n),
+                CSpentIndexValue());
+        }
     }
 
     size_t no = 0;
 
     if(!tx.IsCoinBase() && !tx.HasNoRegularInputs())
         for (CTxIn const & input : tx.vin) {
-            handleInput(input, no++, tx.GetHash(), height, txNumber, view, addressIndex, addressUnspentIndex, spentIndex);
+            if (addressIndex) {
+                handleInput(
+                    input, no, tx.GetHash(), height, txNumber, view,
+                    addressIndex, addressUnspentIndex, noSpentIndex);
+            }
+            if (spentIndex) {
+                spentIndex->emplace_back(
+                    CSpentIndexKey(input.prevout.hash, input.prevout.n),
+                    CSpentIndexValue());
+            }
+            ++no;
         }
 
     if(addressIndex){
@@ -779,7 +799,7 @@ void CDbIndexHelper::DisconnectTransactionInputs(CTransaction const & tx, int he
             iter->second = CAddressUnspentValue();
     }
 
-    if(spentIndex)
+    if (spentIndex)
         std::reverse(spentIndex->begin() + pSpentBegin, spentIndex->end());
 }
 

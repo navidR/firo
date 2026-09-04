@@ -578,6 +578,16 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<con
 
 } // anon namespace
 
+void ResetBlockDownloadPeerCaches()
+{
+    AssertLockHeld(cs_main);
+    for (auto& entry : mapNodeState) {
+        entry.second.pindexLastCommonBlock = nullptr;
+        entry.second.fSyncStarted = false;
+    }
+    nSyncStarted = 0;
+}
+
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     LOCK(cs_main);
     CNodeState *state = State(nodeid);

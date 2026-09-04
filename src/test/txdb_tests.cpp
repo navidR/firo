@@ -170,6 +170,7 @@ BOOST_AUTO_TEST_CASE(dbindexhelper_payToPubKey)
 
             BOOST_CHECK(dbIndexHelper.getSpentIndex()[i].first.txid == uint256S(prevout_txids[inNum-1-i].c_str()));
             BOOST_CHECK(dbIndexHelper.getSpentIndex()[i].first.outputIndex == prevout_idx[inNum-1-i]);
+            BOOST_CHECK(dbIndexHelper.getSpentIndex()[i].second.IsNull());
         }
     }
 }

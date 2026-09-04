@@ -43,7 +43,7 @@ public:
 
     bool ProcessBlock(const CBlock& block, const CBlockIndex* pindex, CValidationState& state);
     bool UndoBlock(const CBlock& block, const CBlockIndex* pindex,
-                   bool fAddMinable = true);
+                   bool fAddMinable = true, bool fJustCheck = false);
 
     void AddMinableCommitment(const CFinalCommitment& fqc);
     bool HasMinableCommitment(const uint256& hash);
@@ -56,6 +56,12 @@ public:
 
     /** Drop database-derived results after temporary database traversal. */
     void ClearMinedCommitmentCache();
+    /** Drop commitments whose quorum block is no longer on the active chain. */
+    void PruneMinableCommitments(const CBlockIndex* pindexTip);
+    /** Drop a commitment for a DKG round that is no longer active. */
+    void RemoveMinableCommitment(
+        Consensus::LLMQType llmqType,
+        const uint256& quorumHash);
 
     std::vector<const CBlockIndex*> GetMinedCommitmentsUntilBlock(Consensus::LLMQType llmqType, const CBlockIndex* pindex, size_t maxCount);
     std::map<Consensus::LLMQType, std::vector<const CBlockIndex*>> GetMinedAndActiveCommitmentsUntilBlock(const CBlockIndex* pindex);

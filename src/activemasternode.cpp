@@ -15,8 +15,34 @@
 CActiveMasternodeInfo activeMasternodeInfo;
 CActiveMasternodeManager* activeMasternodeManager;
 
+uint256 GetActiveMasternodeProTxHash()
+{
+    if (!activeMasternodeManager)
+        return activeMasternodeInfo.proTxHash;
+    return activeMasternodeManager->GetProTxHash();
+}
+
+uint256 CActiveMasternodeManager::GetProTxHash() const
+{
+    LOCK(cs);
+    return activeMasternodeInfo.proTxHash;
+}
+
+COutPoint CActiveMasternodeManager::GetOutPoint() const
+{
+    LOCK(cs);
+    return activeMasternodeInfo.outpoint;
+}
+
+CService CActiveMasternodeManager::GetService() const
+{
+    LOCK(cs);
+    return activeMasternodeInfo.service;
+}
+
 std::string CActiveMasternodeManager::GetStateString() const
 {
+    LOCK(cs);
     switch (state) {
     case MASTERNODE_WAITING_FOR_PROTX:
         return "WAITING_FOR_PROTX";
@@ -39,6 +65,7 @@ std::string CActiveMasternodeManager::GetStateString() const
 
 std::string CActiveMasternodeManager::GetStatus() const
 {
+    LOCK(cs);
     switch (state) {
     case MASTERNODE_WAITING_FOR_PROTX:
         return "Waiting for ProTx to appear on-chain";
@@ -62,6 +89,7 @@ std::string CActiveMasternodeManager::GetStatus() const
 void CActiveMasternodeManager::Init()
 {
     LOCK(cs_main);
+    LOCK(cs);
 
     if (!fMasternodeMode) return;
 
@@ -130,41 +158,50 @@ void CActiveMasternodeManager::Init()
 void CActiveMasternodeManager::UpdatedBlockTip(const CBlockIndex* pindexNew, const CBlockIndex* pindexFork, bool fInitialDownload)
 {
     LOCK(cs_main);
+    LOCK(cs);
 
     if (!fMasternodeMode) return;
 
-    if (!deterministicMNManager->IsDIP3Enforced(pindexNew->nHeight)) return;
+    if (!deterministicMNManager->IsDIP3Enforced(pindexNew->nHeight)) {
+        state = MASTERNODE_WAITING_FOR_PROTX;
+        activeMasternodeInfo.proTxHash = uint256();
+        activeMasternodeInfo.outpoint.SetNull();
+        activeMasternodeInfo.service = CService();
+        strError.clear();
+        return;
+    }
 
     if (state == MASTERNODE_READY) {
-        auto oldMNList = deterministicMNManager->GetListForBlock(pindexNew->pprev);
         auto newMNList = deterministicMNManager->GetListForBlock(pindexNew);
-        if (!newMNList.IsMNValid(activeMasternodeInfo.proTxHash)) {
+        auto newDmn = newMNList.GetMN(activeMasternodeInfo.proTxHash);
+        if (!newDmn || !newMNList.IsMNValid(activeMasternodeInfo.proTxHash)) {
             // MN disappeared from MN list
             state = MASTERNODE_REMOVED;
             activeMasternodeInfo.proTxHash = uint256();
             activeMasternodeInfo.outpoint.SetNull();
+            activeMasternodeInfo.service = CService();
             // MN might have reappeared in same block with a new ProTx
             Init();
             return;
         }
 
-        auto oldDmn = oldMNList.GetMN(activeMasternodeInfo.proTxHash);
-        auto newDmn = newMNList.GetMN(activeMasternodeInfo.proTxHash);
-        if (newDmn->pdmnState->pubKeyOperator != oldDmn->pdmnState->pubKeyOperator) {
+        if (newDmn->pdmnState->pubKeyOperator.Get() != *activeMasternodeInfo.blsPubKeyOperator) {
             // MN operator key changed or revoked
             state = MASTERNODE_OPERATOR_KEY_CHANGED;
             activeMasternodeInfo.proTxHash = uint256();
             activeMasternodeInfo.outpoint.SetNull();
+            activeMasternodeInfo.service = CService();
             // MN might have reappeared in same block with a new ProTx
             Init();
             return;
         }
 
-        if (newDmn->pdmnState->addr != oldDmn->pdmnState->addr) {
+        if (newDmn->pdmnState->addr != activeMasternodeInfo.service) {
             // MN IP changed
             state = MASTERNODE_PROTX_IP_CHANGED;
             activeMasternodeInfo.proTxHash = uint256();
             activeMasternodeInfo.outpoint.SetNull();
+            activeMasternodeInfo.service = CService();
             Init();
             return;
         }

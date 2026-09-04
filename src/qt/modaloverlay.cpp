@@ -16,6 +16,7 @@ ModalOverlay::ModalOverlay(QWidget *parent) :
 QWidget(parent),
 ui(new Ui::ModalOverlay),
 bestHeaderHeight(0),
+lastTipHeight(-1),
 bestHeaderDate(QDateTime()),
 layerIsVisible(false),
 userClosed(false),
@@ -79,6 +80,15 @@ void ModalOverlay::tipUpdate(int count, const QDateTime& blockDate, double nVeri
 {
     QDateTime currentDate = QDateTime::currentDateTime();
 
+    if (count < lastTipHeight ||
+        (!blockProcessTime.isEmpty() &&
+         nVerificationProgress < blockProcessTime.front().second)) {
+        blockProcessTime.clear();
+        ui->progressIncreasePerH->setText(tr("calculating..."));
+        ui->expectedTimeLeft->setText(tr("calculating..."));
+    }
+    lastTipHeight = count;
+
     // keep a vector of samples of verification progress at height
     blockProcessTime.push_front(qMakePair(currentDate.toMSecsSinceEpoch(), nVerificationProgress));
 
@@ -91,6 +101,7 @@ void ModalOverlay::tipUpdate(int count, const QDateTime& blockDate, double nVeri
         qint64 timeDelta = 0;
         qint64 remainingMSecs = 0;
         double remainingProgress = 1.0 - nVerificationProgress;
+        bool hasProgressEstimate = false;
         for (int i = 1; i < blockProcessTime.size(); i++)
         {
             QPair<qint64, double> sample = blockProcessTime[i];
@@ -99,16 +110,24 @@ void ModalOverlay::tipUpdate(int count, const QDateTime& blockDate, double nVeri
             if (sample.first < (currentDate.toMSecsSinceEpoch() - 500 * 1000) || i == blockProcessTime.size() - 1) {
                 progressDelta = progressStart-sample.second;
                 timeDelta = blockProcessTime[0].first - sample.first;
-                progressPerHour = progressDelta/(double)timeDelta*1000*3600;
-                remainingMSecs = remainingProgress / progressDelta * timeDelta;
+                if (progressDelta > 0 && timeDelta > 0) {
+                    progressPerHour = progressDelta/(double)timeDelta*1000*3600;
+                    remainingMSecs = remainingProgress / progressDelta * timeDelta;
+                    hasProgressEstimate = true;
+                }
                 break;
             }
         }
-        // show progress increase per hour
-        ui->progressIncreasePerH->setText(QString::number(progressPerHour*100, 'f', 2)+"%");
+        if (hasProgressEstimate) {
+            // show progress increase per hour
+            ui->progressIncreasePerH->setText(QString::number(progressPerHour*100, 'f', 2)+"%");
 
-        // show expected remaining time
-        ui->expectedTimeLeft->setText(GUIUtil::formatNiceTimeOffset(remainingMSecs/1000.0));
+            // show expected remaining time
+            ui->expectedTimeLeft->setText(GUIUtil::formatNiceTimeOffset(remainingMSecs/1000.0));
+        } else {
+            ui->progressIncreasePerH->setText(tr("calculating..."));
+            ui->expectedTimeLeft->setText(tr("calculating..."));
+        }
 
         static const int MAX_SAMPLES = 5000;
         if (blockProcessTime.count() > MAX_SAMPLES)

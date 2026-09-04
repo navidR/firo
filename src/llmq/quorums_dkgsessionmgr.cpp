@@ -53,13 +53,27 @@ void CDKGSessionManager::UpdatedBlockTip(const CBlockIndex* pindexNew, bool fIni
 
     CleanupCache();
 
-    if (fInitialDownload)
-        return;
-    if (!deterministicMNManager->IsDIP3Enforced(pindexNew->nHeight))
+    bool reset = false;
+    {
+        LOCK(tipCs);
+        if (lastTip) {
+            reset =
+                pindexNew->nHeight < lastTip->nHeight ||
+                pindexNew->GetAncestor(lastTip->nHeight) !=
+                    lastTip;
+        }
+        lastTip = pindexNew;
+    }
+
+    const bool dip3Enforced =
+        deterministicMNManager->
+            IsDIP3Enforced(pindexNew->nHeight);
+    if ((!dip3Enforced || fInitialDownload) && !reset)
         return;
 
     for (auto& qt : dkgSessionHandlers) {
-        qt.second.UpdatedBlockTip(pindexNew);
+        qt.second.UpdatedBlockTip(
+            pindexNew, reset || !dip3Enforced);
     }
 }
 

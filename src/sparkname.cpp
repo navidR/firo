@@ -2,12 +2,15 @@
 #include "libspark/spend_transaction.h"
 #include "libspark/ownership_proof.h"
 #include "libspark/keys.h"
+#include "memusage.h"
 #include "spark/state.h"
 #include "script/standard.h"
 #include "base58.h"
 #include "sparkname.h"
 #include "validation.h"
 #include "ui_interface.h"
+
+#include <limits>
 
 namespace {
 bool IsSparkNameAsciiAlphaNumeric(unsigned char c)
@@ -104,6 +107,37 @@ void CSparkNameManager::CopyFrom(const CSparkNameManager& other)
         sparkNames = std::move(names);
         sparkNameAddresses = std::move(addresses);
     }
+}
+
+std::size_t CSparkNameManager::DynamicMemoryUsage() const
+{
+    LOCK(cs_spark_name);
+
+    std::size_t usage =
+        memusage::DynamicUsage(sparkNames);
+    const auto addUsage = [&usage](std::size_t amount) {
+        if (amount >
+            std::numeric_limits<std::size_t>::max() - usage) {
+            usage = std::numeric_limits<std::size_t>::max();
+        } else {
+            usage += amount;
+        }
+    };
+    addUsage(memusage::DynamicUsage(sparkNameAddresses));
+    for (const auto& entry : sparkNames) {
+        addUsage(memusage::MallocUsage(entry.first.capacity() + 1));
+        addUsage(memusage::MallocUsage(
+            entry.second.name.capacity() + 1));
+        addUsage(memusage::MallocUsage(
+            entry.second.sparkAddress.capacity() + 1));
+        addUsage(memusage::MallocUsage(
+            entry.second.additionalInfo.capacity() + 1));
+    }
+    for (const auto& entry : sparkNameAddresses) {
+        addUsage(memusage::MallocUsage(entry.first.capacity() + 1));
+        addUsage(memusage::MallocUsage(entry.second.capacity() + 1));
+    }
+    return usage;
 }
 
 std::set<std::string> CSparkNameManager::GetSparkNames()

@@ -56,8 +56,9 @@ void CQuorumBlockProcessor::ProcessMessage(CNode* pfrom, const std::string& strC
         auto type = (Consensus::LLMQType)qc.llmqType;
         const auto& params = Params().GetConsensus().llmqs.at(type);
 
-        // Verify that quorumHash is part of the active chain and that it's the first block in the DKG interval
+        // Copy quorum membership while the quorum block is known to be active.
         const CBlockIndex* pquorumIndex;
+        std::vector<CDeterministicMNCPtr> members;
         {
             LOCK(cs_main);
             if (!mapBlockIndex.count(qc.quorumHash)) {
@@ -81,6 +82,9 @@ void CQuorumBlockProcessor::ProcessMessage(CNode* pfrom, const std::string& strC
                 Misbehaving(pfrom->id, 100);
                 return;
             }
+            members =
+                CLLMQUtils::GetAllQuorumMembers(
+                    type, pquorumIndex);
         }
 
         {
@@ -99,20 +103,31 @@ void CQuorumBlockProcessor::ProcessMessage(CNode* pfrom, const std::string& strC
             }
         }
 
-        auto members = CLLMQUtils::GetAllQuorumMembers(type, pquorumIndex);
-
-        if (!qc.Verify(members, true)) {
+        const bool valid = qc.Verify(members, true);
+        {
             LOCK(cs_main);
-            LogPrintf("CQuorumBlockProcessor::%s -- commitment for quorum %s:%d is not valid, peer=%d\n", __func__,
-                      qc.quorumHash.ToString(), qc.llmqType, pfrom->id);
-            Misbehaving(pfrom->id, 100);
-            return;
+            const auto quorumIt =
+                mapBlockIndex.find(qc.quorumHash);
+            if (quorumIt == mapBlockIndex.end() ||
+                chainActive.Tip()->GetAncestor(
+                    quorumIt->second->nHeight) !=
+                    quorumIt->second) {
+                return;
+            }
+            if (!valid) {
+                LogPrintf("CQuorumBlockProcessor::%s -- commitment for quorum %s:%d is not valid, peer=%d\n", __func__,
+                          qc.quorumHash.ToString(), qc.llmqType, pfrom->id);
+                Misbehaving(pfrom->id, 100);
+                return;
+            }
+
+            LogPrint("llmq", "CQuorumBlockProcessor::%s -- received commitment for quorum %s:%d, validMembers=%d, signers=%d, peer=%d\n", __func__,
+                      qc.quorumHash.ToString(), qc.llmqType, qc.CountValidMembers(), qc.CountSigners(), pfrom->id);
+
+            // Keep the active-chain recheck and insertion atomic with respect
+            // to PopBlocks pruning.
+            AddMinableCommitment(qc);
         }
-
-        LogPrint("llmq", "CQuorumBlockProcessor::%s -- received commitment for quorum %s:%d, validMembers=%d, signers=%d, peer=%d\n", __func__,
-                  qc.quorumHash.ToString(), qc.llmqType, qc.CountValidMembers(), qc.CountSigners(), pfrom->id);
-
-        AddMinableCommitment(qc);
     }
 }
 
@@ -227,7 +242,10 @@ bool CQuorumBlockProcessor::ProcessCommitment(int nHeight, const uint256& blockH
 }
 
 bool CQuorumBlockProcessor::UndoBlock(
-        const CBlock& block, const CBlockIndex* pindex, bool fAddMinable)
+        const CBlock& block,
+        const CBlockIndex* pindex,
+        bool fAddMinable,
+        bool fJustCheck)
 {
     AssertLockHeld(cs_main);
 
@@ -236,6 +254,9 @@ bool CQuorumBlockProcessor::UndoBlock(
     if (!GetCommitmentsFromBlock(block, pindex, qcs, dummy)) {
         return false;
     }
+
+    if (fJustCheck)
+        return true;
 
     for (auto& p : qcs) {
         auto& qc = p.second;
@@ -400,6 +421,45 @@ void CQuorumBlockProcessor::ClearMinedCommitmentCache()
     hasMinedCommitmentCache.clear();
 }
 
+void CQuorumBlockProcessor::PruneMinableCommitments(
+    const CBlockIndex* pindexTip)
+{
+    AssertLockHeld(cs_main);
+    assert(pindexTip);
+
+    LOCK(minableCommitmentsCs);
+    for (auto it = minableCommitmentsByQuorum.begin();
+         it != minableCommitmentsByQuorum.end();) {
+        const auto index = mapBlockIndex.find(it->first.second);
+        const bool active =
+            index != mapBlockIndex.end() &&
+            index->second->nHeight <= pindexTip->nHeight &&
+            pindexTip->GetAncestor(index->second->nHeight) ==
+                index->second;
+        if (active) {
+            ++it;
+            continue;
+        }
+
+        minableCommitments.erase(it->second);
+        it = minableCommitmentsByQuorum.erase(it);
+    }
+}
+
+void CQuorumBlockProcessor::RemoveMinableCommitment(
+    Consensus::LLMQType llmqType,
+    const uint256& quorumHash)
+{
+    LOCK(minableCommitmentsCs);
+    const auto key = std::make_pair(llmqType, quorumHash);
+    const auto it = minableCommitmentsByQuorum.find(key);
+    if (it == minableCommitmentsByQuorum.end())
+        return;
+
+    minableCommitments.erase(it->second);
+    minableCommitmentsByQuorum.erase(it);
+}
+
 bool CQuorumBlockProcessor::GetMinedCommitment(Consensus::LLMQType llmqType, const uint256& quorumHash, CFinalCommitment& retQc, uint256& retMinedBlockHash)
 {
     auto key = std::make_pair(DB_MINED_COMMITMENT, std::make_pair((uint8_t)llmqType, quorumHash));
@@ -492,8 +552,9 @@ void CQuorumBlockProcessor::AddMinableCommitment(const CFinalCommitment& fqc)
             auto& oldFqc = minableCommitments.at(ins.first->second);
             if (fqc.CountSigners() > oldFqc.CountSigners()) {
                 // new commitment has more signers, so override the known one
+                const uint256 oldCommitmentHash = ins.first->second;
                 ins.first->second = commitmentHash;
-                minableCommitments.erase(ins.first->second);
+                minableCommitments.erase(oldCommitmentHash);
                 minableCommitments.emplace(commitmentHash, fqc);
                 relay = true;
             }

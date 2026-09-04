@@ -9,6 +9,8 @@
 #include "sync.h"
 #include "uint256.h"
 
+#include <vector>
+
 // "b_b" was used in the initial version of deterministic MN storage
 // "b_b2" was used after compact diffs were introduced
 static const std::string EVODB_BEST_BLOCK = "b_b2";
@@ -82,8 +84,25 @@ public:
 
     bool CommitRootTransaction();
 
+    bool ReadBestBlock(uint256& hash);
     bool VerifyBestBlock(const uint256& hash);
     void WriteBestBlock(const uint256& hash);
+    bool WritePopBlocksRecovery(
+        const uint256& initialTip,
+        const uint256& targetTip,
+        bool forgetData,
+        const std::vector<unsigned char>& cleanupData);
+    bool ReadPopBlocksRecovery(
+        uint256& initialTip,
+        uint256& targetTip,
+        bool& forgetData,
+        std::vector<unsigned char>& cleanupData,
+        bool& legacy);
+    bool HasPopBlocksRecovery();
+    bool ErasePopBlocksRecovery();
+    bool WritePopBlocksMempoolCleanup();
+    bool HasPopBlocksMempoolCleanup();
+    bool ErasePopBlocksMempoolCleanup();
 
     void CommitTransaction(CurTransaction & tx);
     void ClearTransaction(CurTransaction & tx);

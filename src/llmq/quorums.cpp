@@ -177,7 +177,8 @@ void CQuorumManager::EnsureQuorumConnections(Consensus::LLMQType llmqType, const
 {
     const auto& params = Params().GetConsensus().llmqs.at(llmqType);
 
-    auto myProTxHash = activeMasternodeInfo.proTxHash;
+    auto myProTxHash =
+        GetActiveMasternodeProTxHash();
     auto lastQuorums = ScanQuorums(llmqType, pindexNew, (size_t)params.keepOldConnections);
 
     auto connmanQuorumsToDelete = g_connman->GetMasternodeQuorums(llmqType);

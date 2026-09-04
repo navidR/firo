@@ -82,7 +82,7 @@ bool ConnectBlockSpark(
         bool fJustCheck=false,
         bool isVerifyDB=false);
 
-void DisconnectTipSpark(CBlock &block, CBlockIndex *pindexDelete);
+void DisconnectTipSpark(CBlock& block, CBlockIndex* pindexDelete, bool updatePools);
 
 /** Drop a cached successful proof when the tx leaves the mempool. */
 void EraseCheckedSparkSpendTransaction(const uint256& hashTx);
@@ -103,7 +103,8 @@ bool CheckSparkTransaction(
         int nHeight,
         bool isCheckWallet,
         bool fStatefulSigmaCheck,
-        CSparkTxInfo* sparkTxInfo);
+        CSparkTxInfo* sparkTxInfo,
+        bool fDisconnectPreflight = false);
 
 bool GetOutPoint(COutPoint& outPoint, const spark::Coin& coin);
 bool GetOutPoint(COutPoint& outPoint, const uint256& coinHash);
@@ -209,6 +210,8 @@ public:
     void RemoveSpend(const GroupElement& lTag);
     // Add everything from the block to the state
     void AddBlock(CBlockIndex *index);
+    // Check every invariant used while removing a descending active-chain range.
+    bool CanRemoveBlocks(CBlockIndex* tip, int targetHeight) const;
     // Disconnect block from the chain rolling back mints and spends
     void RemoveBlock(CBlockIndex *index);
 

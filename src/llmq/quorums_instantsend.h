@@ -14,8 +14,15 @@
 #include <unordered_map>
 #include <unordered_set>
 
+class CBlock;
+
 namespace llmq
 {
+
+uint256 GetInstantSendInputRequestId(
+    const COutPoint& outpoint);
+uint256 GetInstantSendInputRequestId(
+    const CTxIn& input);
 
 class CInstantSendLock
 {
@@ -61,6 +68,9 @@ public:
     std::unordered_map<uint256, CInstantSendLockPtr> RemoveConfirmedInstantSendLocks(int nUntilHeight);
     void RemoveArchivedInstantSendLocks(int nUntilHeight);
     bool HasArchivedInstantSendLock(const uint256& islockHash);
+    bool HasArchivedInstantSendLockInRange(
+        int minHeight, int maxHeight);
+    bool Sync();
     size_t GetInstantSendLockCount();
 
     CInstantSendLockPtr GetInstantSendLockByHash(const uint256& hash);
@@ -130,6 +140,16 @@ public:
     bool RemoveISLockByTxId(const uint256& txid);
 
     void UpdatedBlockTip(const CBlockIndex* pindexNew);
+    bool CanRollbackToHeight(
+        int currentHeight, const CBlockIndex* targetTip);
+    void RemoveMinedInstantSendLocks(
+        const CBlock& block, int height);
+    void RestoreMinedInstantSendLocks(
+        const CBlock& block, int height);
+    bool SyncRecoveredMinedInstantSendLocks();
+    /** Drop transient tracking for cleared pools and disconnected blocks. */
+    void ClearRemovedTxState(
+        const CBlockIndex* pindexTip);
 
     void NotifyChainLock(const CBlockIndex* pindexChainLock);
     void ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, CConnman& connman);

@@ -348,7 +348,8 @@ void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, CAmount modifyFee,
 }
 
 CTxMemPool::CTxMemPool(const CFeeRate& _minReasonableRelayFee) :
-    nTransactionsUpdated(0)
+    nTransactionsUpdated(0),
+    minerPolicyEstimator(new CBlockPolicyEstimator(_minReasonableRelayFee))
 {
     _clear(); //lock free clear
 
@@ -356,8 +357,6 @@ CTxMemPool::CTxMemPool(const CFeeRate& _minReasonableRelayFee) :
     // accepting transactions becomes O(N^2) where N is the number
     // of transactions in the pool
     nCheckFrequency = 0;
-
-    minerPolicyEstimator = new CBlockPolicyEstimator(_minReasonableRelayFee);
 }
 
 CTxMemPool::~CTxMemPool()
@@ -1127,11 +1126,23 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigne
 
 void CTxMemPool::_clear()
 {
+    for (const CTxMemPoolEntry& entry : mapTx)
+        minerPolicyEstimator->removeTx(entry.GetTx().GetHash());
+
     mapLinks.clear();
     mapTx.clear();
     mapNextTx.clear();
+    vTxHashes.clear();
+    mapAddress.clear();
+    mapAddressInserted.clear();
+    mapSpent.clear();
+    mapSpentInserted.clear();
+    mapProTxRefs.clear();
     mapProTxAddresses.clear();
     mapProTxPubKeyIDs.clear();
+    mapProTxBlsPubKeyHashes.clear();
+    mapProTxCollaterals.clear();
+    sporkManager = CMempoolSporkManager();
     totalTxSize = 0;
     cachedInnerUsage = 0;
     lastRollingFeeUpdate = GetTime();

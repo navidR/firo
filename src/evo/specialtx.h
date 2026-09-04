@@ -33,13 +33,19 @@ bool ProcessSpecialTxsInBlock(const CBlock& block, const CBlockIndex* pindex,
  * Roll back special-transaction state for a disconnected block.
  * @param[in] block Block being disconnected.
  * @param[in] pindex Index of that block.
- * @param[in] fNotify If true, emit MN and quorum rollback notifications.
+ * @param[in] fNotify If true, emit deterministic-MN rollback notifications.
+ * @param[in] fAddMinable If true, return removed quorum commitments to the
+ * mining relay set.
+ * @param[in] fUpdateMNManagerTip If true, move the manager's public tip while
+ * its old EvoDB state is removed.
  * @return true if undo succeeds.
  * @pre pindex is non-null.
  * @pre VerifyDB callers pass fNotify as false.
  */
 bool UndoSpecialTxsInBlock(const CBlock& block, const CBlockIndex* pindex,
-                           bool fNotify = true);
+                           bool fNotify = true, bool fAddMinable = true,
+                           bool fJustCheck = false,
+                           bool fUpdateMNManagerTip = false);
 
 template <typename T>
 inline bool GetTxPayload(const std::vector<unsigned char>& payload, T& obj)
