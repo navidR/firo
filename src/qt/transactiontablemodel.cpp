@@ -22,8 +22,12 @@
 #include <QColor>
 #include <QDateTime>
 #include <QDebug>
+#include <QElapsedTimer>
 #include <QIcon>
 #include <QList>
+#include <QTimer>
+
+#include <optional>
 
 #include <boost/foreach.hpp>
 
@@ -74,21 +78,45 @@ public:
      */
     QList<TransactionRecord> cachedWallet;
     std::vector<std::pair<uint256, std::pair<int, bool>>> cachedUpdatedTx;
+    std::optional<uint256> lastWalletHash;
 
-    /* Query entire wallet anew from core.
+    /* Load history incrementally. Keep a key, not an iterator, across batches:
+     * wallet transactions and live model rows can change between callbacks.
      */
-    void refreshWallet()
+    bool refreshWallet()
     {
-        qDebug() << "TransactionTablePriv::refreshWallet";
-        cachedWallet.clear();
-        {
-            LOCK2(cs_main, wallet->cs_wallet);
-            for(std::map<uint256, CWalletTx>::iterator it = wallet->mapWallet.begin(); it != wallet->mapWallet.end(); ++it)
-            {
-                if(TransactionRecord::showTransaction(it->second))
-                    cachedWallet.append(TransactionRecord::decomposeTransaction(wallet, it->second));
+        TRY_LOCK(cs_main, lockMain);
+        if (!lockMain)
+            return false;
+        TRY_LOCK(wallet->cs_wallet, lockWallet);
+        if (!lockWallet)
+            return false;
+
+        QElapsedTimer elapsed;
+        elapsed.start();
+        // The time budget is checked between transactions; one decomposition
+        // is indivisible. Also cap cheap/hidden records per callback.
+        for (int count = 0; count < 100; ++count) {
+            auto it = lastWalletHash ? wallet->mapWallet.upper_bound(*lastWalletHash) : wallet->mapWallet.begin();
+            if (it == wallet->mapWallet.end())
+                return true;
+            lastWalletHash = it->first;
+
+            const auto lower = std::lower_bound(cachedWallet.begin(), cachedWallet.end(), it->first, TxLessThan());
+            if ((lower == cachedWallet.end() || lower->hash != it->first) && TransactionRecord::showTransaction(it->second)) {
+                const int insertIndex = lower - cachedWallet.begin();
+                const auto records = TransactionRecord::decomposeTransaction(wallet, it->second);
+                if (!records.isEmpty()) {
+                    parent->beginInsertRows(QModelIndex(), insertIndex, insertIndex + records.size() - 1);
+                    for (int row = 0; row < records.size(); ++row)
+                        cachedWallet.insert(insertIndex + row, records[row]);
+                    parent->endInsertRows();
+                }
             }
+            if (elapsed.hasExpired(10))
+                break;
         }
+        return false;
     }
 
     /* Update our model of the wallet incrementally, to synchronize our model of the wallet
@@ -251,18 +279,28 @@ TransactionTableModel::TransactionTableModel(const PlatformStyle *_platformStyle
         walletModel(parent),
         priv(new TransactionTablePriv(_wallet, this)),
         fProcessingQueuedTransactions(false),
-        platformStyle(_platformStyle)
+        platformStyle(_platformStyle),
+        historyLoadTimer(new QTimer(this))
 {
     columns << QString() << QString() << QString() << tr("Date") << tr("Type") << tr("Address / Label") << BitcoinUnits::getAmountColumnTitle(walletModel->getOptionsModel()->getDisplayUnit());
-    priv->refreshWallet();
 
     connect(walletModel->getOptionsModel(), &OptionsModel::displayUnitChanged, this, &TransactionTableModel::updateDisplayUnit);
     
+    // Subscribe before loading so additions/deletions between batches are not lost.
     subscribeToCoreSignals();
+    connect(historyLoadTimer, &QTimer::timeout, this, [this] {
+        if (priv->refreshWallet()) {
+            historyLoadTimer->stop();
+            fLoadingHistory = false;
+            Q_EMIT historyLoaded();
+        }
+    });
+    historyLoadTimer->start(10);
 }
 
 TransactionTableModel::~TransactionTableModel()
 {
+    historyLoadTimer->stop();
     unsubscribeFromCoreSignals();
     delete priv;
 }
