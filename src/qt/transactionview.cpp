@@ -136,6 +136,9 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     vlayout->setSpacing(0);
 
     QTableView *view = new QTableView(this);
+    historyLoadingLabel = new QLabel(tr("Loading transaction history…"), this);
+    historyLoadingLabel->hide();
+    vlayout->addWidget(historyLoadingLabel);
     vlayout->addLayout(headerLayout);
     vlayout->addWidget(createDateRangeWidget());
     vlayout->addWidget(view);
@@ -214,6 +217,9 @@ void TransactionView::setModel(WalletModel *_model)
     this->model = _model;
     if(_model)
     {
+        historyLoadingLabel->setVisible(_model->getTransactionTableModel()->isLoadingHistory());
+        connect(_model->getTransactionTableModel(), &TransactionTableModel::historyLoaded,
+                historyLoadingLabel, &QLabel::hide);
         transactionProxyModel = new TransactionFilterProxy(this);
         transactionProxyModel->setSourceModel(_model->getTransactionTableModel());
         transactionProxyModel->setDynamicSortFilter(true);
@@ -364,6 +370,12 @@ void TransactionView::changedAmount(const QString &amount)
 
 void TransactionView::exportClicked()
 {
+    if (model && model->getTransactionTableModel()->isLoadingHistory()) {
+        Q_EMIT message(tr("Transaction history is loading"),
+                       tr("Please wait for transaction history to finish loading before exporting."),
+                       CClientUIInterface::MSG_WARNING);
+        return;
+    }
     // CSV is currently the only supported format
     QString filename = GUIUtil::getSaveFileName(this,
         tr("Export Transaction History"), QString(),

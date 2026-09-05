@@ -69,6 +69,7 @@ import_plugins(test_firo-qt)
 if(ENABLE_WALLET)
   target_sources(test_firo-qt
     PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/transactionhistorytests.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/../../wallet/test/wallet_tests.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/../../wallet/test/wallet_test_fixture.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/../../wallet/test/wallet_test_fixture.h

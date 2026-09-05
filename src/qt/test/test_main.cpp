@@ -13,6 +13,9 @@
 #include "uritests.h"
 #include "compattests.h"
 #include "test_sendcoinsentry.h"
+#ifdef ENABLE_WALLET
+#include "transactionhistorytests.h"
+#endif
 #include <QApplication>
 #include <QObject>
 #include <openssl/ssl.h>
@@ -60,5 +63,11 @@ int main(int argc, char *argv[])
         fInvalid = true;
 
     ECC_Stop();
+#ifdef ENABLE_WALLET
+    // The history suite's core fixtures own their ECC context lifetimes.
+    TransactionHistoryTests historyTests;
+    if (QTest::qExec(&historyTests) != 0)
+        fInvalid = true;
+#endif
     return fInvalid;
 }

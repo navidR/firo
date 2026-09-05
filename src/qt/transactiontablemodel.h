@@ -14,6 +14,7 @@ class PlatformStyle;
 class TransactionRecord;
 class TransactionTablePriv;
 class WalletModel;
+class QTimer;
 
 class CWallet;
 
@@ -86,7 +87,8 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
     QModelIndex index(int row, int column, const QModelIndex & parent = QModelIndex()) const override;
-    bool processingQueuedTransactions() { return fProcessingQueuedTransactions; }
+    bool processingQueuedTransactions() const { return fLoadingHistory || fProcessingQueuedTransactions; }
+    bool isLoadingHistory() const { return fLoadingHistory; }
     void updateNumISLocks(int numISLocks);
     void updateChainLockHeight(int chainLockHeight);
     int getNumISLocks() const;
@@ -99,8 +101,10 @@ private:
     TransactionTablePriv *priv;
     bool fProcessingQueuedTransactions;
     const PlatformStyle *platformStyle;
-    int cachedNumISLocks;
-    int cachedChainLockHeight;
+    QTimer* historyLoadTimer;
+    bool fLoadingHistory{true};
+    int cachedNumISLocks{0};
+    int cachedChainLockHeight{-1};
 
     void subscribeToCoreSignals();
     void unsubscribeFromCoreSignals();
@@ -119,6 +123,8 @@ private:
     QVariant txAddressDecoration(const TransactionRecord *wtx) const;
     void processCachedTransactions();
 
+Q_SIGNALS:
+    void historyLoaded();
 
 public Q_SLOTS:
     /* New transaction, or transaction changed status */

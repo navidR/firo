@@ -20,6 +20,7 @@ class QComboBox;
 class QDateTimeEdit;
 class QFrame;
 class QLineEdit;
+class QLabel;
 class QMenu;
 class QModelIndex;
 class QTableView;
@@ -68,6 +69,7 @@ private:
     WalletModel *model;
     TransactionFilterProxy *transactionProxyModel;
     QTableView *transactionView;
+    QLabel* historyLoadingLabel;
 
     QHBoxLayout * headerLayout;
     QSpacerItem *statusSpacer;
